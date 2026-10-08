@@ -23,6 +23,11 @@ npm run test:integration
 - `trust.test.ts` 驗證 SpaceStore 在有工作區時寫入 Workspace 範圍，測試以暫存路徑操作，並在 `finally` 還原原有 workspace/global 設定；同時確認重複新增為 no-op。
 - `outsideWorkspaceRoot.test.ts` 以系統暫存目錄驗證工作區外根的 provider 樹節點、排序、exclude 與路徑解析；測試結束會清理暫存根。
 
+## 工作區複本（避免弄髒 committed fixture）
+
+`.vscode-test.mjs` 在啟動測試前會把 `tests/integration/fixtures/workspace/` 複製到 `.vscode-test/workspace-copy/`（gitignored），並以**複本**作為 Extension Host 的 `workspaceFolder`。原因是 VS Code 會將 workspace 設定寫回並正規化格式（例如 `{}
+` 變成多行），若直接使用 committed fixture，每次執行都會產生 git 變更並觸發 `trust.test.ts` 的污染守門。複本每次啟動重建，測試結束後不需清理。
+
 ## trust 與工作區外根
 
 `@vscode/test-electron` 的 `node_modules/@vscode/test-electron/out/runTest.js` 固定傳入 `--disable-workspace-trust`，因此整合測試 Extension Host 是 trusted，`trust.test.ts` 以 `vscode.workspace.isTrusted === true` 明確記錄此限制。受限模式無法由本自動化套件涵蓋，須透過 Extension Development Host（EDH）probe 手動取證，結果見 `dev/tests/s1-3-s1-4-runtime-evidence.md`。
