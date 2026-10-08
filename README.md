@@ -26,7 +26,7 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 - In-place drill-down with a back stack; root switcher and inline root rename.
 - Full context actions (new file/folder, rename, delete, reveal in OS, open in terminal, copy path).
 - Drag & drop between spaces, with undo for supported operations.
-- Linked spaces (parent → child focus following) and an optional webview file list.
+- Linked spaces as stacked panes: the default layout shows two identical panes (parent above, child below) that follow each other, forming a cascading chain — the product's signature interaction. The "files pane" effect comes from view presets (Files / Contents / List flat lists) instead of a webview.
 - Full Traditional Chinese / English localization.
 
 See `CHANGELOG.md` for details as they land.

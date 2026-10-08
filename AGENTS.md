@@ -31,6 +31,8 @@
 4. **`resourceUri` 必填**：原生檔案圖示、Git 裝飾、問題徽章都依賴它。
 5. **無遠端程式碼**：所有相依在打包期 bundle 進 `.vsix`；`eval`／遠端載入一律禁止。
 6. **`engines.vscode` 與 `@types/vscode` 對齊**，調整最低版本需同步 `CHANGELOG.md`。
+7. **不使用 webview**：Files pane 的清單效果由檢視預設集（Files／Contents／List 扁平清單）達成，以維持單一 pane cascading chaining 的產品特色。設計見 `dev/specs/pane-cascade-and-presets-design.md`。
+8. **Linked spaces = 多個原生 TreeView pane 上下堆疊**：預設上下兩個相同 pane（上父下子）互相連動；採固定 view 插槽 `codeFolderSpaces.pane1..8` + `when` context key（VS Code 無法執行期新增 view）。
 
 ## 指令與驗證
 
