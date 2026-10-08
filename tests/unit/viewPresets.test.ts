@@ -21,8 +21,8 @@ describe('view presets and state', () => {
     expect(normalizePaneState({ version: 2, bySpace: { a: { preset: 'Files' } } })).toEqual({ version: 1, bySpace: {} });
     expect(normalizePaneState({ version: 1, bySpace: { a: { preset: 'bogus' }, b: { preset: 'Files' } } })).toEqual({
       version: 1, bySpace: {
-        a: { preset: 'Explorer', filter: '', sort: { key: 'name', direction: 'asc' } },
-        b: { preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' } },
+        a: { preset: 'Explorer', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [] },
+        b: { preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [] },
       },
     });
   });

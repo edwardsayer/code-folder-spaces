@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
+import * as path from 'node:path';
 import { SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
-import { PaneStateStore } from './spaces/viewState';
+import { classifySpaceRename, PaneStateStore } from './spaces/viewState';
+import { isAllowedSpaceRoot, isValidSpaceRoot, validateSpaceName } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 
 const VIEW_ID = 'codeFolderSpaces.explorer';
@@ -82,6 +84,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const state = definition ? viewState.get(definition.basePath) : undefined;
     const preset = state?.preset ?? DEFAULT_VIEW_PRESET;
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasFilter', Boolean(state?.filter));
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canDrillUp', Boolean(state?.drillStack?.length));
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.preset', preset);
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', VIEW_PRESETS[preset].mode);
   };
@@ -90,7 +93,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   context.subscriptions.push(provider.onDidChangeTreeData(() => {
     const selected = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
     const definition = selected instanceof SpaceRootNode ? selected.definition : selected && 'space' in selected ? selected.space : store.getDefinitions()[0];
-    if (definition) void provider.getChildren(new SpaceRootNode(definition, undefined)).then(() => { treeView.message = provider.filterMessage; });
+    if (definition) void provider.getChildren(new SpaceRootNode(definition, undefined)).then(() => {
+      const stalePath = provider.staleRoots.values().next().value as string | undefined;
+      treeView.message = stalePath ? vscode.l10n.t('Space path is stale: {0}. Update the space path to restore it.', stalePath) : provider.filterMessage;
+    });
   }));
   store.onDidChange(
     () => {
@@ -102,6 +108,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     context.subscriptions
   );
   context.subscriptions.push(
+    vscode.workspace.onDidRenameFiles(async event => {
+      for (const file of event.files) {
+        for (const definition of store.getDefinitions()) {
+          const impact = classifySpaceRename([definition.basePath], file.oldUri.fsPath);
+          if (impact.kind === 'space-root') {
+            await viewState.migrateRename(file.oldUri.fsPath, file.newUri.fsPath);
+            provider.markStale(definition.basePath);
+            treeView.message = vscode.l10n.t('Space path is stale: {0}. Update the space path to restore it.', file.oldUri.fsPath);
+            const action = vscode.l10n.t('Update space path');
+            void vscode.window.showInformationMessage(treeView.message, action).then(async selected => {
+              if (selected !== action) return;
+              try {
+                await store.updateSpacePath(file.oldUri.fsPath, file.newUri.fsPath);
+                provider.clearStale(definition.basePath);
+                treeView.message = '';
+                provider.refresh();
+              } catch (error) {
+                void vscode.window.showErrorMessage(vscode.l10n.t('Could not update space path: {0}', String(error)));
+              }
+            });
+          } else if (impact.kind === 'inside-space') {
+            await viewState.rewriteRename(definition.basePath, file.oldUri.fsPath, file.newUri.fsPath);
+            provider.refresh();
+          }
+        }
+      }
+    }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       provider.refresh();
       rebuildWatchers();
@@ -111,6 +144,88 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   context.subscriptions.push(
     vscode.commands.registerCommand('codeFolderSpaces.refresh', () => provider.refresh()),
+    vscode.commands.registerCommand('codeFolderSpaces.drillDown', async (node?: unknown) => {
+      const target = node && typeof node === 'object' && 'space' in node ? node as { space: import('./types').SpaceDefinition; uri: vscode.Uri; isDirectory: boolean } : undefined;
+      if (!target?.isDirectory) return;
+      const state = viewState.get(target.space.basePath);
+      const activeRoot = state.root ?? target.space.basePath;
+      const relative = path.relative(activeRoot, target.uri.fsPath);
+      if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return;
+      await viewState.drillDown(target.space.basePath, target.uri.fsPath);
+      provider.refresh();
+      await syncContext();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.drillUp', async () => {
+      const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
+      const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];
+      if (!definition || !(await viewState.drillUp(definition.basePath))) return;
+      provider.refresh();
+      await syncContext();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.switchRoot', async (node?: SpaceRootNode) => {
+      const target = node instanceof SpaceRootNode ? node : treeView.selection.find((item) => item instanceof SpaceRootNode);
+      const definition = target?.definition ?? store.getDefinitions()[0];
+      if (!definition) return;
+      const currentRoot = viewState.get(definition.basePath).root ?? definition.basePath;
+      const items: Array<vscode.QuickPickItem & { rootPath: string }> = [];
+      if (path.resolve(currentRoot) !== path.resolve(definition.basePath)) {
+        const parent = path.dirname(currentRoot);
+        if (isAllowedSpaceRoot(definition.basePath, parent)) items.push({ label: '..', description: parent, rootPath: parent });
+      }
+      try {
+        for (const [name, type] of await vscode.workspace.fs.readDirectory(vscode.Uri.file(currentRoot))) {
+          if (type & vscode.FileType.Directory) {
+            const rootPath = path.resolve(currentRoot, name);
+            if (isAllowedSpaceRoot(definition.basePath, rootPath)) items.push({ label: name, description: rootPath, rootPath });
+          }
+        }
+      } catch (error) {
+        void vscode.window.showErrorMessage(vscode.l10n.t('Could not read folders: {0}', String(error)));
+        return;
+      }
+      const selected = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a new space root') });
+      if (!selected) return;
+      if (!isAllowedSpaceRoot(definition.basePath, selected.rootPath)) {
+        void vscode.window.showErrorMessage(vscode.l10n.t('The selected folder is outside the space root.'));
+        return;
+      }
+      let selectedStat: vscode.FileStat | undefined;
+      try { selectedStat = await vscode.workspace.fs.stat(vscode.Uri.file(selected.rootPath)); } catch { /* missing paths are rejected below */ }
+      const validRoot = await isValidSpaceRoot(definition.basePath, selected.rootPath, async () => Boolean(selectedStat && (selectedStat.type & vscode.FileType.Directory)));
+      if (!selectedStat) {
+        void vscode.window.showErrorMessage(vscode.l10n.t('The selected folder does not exist.'));
+        return;
+      }
+      if (!validRoot) {
+        void vscode.window.showErrorMessage(vscode.l10n.t('The selected path is not a folder.'));
+        return;
+      }
+      // 切換根＝重置 stack；drillDown／drillUp＝堆疊操作，避免混淆兩種 root 語意。
+      await viewState.switchRoot(definition.basePath, selected.rootPath);
+      provider.refresh();
+      await syncContext();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.renameSpace', async (node?: SpaceRootNode) => {
+      const target = node instanceof SpaceRootNode ? node : treeView.selection.find((item): item is SpaceRootNode => item instanceof SpaceRootNode);
+      if (!target) return;
+      const proposed = await vscode.window.showInputBox({ prompt: vscode.l10n.t('Enter a new space name'), value: target.definition.name });
+      if (proposed === undefined) return;
+      const name = validateSpaceName(target.definition.name, proposed);
+      if (!name) return;
+      try {
+        if (!(await store.renameSpace(target.definition.basePath, name))) return;
+        void vscode.window.showInformationMessage(vscode.l10n.t('Renamed space to: {0}', name));
+      } catch (error) {
+        void vscode.window.showErrorMessage(vscode.l10n.t('Could not rename space: {0}', String(error)));
+      }
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.resetStaleSpace', async (basePath?: string) => {
+      if (!basePath) return;
+      await viewState.resetRoot(basePath);
+      provider.clearStale(basePath);
+      treeView.message = '';
+      provider.refresh();
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.setPreset', async (preset?: unknown) => {
       const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
       const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];

@@ -66,6 +66,28 @@ export class SpaceStore implements vscode.Disposable {
     return true;
   }
 
+  /** Explicitly updates a renamed space root after user confirmation. */
+  async updateSpacePath(oldPath: string, newPath: string): Promise<boolean> {
+    const target = this.getDefinitions().find(definition => samePath(definition.basePath, oldPath));
+    if (!target) return false;
+    const entries = this.getRawEntries();
+    const entry = entries[target.sourceIndex];
+    entries[target.sourceIndex] = typeof entry === 'string' ? newPath : { ...entry, path: newPath };
+    await this._writeEntries(entries);
+    return true;
+  }
+
+  /** Updates only the configured display name, preserving the path and other entry fields. */
+  async renameSpace(basePath: string, name: string): Promise<boolean> {
+    const target = this.getDefinitions().find(definition => samePath(definition.basePath, basePath));
+    if (!target) return false;
+    const entries = this.getRawEntries();
+    const entry = entries[target.sourceIndex];
+    entries[target.sourceIndex] = typeof entry === 'string' ? { path: entry, name } : { ...entry, name };
+    await this._writeEntries(entries);
+    return true;
+  }
+
   /** Removes a folder by resolved path; returns whether an entry was removed. */
   async removeSpace(basePath: string): Promise<boolean> {
     const entries = this.getRawEntries();

@@ -11,5 +11,16 @@
   "Filter by path substring": "依路徑片段過濾",
   "Choose sort field": "選擇排序欄位",
   "Choose sort direction": "選擇排序方向",
+  "Space path is stale: {0}. Update the space path to restore it.": "空間路徑已失效：{0}。請更新空間路徑以恢復檢視。",
+  "Update space path": "更新空間路徑",
+  "Could not update space path: {0}": "無法更新空間路徑：{0}",
+  "Choose a new space root": "選擇新的空間根目錄",
+  "Could not read folders: {0}": "無法讀取資料夾：{0}",
+  "The selected folder is outside the space root.": "所選資料夾超出空間原始根目錄範圍。",
+  "The selected path is not a folder.": "所選路徑不是資料夾。",
+  "The selected folder does not exist.": "所選資料夾不存在。",
+  "Enter a new space name": "輸入新的空間名稱",
+  "Renamed space to: {0}": "已將空間重新命名為：{0}",
+  "Could not rename space: {0}": "無法重新命名空間：{0}",
   "{0} / {1} matches": "符合 {0} / {1} 項"
 }

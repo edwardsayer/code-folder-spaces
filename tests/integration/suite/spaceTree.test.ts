@@ -36,6 +36,63 @@ suite('空間樹 provider', () => {
   const logs = path.join(fixtureWorkspace, 'spaces/logs');
   const spaces = [alpha, beta];
 
+  test('下鑽後 provider 從新根列舉，返回還原原檢視狀態', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    let document: unknown;
+    const state = new PaneStateStore({ get: <T>() => document as T | undefined, update: async (_key, value) => { document = value; } });
+    const provider = new SpaceTreeDataProvider(store, state);
+    try {
+      await state.setPreset(alpha, 'Files');
+      await state.setFilter(alpha, 'deep');
+      const root = (await provider.getChildren())[0] as SpaceRootNode;
+      await state.drillDown(alpha, path.join(alpha, 'nested'));
+      const drilledRoot = (await provider.getChildren())[0] as SpaceRootNode;
+      assert.equal(drilledRoot.uri.fsPath, path.join(alpha, 'nested'));
+      const drilled = await provider.getChildren(drilledRoot) as Node[];
+      assert.deepEqual(drilled.map(node => node.label), ['deeper', 'deep.md']);
+      assert.equal(state.get(alpha).preset, 'Explorer');
+      assert.equal(await state.drillUp(alpha), true);
+      const returned = (await provider.getChildren())[0] as SpaceRootNode;
+      assert.equal(returned.uri.fsPath, root.uri.fsPath);
+      assert.deepEqual(state.get(alpha), { preset: 'Files', filter: 'deep', sort: { key: 'name', direction: 'asc' }, root: alpha, drillStack: [] });
+    } finally { provider.dispose(); store.dispose(); }
+  }));
+
+  test('切換根更新 provider 樹但不改空間設定，並清空下鑽堆疊', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    const values = new Map<string, unknown>();
+    const state = new PaneStateStore({ get: key => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
+    const provider = new SpaceTreeDataProvider(store, state);
+    try {
+      await state.drillDown(alpha, path.join(alpha, 'nested'));
+      const beforeSetting = vscode.workspace.getConfiguration('codeFolderSpaces').inspect('spaces')?.globalValue;
+      const beforeRoot = (await provider.getChildren())[0] as SpaceRootNode;
+      assert.deepEqual((await provider.getChildren(beforeRoot) as Node[]).map(node => node.label), ['deeper', 'deep.md']);
+      await state.switchRoot(alpha, alpha);
+      const afterRoot = (await provider.getChildren())[0] as SpaceRootNode;
+      assert.equal(afterRoot.uri.fsPath, alpha);
+      assert.deepEqual((await provider.getChildren(afterRoot) as Node[]).map(node => node.label), ['nested', 'a.txt', 'B.txt']);
+      assert.deepEqual(state.get(alpha).drillStack, []);
+      assert.deepEqual(vscode.workspace.getConfiguration('codeFolderSpaces').inspect('spaces')?.globalValue, beforeSetting);
+    } finally { provider.dispose(); store.dispose(); }
+  }));
+
+  test('SpaceStore 重新命名會寫回設定名稱且保留原始路徑', async () => {
+    const config = vscode.workspace.getConfiguration('codeFolderSpaces');
+    const previous = config.inspect<SpaceConfigEntry[]>('spaces')?.workspaceValue;
+    try {
+      await config.update('spaces', [alpha], vscode.ConfigurationTarget.Workspace);
+      const store = new SpaceStore();
+      try {
+        assert.equal(await store.renameSpace(alpha, '新名稱'), true);
+        const saved = config.inspect<SpaceConfigEntry[]>('spaces')?.workspaceValue;
+        assert.deepEqual(saved, [{ path: alpha, name: '新名稱' }]);
+      } finally { store.dispose(); }
+    } finally {
+      await config.update('spaces', previous, vscode.ConfigurationTarget.Workspace);
+    }
+  });
+
   test('空間根保留設定順序與資源路徑', async () => withProvider(spaces, async (provider) => {
     const roots = await provider.getChildren() as Node[];
     assert.deepEqual(roots.map((node) => node.label), ['alpha', 'beta']);

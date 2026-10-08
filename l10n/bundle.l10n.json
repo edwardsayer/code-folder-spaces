@@ -11,5 +11,16 @@
   "Filter by path substring": "Filter by path substring",
   "Choose sort field": "Choose sort field",
   "Choose sort direction": "Choose sort direction",
+  "Space path is stale: {0}. Update the space path to restore it.": "Space path is stale: {0}. Update the space path to restore it.",
+  "Update space path": "Update space path",
+  "Could not update space path: {0}": "Could not update space path: {0}",
+  "Choose a new space root": "Choose a new space root",
+  "Could not read folders: {0}": "Could not read folders: {0}",
+  "The selected folder is outside the space root.": "The selected folder is outside the space root.",
+  "The selected path is not a folder.": "The selected path is not a folder.",
+  "The selected folder does not exist.": "The selected folder does not exist.",
+  "Enter a new space name": "Enter a new space name",
+  "Renamed space to: {0}": "Renamed space to: {0}",
+  "Could not rename space: {0}": "Could not rename space: {0}",
   "{0} / {1} matches": "{0} / {1} matches"
 }

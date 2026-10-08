@@ -45,19 +45,20 @@ function resolveIcon(icon: string | undefined): vscode.ThemeIcon | vscode.Uri | 
 export class SpaceRootNode extends vscode.TreeItem {
   constructor(
     readonly definition: SpaceDefinition,
-    readonly parent: undefined
+    readonly parent: undefined,
+    readonly rootPath = definition.basePath
   ) {
     super(definition.name, vscode.TreeItemCollapsibleState.Collapsed);
     this.id = `codeFolderSpaces.space:${definition.basePath}`;
-    this.resourceUri = vscode.Uri.file(definition.basePath);
+    this.resourceUri = vscode.Uri.file(rootPath);
     this.contextValue = 'codeFolderSpaces.spaceRoot';
-    this.tooltip = definition.basePath;
+    this.tooltip = rootPath;
     this.iconPath = resolveIcon(definition.icon) ?? vscode.ThemeIcon.Folder;
   }
 
   /** Filesystem URI of this space root. */
   get uri(): vscode.Uri {
-    return vscode.Uri.file(this.definition.basePath);
+    return vscode.Uri.file(this.rootPath);
   }
 }
 
@@ -107,11 +108,15 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   private _definitions: SpaceDefinition[];
   private readonly _statCache = new StatCache();
   filterMessage = '';
+  readonly staleRoots = new Set<string>();
 
   constructor(private readonly _store: SpaceStore, private readonly _viewState?: PaneStateStore) {
     this._definitions = _store.getDefinitions();
     this._storeListener = _store.onDidChange(() => this.refresh());
   }
+
+  markStale(basePath: string): void { this.staleRoots.add(basePath); this.refresh(); }
+  clearStale(basePath: string): void { this.staleRoots.delete(basePath); }
 
   refresh(): void {
     this._statCache.clear();
@@ -130,7 +135,10 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
 
   async getChildren(element?: SpaceNode): Promise<SpaceNode[]> {
     if (!element) {
-      return this._definitions.map((definition) => new SpaceRootNode(definition, undefined));
+      return this._definitions.map((definition) => {
+        const state = this._viewState?.get(definition.basePath);
+        return new SpaceRootNode(definition, undefined, state?.root ?? definition.basePath);
+      });
     }
     return this._listChildren(element);
   }
@@ -182,14 +190,15 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const settings = VIEW_PRESETS[viewState?.preset ?? 'Explorer'];
     if (element instanceof SpaceRootNode && settings.mode === 'flat') {
       const flat = await this._listFlat(space, element, settings.content, settings.level);
-      return this._applyFilter(flat, space, viewState?.filter ?? '');
+      return this._applyFilter(flat, element.rootPath, viewState?.filter ?? '');
     }
     if (settings.content === 'files' && element instanceof SpaceEntryNode && element.isDirectory) return [];
     if (settings.content === 'folders' && element instanceof SpaceEntryNode && !element.isDirectory) return [];
-    const elementDepth = element instanceof SpaceRootNode ? 0 : path.relative(space.basePath, element.uri.fsPath).split(/[\\/]+/).filter(Boolean).length;
+    const activeRoot = element instanceof SpaceRootNode ? element.rootPath : this._viewState?.get(space.basePath).root ?? space.basePath;
+    const elementDepth = element instanceof SpaceRootNode ? 0 : path.relative(activeRoot, element.uri.fsPath).split(/[\\/]+/).filter(Boolean).length;
     if (settings.level !== 'all' && elementDepth >= settings.level) return [];
     const entries = await readDirectorySafe(element.uri);
-    const parentRelative = path.relative(space.basePath, element.uri.fsPath).replace(/\\/g, '/');
+    const parentRelative = path.relative(activeRoot, element.uri.fsPath).replace(/\\/g, '/');
     const directories: { name: string; uri: vscode.Uri; relativePath: string }[] = [];
     const files: SpaceEntryNode[] = [];
 
@@ -216,7 +225,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     });
     const candidates = [...directoryNodes, ...files];
     const sorted = await this._sortNodes(candidates, space.basePath);
-    return this._applyFilter(sorted, space, viewState?.filter ?? '');
+    return this._applyFilter(sorted, activeRoot, viewState?.filter ?? '');
   }
 
   private async _listFlat(
@@ -227,7 +236,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   ): Promise<SpaceEntryNode[]> {
     const listing = await buildFlatListing(async (parent: vscode.Uri | undefined) => {
       const parentUri = parent ?? root.uri;
-      const parentRelative = path.relative(space.basePath, parentUri.fsPath).replace(/\\/g, '/');
+      const parentRelative = path.relative(root.rootPath, parentUri.fsPath).replace(/\\/g, '/');
       const result: { value: vscode.Uri; isDirectory: boolean }[] = [];
       for (const [name, type] of await readDirectorySafe(parentUri)) {
         const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
@@ -245,7 +254,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const nodes = listing
       .filter(({ isDirectory }) => content === 'all' ? true : content === 'folders' ? isDirectory : !isDirectory)
       .map(({ value: uri, isDirectory }) => {
-        const relative = path.relative(space.basePath, uri.fsPath).replace(/\\/g, '/');
+        const relative = path.relative(root.rootPath, uri.fsPath).replace(/\\/g, '/');
         const node = new SpaceEntryNode(uri, isDirectory, space, root, false);
         node.description = relative;
         if (isDirectory) node.iconPath = vscode.ThemeIcon.Folder;
@@ -255,8 +264,8 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     return content === 'all' ? sorted.sort((a, b) => path.posix.dirname(String(a.description)).localeCompare(path.posix.dirname(String(b.description)), undefined, { sensitivity: 'base' })) : sorted;
   }
 
-  private _applyFilter(nodes: SpaceEntryNode[], space: SpaceDefinition, filter: string): SpaceEntryNode[] {
-    const filtered = filter ? nodes.filter(node => matchesPathFilter(path.relative(space.basePath, node.uri.fsPath).replace(/\\/g, '/'), filter)) : nodes;
+  private _applyFilter(nodes: SpaceEntryNode[], rootPath: string, filter: string): SpaceEntryNode[] {
+    const filtered = filter ? nodes.filter(node => matchesPathFilter(path.relative(rootPath, node.uri.fsPath).replace(/\\/g, '/'), filter)) : nodes;
     this.filterMessage = filter ? vscode.l10n.t('{0} / {1} matches', filtered.length, nodes.length) : '';
     return filtered;
   }
