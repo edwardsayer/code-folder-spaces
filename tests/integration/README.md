@@ -8,7 +8,7 @@
 npm run test:integration
 ```
 
-命令先建置擴充套件與測試 bundle，再啟動 desktop 測試。測試產物及 test-electron profile 位於專案內 `.vscode-test/`，不會修改或刪除 `~/.vscode`、`~/.vscode-debug` 等使用者 profile。測試設定只透過 `ConfigurationTarget.Global` 設定測試值，並在每例結束後還原；fixture 的 `.vscode/settings.json` 固定為 `{}`。
+命令先建置擴充套件與測試 bundle，再啟動 desktop 測試。測試產物及 test-electron profile 位於專案內 `.vscode-test/`，不會修改或刪除 `~/.vscode`、`~/.vscode-debug` 等使用者 profile。其餘測試僅透過 `ConfigurationTarget.Global` 設定測試值，並在每例結束後還原；`trust.test.ts` 另會寫入 Workspace 範圍，並以原始位元組還原，使 fixture 內容恆回 `{}`。
 
 ## VS Code 選擇與 fixture
 

@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import type { SpaceConfigEntry } from '../../../src/types';
+import { clearGlobalSettings } from './helpers';
 
 suite('Workspace Trust 與 SpaceStore 設定範圍', () => {
   let settingsPath: string;
@@ -15,9 +16,15 @@ suite('Workspace Trust 與 SpaceStore 設定範圍', () => {
     assert.ok(workspacePath, '整合測試需開啟 workspace fixture');
     settingsPath = path.join(workspacePath, '.vscode', 'settings.json');
     originalSettings = fs.existsSync(settingsPath) ? fs.readFileSync(settingsPath) : undefined;
+    if (originalSettings?.toString('utf8').replace(/\r\n/g, '\n') !== '{}\n') {
+      throw new Error(
+        'Fixture 已被污染，請執行 git checkout -- tests/integration/fixtures/workspace/.vscode/settings.json 還原後重跑。'
+      );
+    }
   });
 
   suiteTeardown(async () => {
+    await clearGlobalSettings();
     // 等待 VS Code 設定寫入佇列完成，再以原始位元組做最後還原。
     await new Promise((resolve) => setTimeout(resolve, 100));
     restoreFixtureSettings();

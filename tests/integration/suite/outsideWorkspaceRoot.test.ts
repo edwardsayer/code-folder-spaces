@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
+import { clearGlobalSettings } from './helpers';
 
 suite('工作區外空間根', () => {
   let tmpRoot: string;
@@ -20,7 +21,8 @@ suite('工作區外空間根', () => {
     fs.writeFileSync(path.join(tmpRoot, 'skip.log'), 'skip');
   });
 
-  suiteTeardown(() => {
+  suiteTeardown(async () => {
+    await clearGlobalSettings();
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
