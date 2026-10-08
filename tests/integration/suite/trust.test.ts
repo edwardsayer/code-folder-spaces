@@ -16,7 +16,10 @@ suite('Workspace Trust 與 SpaceStore 設定範圍', () => {
     assert.ok(workspacePath, '整合測試需開啟 workspace fixture');
     settingsPath = path.join(workspacePath, '.vscode', 'settings.json');
     originalSettings = fs.existsSync(settingsPath) ? fs.readFileSync(settingsPath) : undefined;
-    if (originalSettings?.toString('utf8').replace(/\r\n/g, '\n') !== '{}\n') {
+    // 容忍 VS Code 正規化後的等價空物件（單行 `{}` 或多行），僅在內容真的被寫入時才視為污染。
+    const initialContent = originalSettings?.toString('utf8').replace(/\r\n/g, '\n');
+    const isPristine = initialContent === undefined || /^\{\s*\}\s*$/.test(initialContent);
+    if (!isPristine) {
       throw new Error(
         'Fixture 已被污染，請執行 git checkout -- tests/integration/fixtures/workspace/.vscode/settings.json 還原後重跑。'
       );
