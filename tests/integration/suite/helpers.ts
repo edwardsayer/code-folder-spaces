@@ -11,6 +11,13 @@ export function assertFixtureWorkspace(): void {
   }
 }
 
+/** 清除整合測試使用的 Global 設定，作為 suite 結束時的殘留保險。 */
+export async function clearGlobalSettings(): Promise<void> {
+  const config = vscode.workspace.getConfiguration('codeFolderSpaces');
+  await config.update('spaces', undefined, vscode.ConfigurationTarget.Global);
+  await config.update('view.showFiles', undefined, vscode.ConfigurationTarget.Global);
+}
+
 /** 僅操作 Global 設定，完成後逐項還原，不寫入工作區設定。 */
 export async function withGlobalSettings<T>(
   values: { spaces?: SpaceConfigEntry[]; showFiles?: boolean },

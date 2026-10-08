@@ -5,7 +5,7 @@ import * as esbuild from 'esbuild';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const suiteDir = path.join(root, 'tests/integration/suite');
-const entryPoints = fs.readdirSync(suiteDir)
+const entryPoints = fs.readdirSync(suiteDir, { recursive: true })
   .filter((file) => file.endsWith('.test.ts'))
   .map((file) => path.join(suiteDir, file));
 

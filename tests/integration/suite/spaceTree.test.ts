@@ -5,7 +5,8 @@ import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import { SpaceRootNode, SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
-import { assertFixtureWorkspace, fixtureWorkspace, withGlobalSettings } from './helpers';
+import type { SpaceConfigEntry } from '../../../src/types';
+import { assertFixtureWorkspace, clearGlobalSettings, fixtureWorkspace, withGlobalSettings } from './helpers';
 
 // activation.test.ts 驗證 Extension Host 中 extension/view/commands 的啟用與註冊；
 // 本檔獨立建構 provider，透過真實 VS Code 設定與 workspace.fs 驗證樹節點語意，避免依賴 activation 私有實例。
@@ -14,9 +15,10 @@ type Node = SpaceNode;
 
 suite('空間樹 provider', () => {
   suiteSetup(() => assertFixtureWorkspace());
+  suiteTeardown(() => clearGlobalSettings());
 
-  async function withProvider<T>(spaces: unknown[], run: (provider: SpaceTreeDataProvider) => Promise<T>, showFiles?: boolean): Promise<T> {
-    return withGlobalSettings({ spaces: spaces as never[], ...(showFiles === undefined ? {} : { showFiles }) }, async () => {
+  async function withProvider<T>(spaces: SpaceConfigEntry[], run: (provider: SpaceTreeDataProvider) => Promise<T>, showFiles?: boolean): Promise<T> {
+    return withGlobalSettings({ spaces, ...(showFiles === undefined ? {} : { showFiles }) }, async () => {
       const store = new SpaceStore();
       const provider = new SpaceTreeDataProvider(store);
       try {
@@ -44,7 +46,8 @@ suite('空間樹 provider', () => {
   test('展開目錄優先且不分大小寫排序', async () => withProvider([alpha], async (provider) => {
     const root = (await provider.getChildren())[0];
     const children = await provider.getChildren(root) as Node[];
-    assert.deepEqual(children.map((node) => node.label), ['nested', 'a.txt']);
+    // B.txt 存在時，ASCII 大小寫敏感排序會讓 B 排在 a 前，因此可偵測 sensitivity:'base' 回歸。
+    assert.deepEqual(children.map((node) => node.label), ['nested', 'a.txt', 'B.txt']);
     assert.equal(children[0].collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
     assert.equal(children[1].collapsibleState, vscode.TreeItemCollapsibleState.None);
     assert.equal(children[1].contextValue, 'codeFolderSpaces.file');
@@ -79,11 +82,13 @@ suite('空間樹 provider', () => {
     await withProvider([{ path: alpha, showFiles: false }], async (provider) => {
       const root = (await provider.getChildren())[0];
       const children = await provider.getChildren(root) as Node[];
+      assert.ok(children.length > 0);
       assert.ok(children.every((node) => node.contextValue !== 'codeFolderSpaces.file'));
     });
     await withProvider([alpha], async (provider) => {
       const root = (await provider.getChildren())[0];
       const children = await provider.getChildren(root) as Node[];
+      assert.ok(children.length > 0);
       assert.ok(children.every((node) => node.contextValue !== 'codeFolderSpaces.file'));
     }, false);
   });
