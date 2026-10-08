@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import type { ViewPresetName } from './viewPresets';
 import { DEFAULT_VIEW_PRESET, isViewPresetName } from './viewPresets';
 
@@ -7,14 +8,22 @@ export type SortKey = 'name' | 'mtime' | 'ctime';
 export type SortDirection = 'asc' | 'desc';
 
 export interface SpaceViewState {
+  [key: string]: unknown;
   preset: ViewPresetName;
   filter: string;
   sort: { key: SortKey; direction: SortDirection };
 }
 
 interface PaneStateDocument {
+  [key: string]: unknown;
   version: 1;
   bySpace: Record<string, SpaceViewState>;
+}
+
+/** Normalize per-space keys consistently with the host platform's path semantics. */
+export function normalizeSpaceKey(basePath: string): string {
+  const normalized = path.normalize(basePath);
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
 export interface MementoLike {
@@ -35,13 +44,15 @@ export function normalizePaneState(value: unknown): PaneStateDocument {
     const sort = state.sort && typeof state.sort === 'object' ? state.sort as Record<string, unknown> : {};
     const key = sort.key === 'mtime' || sort.key === 'ctime' ? sort.key : 'name';
     const direction = sort.direction === 'desc' ? 'desc' : 'asc';
-    bySpace[basePath] = {
+    bySpace[normalizeSpaceKey(basePath)] = {
+      ...state,
       preset: isViewPresetName(preset) ? preset : DEFAULT_VIEW_PRESET,
       filter: typeof state.filter === 'string' ? state.filter : '',
       sort: { key, direction },
     };
   }
-  return { version: 1, bySpace };
+  // 保留未知欄位，避免 S4 等後續版本新增的 pane／per-space 狀態在本版更新時被抹除。
+  return { ...source, version: 1, bySpace };
 }
 
 /** Per-window state adapter. Schema normalization is isolated for unit testing. */
@@ -53,7 +64,7 @@ export class PaneStateStore {
   }
 
   get(basePath: string): SpaceViewState {
-    return this.state.bySpace[basePath] ?? { preset: DEFAULT_VIEW_PRESET, filter: '', sort: { key: 'name', direction: 'asc' } };
+    return this.state.bySpace[normalizeSpaceKey(basePath)] ?? { preset: DEFAULT_VIEW_PRESET, filter: '', sort: { key: 'name', direction: 'asc' } };
   }
 
   async setPreset(basePath: string, preset: ViewPresetName): Promise<void> {
@@ -73,7 +84,7 @@ export class PaneStateStore {
   }
 
   private async update(basePath: string, value: SpaceViewState): Promise<void> {
-    this.state.bySpace[basePath] = value;
+    this.state.bySpace[normalizeSpaceKey(basePath)] = value;
     await this.memento.update(PANE_STATE_KEY, this.state);
   }
 }

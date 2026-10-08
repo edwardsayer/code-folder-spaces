@@ -73,7 +73,9 @@ suite('空間樹 provider', () => {
     const alphaChildren = await provider.getChildren(roots[0]) as Node[];
     assert.deepEqual(alphaChildren.map((node) => node.label), ['nested']);
     const nestedChildren = await provider.getChildren(alphaChildren[0]) as Node[];
-    assert.deepEqual(nestedChildren.map((node) => node.label), ['deep.md']);
+    assert.deepEqual(nestedChildren.map((node) => node.label), ['deeper', 'deep.md']);
+    const deeperChildren = await provider.getChildren(nestedChildren[0]) as Node[];
+    assert.deepEqual(deeperChildren.map((node) => node.label), ['two-level.md']);
     const betaChildren = await provider.getChildren(roots[1]) as Node[];
     assert.deepEqual(betaChildren.map((node) => node.label), ['nested', 'b.md']);
     assert.equal(betaChildren[0].collapsibleState, vscode.TreeItemCollapsibleState.None);
@@ -162,9 +164,10 @@ suite('空間樹 provider', () => {
       assert.equal(nested.collapsibleState, vscode.TreeItemCollapsibleState.None);
       await state.setPreset(alpha, 'Context');
       nested = (await provider.getChildren(root) as Node[]).find((node) => node.label === 'nested')!;
-      assert.equal(nested.collapsibleState, vscode.TreeItemCollapsibleState.None);
+      assert.equal(nested.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
       const second = await provider.getChildren(nested) as Node[];
-      assert.deepEqual(second, []);
+      assert.deepEqual(second.map((node) => node.label), ['deeper']);
+      assert.equal(second[0].collapsibleState, vscode.TreeItemCollapsibleState.None);
       await state.setPreset(alpha, 'Navigate');
       assert.ok((await provider.getChildren(root) as Node[]).every((node) => node.contextValue === 'codeFolderSpaces.folder'));
     } finally { provider.dispose(); store.dispose(); }

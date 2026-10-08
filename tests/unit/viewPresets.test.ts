@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildFlatListing } from '../../src/spaces/flatListing';
 import { VIEW_PRESETS } from '../../src/spaces/viewPresets';
-import { normalizePaneState, PaneStateStore, PANE_STATE_KEY } from '../../src/spaces/viewState';
+import { normalizePaneState, normalizeSpaceKey, PaneStateStore, PANE_STATE_KEY } from '../../src/spaces/viewState';
 
 describe('view presets and state', () => {
   it('maps all seven presets to their designed mode, level, and content', () => {
@@ -31,7 +31,7 @@ describe('view presets and state', () => {
     const values = new Map<string, unknown>();
     const state = new PaneStateStore({ get: (key) => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
     await state.setPreset('/space', 'Files');
-    expect(values.get(PANE_STATE_KEY)).toEqual({ version: 1, bySpace: { '/space': { preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' } } } });
+    expect(values.get(PANE_STATE_KEY)).toEqual({ version: 1, bySpace: { [normalizeSpaceKey('/space')]: { preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' } } } });
     expect(state.get('/space').preset).toBe('Files');
   });
 
