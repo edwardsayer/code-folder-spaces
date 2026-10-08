@@ -163,6 +163,8 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
+    "build:tests": "node esbuild.tests.mjs",
+    "test:integration": "npm run build && npm run build:tests && vscode-test --config .vscode-test.mjs",
     "test:unit:watch": "vitest",
     "package:vsix": "node esbuild.mjs --production && vsce package",
     "check:project": "node scripts/check-project.mjs",

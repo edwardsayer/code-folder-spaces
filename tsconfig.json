@@ -15,6 +15,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests/unit"],
+  "include": ["src", "tests/unit", "tests/integration"],
   "exclude": ["node_modules", "dist"]
 }

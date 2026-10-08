@@ -42,6 +42,7 @@ npm run test:unit       # vitest run
 npm run build           # esbuild → dist/extension.js
 npm run check:project   # 專案健康度與 manifest 契約
 npm run check           # 以上全部
+npm run test:integration # 隔離 profile 啟動 VS Code 執行整合測試；優先使用本機安裝
 npm run package:vsix    # production bundle + vsce package
 ```
 

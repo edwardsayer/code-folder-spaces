@@ -11,6 +11,9 @@ test-results/
 .github/
 
 # Build artifacts that should not ship
+out/
+.vscode-test.mjs
+esbuild.tests.mjs
 dist/**/*.map
 
 # Config files not needed at runtime

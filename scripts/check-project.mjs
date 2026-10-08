@@ -37,6 +37,8 @@ const requiredPaths = [
   'assets/icon.svg',
   'tsconfig.json',
   'esbuild.mjs',
+  '.vscode-test.mjs',
+  'esbuild.tests.mjs',
   '.vscode/launch.json',
 ];
 
@@ -50,6 +52,12 @@ const pkg = readJson('package.json');
 if (!pkg) {
   errors.push('package.json 無法解析');
 } else {
+  if (!pkg.scripts?.['test:integration']) {
+    errors.push('package.json scripts 缺少 test:integration');
+  }
+  if (!pkg.scripts?.['build:tests']) {
+    errors.push('package.json scripts 缺少 build:tests');
+  }
   if (!pkg.engines?.vscode) {
     errors.push('package.json 缺少 engines.vscode');
   }
@@ -75,6 +83,13 @@ if (!pkg) {
   const typesMinor = types.split('.').slice(0, 2).join('.');
   if (engines && types && enginesMinor !== typesMinor) {
     errors.push(`engines.vscode (${pkg.engines.vscode}) 與 @types/vscode (${pkg.devDependencies['@types/vscode']}) 不一致`);
+  }
+
+  const vscodeignore = fs.existsSync(path.join(root, '.vscodeignore'))
+    ? fs.readFileSync(path.join(root, '.vscodeignore'), 'utf8').split(/\r?\n/).map((line) => line.trim())
+    : [];
+  if (!['out', 'out/', '/out/'].some((entry) => vscodeignore.includes(entry))) {
+    errors.push('.vscodeignore 缺少 out 忽略規則，避免 VSIX 打包測試 bundle');
   }
 
   const nls = readJson('package.nls.json') ?? {};
