@@ -3,7 +3,12 @@ import * as vscode from 'vscode';
 import type { SpaceDefinition } from '../types';
 import { mapWithConcurrency } from '../util/concurrency';
 import { isVisibleDirectory, isVisibleFile } from './spaceConfig';
+import { buildFlatListing } from './flatListing';
+import { VIEW_PRESETS } from './viewPresets';
+import { matchesPathFilter, sortEntries, StatCache } from './sortEntries';
+import type { SortableEntry } from './sortEntries';
 import type { SpaceStore } from './spaceStore';
+import type { PaneStateStore } from './viewState';
 
 export type SpaceNode = SpaceRootNode | SpaceEntryNode;
 
@@ -100,13 +105,17 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
 
   private readonly _storeListener: vscode.Disposable;
   private _definitions: SpaceDefinition[];
+  private readonly _statCache = new StatCache();
+  filterMessage = '';
 
-  constructor(private readonly _store: SpaceStore) {
+  constructor(private readonly _store: SpaceStore, private readonly _viewState?: PaneStateStore) {
     this._definitions = _store.getDefinitions();
     this._storeListener = _store.onDidChange(() => this.refresh());
   }
 
   refresh(): void {
+    this._statCache.clear();
+    this.filterMessage = '';
     this._definitions = this._store.getDefinitions();
     this._onDidChangeTreeData.fire();
   }
@@ -169,10 +178,20 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
 
   private async _listChildren(element: SpaceRootNode | SpaceEntryNode): Promise<SpaceNode[]> {
     const space = element instanceof SpaceRootNode ? element.definition : element.space;
+    const viewState = this._viewState?.get(space.basePath);
+    const settings = VIEW_PRESETS[viewState?.preset ?? 'Explorer'];
+    if (element instanceof SpaceRootNode && settings.mode === 'flat') {
+      const flat = await this._listFlat(space, element, settings.content, settings.level);
+      return this._applyFilter(flat, space, viewState?.filter ?? '');
+    }
+    if (settings.content === 'files' && element instanceof SpaceEntryNode && element.isDirectory) return [];
+    if (settings.content === 'folders' && element instanceof SpaceEntryNode && !element.isDirectory) return [];
+    const elementDepth = element instanceof SpaceRootNode ? 0 : path.relative(space.basePath, element.uri.fsPath).split(/[\\/]+/).filter(Boolean).length;
+    if (settings.level !== 'all' && elementDepth >= settings.level) return [];
     const entries = await readDirectorySafe(element.uri);
     const parentRelative = path.relative(space.basePath, element.uri.fsPath).replace(/\\/g, '/');
     const directories: { name: string; uri: vscode.Uri; relativePath: string }[] = [];
-    const files: SpaceNode[] = [];
+    const files: SpaceEntryNode[] = [];
 
     for (const [name, type] of entries) {
       const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
@@ -183,7 +202,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         }
         directories.push({ name, uri, relativePath });
       } else if (type & vscode.FileType.File) {
-        if (!space.showFiles || !isVisibleFile(name, relativePath, space.include, space.exclude)) {
+        if (settings.content === 'folders' || !space.showFiles || !isVisibleFile(name, relativePath, space.include, space.exclude)) {
           continue;
         }
         files.push(new SpaceEntryNode(uri, false, space, element));
@@ -191,14 +210,72 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     }
 
     const directoryNodes = await mapWithConcurrency(directories, DIRECTORY_CHILD_CHECK_CONCURRENCY, async (directory) => {
-      const hasChildren = await this._directoryHasVisibleChildren(directory.uri, space, directory.relativePath);
+      const atLevelLimit = settings.level !== 'all' && elementDepth + 1 >= settings.level;
+      const hasChildren = !atLevelLimit && await this._directoryHasVisibleChildren(directory.uri, space, directory.relativePath);
       return new SpaceEntryNode(directory.uri, true, space, element, hasChildren);
     });
-    const byLabel = (a: SpaceNode, b: SpaceNode): number =>
-      String(a.label ?? '').localeCompare(String(b.label ?? ''), undefined, { sensitivity: 'base' });
-    directoryNodes.sort(byLabel);
-    files.sort(byLabel);
-    return [...directoryNodes, ...files];
+    const candidates = [...directoryNodes, ...files];
+    const sorted = await this._sortNodes(candidates, space.basePath);
+    return this._applyFilter(sorted, space, viewState?.filter ?? '');
+  }
+
+  private async _listFlat(
+    space: SpaceDefinition,
+    root: SpaceRootNode,
+    content: 'all' | 'folders' | 'files',
+    level: 1 | 2 | 'all'
+  ): Promise<SpaceEntryNode[]> {
+    const listing = await buildFlatListing(async (parent: vscode.Uri | undefined) => {
+      const parentUri = parent ?? root.uri;
+      const parentRelative = path.relative(space.basePath, parentUri.fsPath).replace(/\\/g, '/');
+      const result: { value: vscode.Uri; isDirectory: boolean }[] = [];
+      for (const [name, type] of await readDirectorySafe(parentUri)) {
+        const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
+        const uri = vscode.Uri.joinPath(parentUri, name);
+        if (type & vscode.FileType.Directory) {
+          if (isVisibleDirectory(name, relativePath, space.exclude)) result.push({ value: uri, isDirectory: true });
+        } else if (type & vscode.FileType.File) {
+          if (content !== 'folders' && space.showFiles && isVisibleFile(name, relativePath, space.include, space.exclude)) {
+            result.push({ value: uri, isDirectory: false });
+          }
+        }
+      }
+      return result;
+    }, undefined, level);
+    const nodes = listing
+      .filter(({ isDirectory }) => content === 'all' ? true : content === 'folders' ? isDirectory : !isDirectory)
+      .map(({ value: uri, isDirectory }) => {
+        const relative = path.relative(space.basePath, uri.fsPath).replace(/\\/g, '/');
+        const node = new SpaceEntryNode(uri, isDirectory, space, root, false);
+        node.description = relative;
+        if (isDirectory) node.iconPath = vscode.ThemeIcon.Folder;
+        return node;
+      });
+    const sorted = await this._sortNodes(nodes, space.basePath);
+    return content === 'all' ? sorted.sort((a, b) => path.posix.dirname(String(a.description)).localeCompare(path.posix.dirname(String(b.description)), undefined, { sensitivity: 'base' })) : sorted;
+  }
+
+  private _applyFilter(nodes: SpaceEntryNode[], space: SpaceDefinition, filter: string): SpaceEntryNode[] {
+    const filtered = filter ? nodes.filter(node => matchesPathFilter(path.relative(space.basePath, node.uri.fsPath).replace(/\\/g, '/'), filter)) : nodes;
+    this.filterMessage = filter ? vscode.l10n.t('{0} / {1} matches', filtered.length, nodes.length) : '';
+    return filtered;
+  }
+
+  private async _sortNodes(nodes: SpaceEntryNode[], basePath: string): Promise<SpaceEntryNode[]> {
+    const sort = this._viewState?.get(basePath).sort ?? { key: 'name' as const, direction: 'asc' as const };
+    const entries = nodes.map(node => ({ name: String(node.label ?? ''), uri: node.uri.toString(), node }));
+    const statTimes = async (entry: SortableEntry) => this._statCache.get(entry.uri, async () => {
+      try { const stat = await vscode.workspace.fs.stat(vscode.Uri.parse(entry.uri)); return { mtime: stat.mtime, ctime: stat.ctime }; }
+      catch { return undefined; }
+    });
+    if (sort.key === 'name') {
+      const folders = entries.filter(entry => entry.node.isDirectory);
+      const files = entries.filter(entry => !entry.node.isDirectory);
+      const sortedFolders = await sortEntries(folders, sort.key, sort.direction, statTimes);
+      const sortedFiles = await sortEntries(files, sort.key, sort.direction, statTimes);
+      return [...sortedFolders, ...sortedFiles].map(entry => entry.node);
+    }
+    return (await sortEntries(entries, sort.key, sort.direction, statTimes)).map(entry => entry.node);
   }
 
   private async _directoryHasVisibleChildren(
@@ -207,13 +284,14 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     parentRelative: string
   ): Promise<boolean> {
     const entries = await readDirectorySafe(uri);
+    const preset = VIEW_PRESETS[this._viewState?.get(space.basePath).preset ?? 'Explorer'];
     return entries.some(([name, type]) => {
       const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
       if (type & vscode.FileType.Directory) {
         return isVisibleDirectory(name, relativePath, space.exclude);
       }
       if (type & vscode.FileType.File) {
-        return space.showFiles && isVisibleFile(name, relativePath, space.include, space.exclude);
+        return preset.content !== 'folders' && space.showFiles && isVisibleFile(name, relativePath, space.include, space.exclude);
       }
       return false;
     });

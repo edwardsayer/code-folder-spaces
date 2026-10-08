@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import { SpaceRootNode, SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
+import { PaneStateStore } from '../../../src/spaces/viewState';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceConfigEntry } from '../../../src/types';
 import { assertFixtureWorkspace, clearGlobalSettings, fixtureWorkspace, withGlobalSettings } from './helpers';
@@ -105,6 +106,94 @@ suite('空間樹 provider', () => {
     assert.equal(await provider.findNodeByPath(path.join(logs, 'trace.log')), undefined);
     assert.equal(await provider.findNodeByPath(path.join(os.tmpdir(), 'outside-folder-spaces.txt')), undefined);
     assert.ok(await provider.findNodeByPath(alpha) instanceof SpaceRootNode);
+  }));
+
+  test('扁平 Files 預設集列出遞迴檔案、保留 URI 與根相對路徑', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    const state = new PaneStateStore({ get: () => undefined, update: async () => undefined });
+    await state.setPreset(alpha, 'Files');
+    const provider = new SpaceTreeDataProvider(store, state);
+    try {
+      const root = (await provider.getChildren())[0];
+      const files = await provider.getChildren(root) as Node[];
+      const deep = files.find((node) => node.label === 'deep.md');
+      assert.ok(deep);
+      assert.equal(deep.resourceUri?.fsPath, path.join(alpha, 'nested/deep.md'));
+      assert.equal(deep.description, 'nested/deep.md');
+      assert.equal(deep.collapsibleState, vscode.TreeItemCollapsibleState.None);
+      assert.ok(files.every((node) => node.contextValue === 'codeFolderSpaces.file'));
+    } finally { provider.dispose(); store.dispose(); }
+  }));
+
+  test('List 只列根層檔案，Files 遞迴列檔且 Contents 同時列目錄與檔案', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    const values = new Map<string, unknown>();
+    const state = new PaneStateStore({ get: (key) => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
+    const provider = new SpaceTreeDataProvider(store, state);
+    try {
+      const root = (await provider.getChildren())[0];
+      await state.setPreset(alpha, 'List');
+      const list = await provider.getChildren(root) as Node[];
+      assert.ok(list.length > 0);
+      assert.ok(list.every((node) => node.contextValue === 'codeFolderSpaces.file'));
+      assert.ok(!list.some((node) => node.description === 'nested/deep.md'));
+
+      await state.setPreset(alpha, 'Files');
+      const files = await provider.getChildren(root) as Node[];
+      assert.ok(files.some((node) => node.description === 'nested/deep.md'));
+      assert.ok(files.every((node) => node.contextValue === 'codeFolderSpaces.file'));
+
+      await state.setPreset(alpha, 'Contents');
+      const contents = await provider.getChildren(root) as Node[];
+      assert.ok(contents.some((node) => node.contextValue === 'codeFolderSpaces.folder'));
+      assert.ok(contents.some((node) => node.contextValue === 'codeFolderSpaces.file'));
+    } finally { provider.dispose(); store.dispose(); }
+  }));
+
+  test('Columns 限制為一層、Context 為兩層且 Navigate 僅顯示資料夾', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    const values = new Map<string, unknown>();
+    const state = new PaneStateStore({ get: (key) => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
+    const provider = new SpaceTreeDataProvider(store, state);
+    try {
+      const root = (await provider.getChildren())[0];
+      await state.setPreset(alpha, 'Columns');
+      let nested = (await provider.getChildren(root) as Node[]).find((node) => node.label === 'nested')!;
+      assert.equal(nested.collapsibleState, vscode.TreeItemCollapsibleState.None);
+      await state.setPreset(alpha, 'Context');
+      nested = (await provider.getChildren(root) as Node[]).find((node) => node.label === 'nested')!;
+      assert.equal(nested.collapsibleState, vscode.TreeItemCollapsibleState.None);
+      const second = await provider.getChildren(nested) as Node[];
+      assert.deepEqual(second, []);
+      await state.setPreset(alpha, 'Navigate');
+      assert.ok((await provider.getChildren(root) as Node[]).every((node) => node.contextValue === 'codeFolderSpaces.folder'));
+    } finally { provider.dispose(); store.dispose(); }
+  }));
+
+  test('mtime 排序與路徑過濾可套用並清除，且回報符合數／總數', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    const values = new Map<string, unknown>();
+    const state = new PaneStateStore({ get: (key) => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
+    const provider = new SpaceTreeDataProvider(store, state);
+    try {
+      const root = (await provider.getChildren())[0];
+      await state.setSort(alpha, 'mtime', 'asc');
+      const items = await provider.getChildren(root) as Node[];
+      const actualTimes = await Promise.all(items.map(async node => (await vscode.workspace.fs.stat(node.resourceUri!)).mtime));
+      const expectedOrder = items.map((node, index) => ({ label: String(node.label), time: actualTimes[index] }))
+        .sort((a, b) => a.time - b.time || a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })).map(item => item.label);
+      assert.deepEqual(items.map(node => node.label), expectedOrder);
+      await state.setFilter(alpha, 'NESTED');
+      const filtered = await provider.getChildren(root) as Node[];
+      assert.deepEqual(filtered.map(node => node.label), ['nested']);
+      assert.equal(provider.filterMessage, '1 / 3 matches');
+      await state.setFilter(alpha, 'does-not-exist');
+      assert.deepEqual(await provider.getChildren(root), []);
+      assert.equal(provider.filterMessage, '0 / 3 matches');
+      await state.clearFilter(alpha);
+      assert.equal((await provider.getChildren(root)).length, 3);
+      assert.equal(provider.filterMessage, '');
+    } finally { provider.dispose(); store.dispose(); }
   }));
 
   test('空間名稱預設為 basename 並可由 name 覆寫', async () => withProvider([

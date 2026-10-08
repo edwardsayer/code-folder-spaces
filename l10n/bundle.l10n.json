@@ -6,5 +6,10 @@
   "Added folder space: {0}": "Added folder space: {0}",
   "No active file to reveal.": "No active file to reveal.",
   "No folder space contains the active file: {0}": "No folder space contains the active file: {0}",
-  "Remove folder space \"{0}\"?": "Remove folder space \"{0}\"?"
+  "Remove folder space \"{0}\"?": "Remove folder space \"{0}\"?",
+  "Choose a view preset": "Choose a view preset",
+  "Filter by path substring": "Filter by path substring",
+  "Choose sort field": "Choose sort field",
+  "Choose sort direction": "Choose sort direction",
+  "{0} / {1} matches": "{0} / {1} matches"
 }

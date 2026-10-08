@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
+import { PaneStateStore } from '../../../src/spaces/viewState';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
 import { clearGlobalSettings } from './helpers';
 
@@ -38,7 +39,9 @@ suite('S1-5 大型目錄量測', () => {
     let provider: SpaceTreeDataProvider | undefined;
     try {
       await config.update('spaces', [{ path: tmpRoot }], vscode.ConfigurationTarget.Global);
-      provider = new SpaceTreeDataProvider(store);
+      const stateValues = new Map<string, unknown>();
+      const viewState = new PaneStateStore({ get: (key) => stateValues.get(key) as never, update: async (key, value) => { stateValues.set(key, value); } });
+      provider = new SpaceTreeDataProvider(store, viewState);
       const root = (await provider.getChildren())[0];
       const deepPath = path.join(tmpRoot, 'deep', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'target.txt');
       await provider.getChildren(root); // warm-up
@@ -60,8 +63,18 @@ suite('S1-5 大型目錄量測', () => {
         samples.findPathMilliseconds.push(performance.now() - started);
         assert.ok(target);
       }
+      await viewState.setSort(tmpRoot, 'mtime', 'asc');
+      provider.refresh();
+      const statSortMilliseconds: number[] = [];
+      for (let iteration = 0; iteration < 3; iteration += 1) {
+        const started = performance.now();
+        assert.equal((await provider.getChildren(root)).length, 4501);
+        statSortMilliseconds.push(performance.now() - started);
+        provider.refresh();
+      }
       const medians = Object.fromEntries(Object.entries(samples).map(([key, values]) => [key, [...values].sort((a, b) => a - b)[1]]));
-      console.log(`S1-5-MEASUREMENT ${JSON.stringify({ phase: process.env.S1_5_PHASE ?? 'unspecified', platform: process.platform, node: process.version, vscode: vscode.version, localFileSystem: 'Node fs temporary directory + vscode.workspace.fs provider', directoryCount: 1500, filesPerDirectory: 1, topLevelFiles: 3000, depth: 11, samples, medians })}`);
+      const statSortMedianMilliseconds = [...statSortMilliseconds].sort((a, b) => a - b)[1];
+      console.log(`S1-5-MEASUREMENT ${JSON.stringify({ phase: process.env.S1_5_PHASE ?? 'unspecified', platform: process.platform, node: process.version, vscode: vscode.version, localFileSystem: 'Node fs temporary directory + vscode.workspace.fs provider', directoryCount: 1500, filesPerDirectory: 1, topLevelFiles: 3000, depth: 11, samples, medians, statSortMilliseconds, statSortMedianMilliseconds })}`);
     } finally {
       provider?.dispose();
       store.dispose();

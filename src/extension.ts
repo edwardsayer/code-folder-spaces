@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
+import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
+import { PaneStateStore } from './spaces/viewState';
 import { disposeLogChannel, getLogChannel } from './util/log';
 
 const VIEW_ID = 'codeFolderSpaces.explorer';
@@ -17,7 +19,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   log.info('Activating Folder Spaces');
 
   const store = new SpaceStore();
-  const provider = new SpaceTreeDataProvider(store);
+  const viewState = new PaneStateStore(context.workspaceState);
+  const provider = new SpaceTreeDataProvider(store, viewState);
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
     showCollapseAll: true,
@@ -32,6 +35,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     refreshTimer = setTimeout(() => {
       refreshTimer = undefined;
       provider.refresh();
+      treeView.message = provider.filterMessage;
     }, REFRESH_DEBOUNCE_MS);
   };
   context.subscriptions.push(
@@ -71,13 +75,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   );
 
   const syncContext = async (): Promise<void> => {
-    await vscode.commands.executeCommand(
-      'setContext',
-      'codeFolderSpaces.hasSpaces',
-      store.getDefinitions().length > 0
-    );
+    const definitions = store.getDefinitions();
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasSpaces', definitions.length > 0);
+    const selected = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
+    const definition = selected instanceof SpaceRootNode ? selected.definition : selected && 'space' in selected ? selected.space : definitions[0];
+    const state = definition ? viewState.get(definition.basePath) : undefined;
+    const preset = state?.preset ?? DEFAULT_VIEW_PRESET;
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasFilter', Boolean(state?.filter));
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.preset', preset);
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', VIEW_PRESETS[preset].mode);
   };
 
+  context.subscriptions.push(treeView.onDidChangeSelection(() => { void syncContext(); }));
+  context.subscriptions.push(provider.onDidChangeTreeData(() => {
+    const selected = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
+    const definition = selected instanceof SpaceRootNode ? selected.definition : selected && 'space' in selected ? selected.space : store.getDefinitions()[0];
+    if (definition) void provider.getChildren(new SpaceRootNode(definition, undefined)).then(() => { treeView.message = provider.filterMessage; });
+  }));
   store.onDidChange(
     () => {
       provider.refresh();
@@ -97,6 +111,64 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   context.subscriptions.push(
     vscode.commands.registerCommand('codeFolderSpaces.refresh', () => provider.refresh()),
+    vscode.commands.registerCommand('codeFolderSpaces.setPreset', async (preset?: unknown) => {
+      const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
+      const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];
+      if (!definition) return;
+      let selected = preset;
+      if (!isViewPresetName(selected)) {
+        selected = await vscode.window.showQuickPick(Object.keys(VIEW_PRESETS), { placeHolder: vscode.l10n.t('Choose a view preset') });
+      }
+      if (!isViewPresetName(selected)) return;
+      await viewState.setPreset(definition.basePath, selected);
+      provider.refresh();
+      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.preset', selected);
+      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', VIEW_PRESETS[selected].mode);
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.filter', async () => {
+      const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
+      const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];
+      if (!definition) return;
+      const value = await vscode.window.showInputBox({ prompt: vscode.l10n.t('Filter by path substring'), value: viewState.get(definition.basePath).filter });
+      if (value === undefined) return;
+      await viewState.setFilter(definition.basePath, value.trim());
+      provider.refresh();
+      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasFilter', Boolean(value.trim()));
+      treeView.message = '';
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.clearFilter', async () => {
+      const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
+      const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];
+      if (!definition) return;
+      await viewState.clearFilter(definition.basePath);
+      provider.refresh();
+      treeView.message = '';
+      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasFilter', false);
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.setSort', async (key?: unknown, direction?: unknown) => {
+      const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
+      const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];
+      if (!definition) return;
+      const options = ['name', 'mtime', 'ctime'];
+      const selectedKey = options.includes(String(key)) ? String(key) : await vscode.window.showQuickPick(options, { placeHolder: vscode.l10n.t('Choose sort field') });
+      if (!selectedKey) return;
+      const selectedDirection = direction === 'desc' || direction === 'asc' ? direction : await vscode.window.showQuickPick(['asc', 'desc'], { placeHolder: vscode.l10n.t('Choose sort direction') });
+      if (selectedDirection !== 'asc' && selectedDirection !== 'desc') return;
+      await viewState.setSort(definition.basePath, selectedKey as 'name' | 'mtime' | 'ctime', selectedDirection);
+      provider.refresh();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.toggleMode', async () => {
+      const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
+      const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];
+      if (!definition) return;
+      const current = viewState.get(definition.basePath).preset;
+      const currentSettings = VIEW_PRESETS[current];
+      const next = Object.entries(VIEW_PRESETS).find(([, value]) => value.mode !== currentSettings.mode && value.content === currentSettings.content && value.level === currentSettings.level)?.[0]
+        ?? (currentSettings.mode === 'tree' ? 'Contents' : DEFAULT_VIEW_PRESET);
+      await viewState.setPreset(definition.basePath, next as keyof typeof VIEW_PRESETS);
+      provider.refresh();
+      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', VIEW_PRESETS[next as keyof typeof VIEW_PRESETS].mode);
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.addSpace', async () => {
       const picked = await vscode.window.showOpenDialog({
         canSelectFiles: false,
@@ -151,6 +223,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   rebuildWatchers();
   await syncContext();
+  treeView.message = provider.filterMessage;
   log.info('Folder Spaces activated');
 
   const version = String(context.extension.packageJSON.version ?? '0.0.0');

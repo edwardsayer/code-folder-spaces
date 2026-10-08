@@ -76,6 +76,31 @@
         "command": "codeFolderSpaces.revealActiveFile",
         "title": "%command.revealActiveFile.title%",
         "icon": "$(target)"
+      },
+      {
+        "command": "codeFolderSpaces.setPreset",
+        "title": "%command.setPreset.title%",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "codeFolderSpaces.toggleMode",
+        "title": "%command.toggleMode.title%",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "codeFolderSpaces.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "codeFolderSpaces.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "codeFolderSpaces.setSort",
+        "title": "%command.setSort.title%",
+        "icon": "$(sort-precedence)"
       }
     ],
     "menus": {
@@ -87,6 +112,27 @@
         {
           "command": "codeFolderSpaces.refresh",
           "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.setPreset",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.toggleMode",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.filter",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.clearFilter",
+          "when": "codeFolderSpaces.hasFilter",
+          "group": "navigation@6"
+        },
+        {
+          "command": "codeFolderSpaces.setSort",
+          "group": "navigation@7"
         }
       ],
       "view/item/context": [
