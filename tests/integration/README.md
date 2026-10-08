@@ -20,7 +20,14 @@ npm run test:integration
 
 - `activation.test.ts` 驗證擴充套件 API、命令與 view 的 Extension API 註冊證據，不代表視覺 UI 驗收。
 - `spaceTree.test.ts` 自行建構 `SpaceStore` 與 `SpaceTreeDataProvider`，驗證樹根、展開排序、include／exclude、檔案顯示、名稱與路徑 reveal 語意。這個 provider 與 activation 建立的實例互不干擾。
-- 本輪不測 workspace 範圍設定寫入、watcher、Workspace Trust、工作區外根；這些屬於 S1-3／S1-4 範圍。測試絕不寫入 workspace 設定。
+- `trust.test.ts` 驗證 SpaceStore 在有工作區時寫入 Workspace 範圍，測試以暫存路徑操作，並在 `finally` 還原原有 workspace/global 設定；同時確認重複新增為 no-op。
+- `outsideWorkspaceRoot.test.ts` 以系統暫存目錄驗證工作區外根的 provider 樹節點、排序、exclude 與路徑解析；測試結束會清理暫存根。glob 與 watcher 的兩個已知限制以 skipped 案例保留追蹤。
+
+## trust 與工作區外根
+
+`@vscode/test-electron` 的 `node_modules/@vscode/test-electron/out/runTest.js` 固定傳入 `--disable-workspace-trust`，因此整合測試 Extension Host 是 trusted，`trust.test.ts` 以 `vscode.workspace.isTrusted === true` 明確記錄此限制。受限模式無法由本自動化套件涵蓋，須透過 Extension Development Host（EDH）probe 手動取證，結果見 `dev/tests/s1-3-s1-4-runtime-evidence.md`。
+
+工作區外根的自動化涵蓋 `workspace.fs` provider 讀取／樹節點、排序與篩選、`findNodeByPath`。已知缺陷 F-R3-1 是 `**/*.log` 不匹配頂層 `skip.log`，案例以 skipped 測試留存，provider 測試暫以 `*.log` 與 `**/*.log` 雙 pattern 驗證頂層及巢狀排除。F-R3-2 watcher 案例亦以 skipped 保留：trusted harness 兩次各等候 15 秒未收到 `onDidCreate`，與 EDH probe 觀測並不一致，待後續裁決。這些測試不代表 restricted 模式；受限模式的 watcher 與瀏覽／開檔實機證據見 EDH probe 報告。測試設定會還原 workspace/global 值，不在 committed fixture 留下設定變更。
 
 ## 已知平台行為／限制
 
