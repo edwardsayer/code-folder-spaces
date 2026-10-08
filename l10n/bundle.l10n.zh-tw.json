@@ -1,0 +1,10 @@
+{
+  "Folder Spaces": "Folder Spaces",
+  "Open File": "開啟檔案",
+  "Remove": "移除",
+  "Select a folder to add as a folder space": "選擇要新增為資料夾空間的資料夾",
+  "Added folder space: {0}": "已新增資料夾空間：{0}",
+  "No active file to reveal.": "沒有作用中的檔案可顯示。",
+  "No folder space contains the active file: {0}": "沒有資料夾空間包含目前檔案：{0}",
+  "Remove folder space \"{0}\"?": "移除資料夾空間「{0}」？"
+}

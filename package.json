@@ -1,0 +1,183 @@
+{
+  "name": "code-folder-spaces",
+  "displayName": "%extension.displayName%",
+  "description": "%extension.description%",
+  "version": "0.0.1",
+  "publisher": "edwardsayer",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "file explorer",
+    "folder",
+    "spaces",
+    "navigation",
+    "explorer"
+  ],
+  "main": "./dist/extension.js",
+  "l10n": "./l10n",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.untrustedWorkspaces.description%"
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "%capabilities.virtualWorkspaces.description%"
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "code-folder-spaces",
+          "title": "%container.title%",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "code-folder-spaces": [
+        {
+          "id": "codeFolderSpaces.explorer",
+          "name": "%view.explorer.name%",
+          "contextualTitle": "%container.title%"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "codeFolderSpaces.explorer",
+        "contents": "%viewsWelcome.empty%",
+        "when": "!codeFolderSpaces.hasSpaces"
+      }
+    ],
+    "commands": [
+      {
+        "command": "codeFolderSpaces.refresh",
+        "title": "%command.refresh.title%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codeFolderSpaces.addSpace",
+        "title": "%command.addSpace.title%",
+        "icon": "$(add)"
+      },
+      {
+        "command": "codeFolderSpaces.removeSpace",
+        "title": "%command.removeSpace.title%",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "codeFolderSpaces.revealActiveFile",
+        "title": "%command.revealActiveFile.title%",
+        "icon": "$(target)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codeFolderSpaces.addSpace",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.refresh",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "codeFolderSpaces.removeSpace",
+          "when": "view == codeFolderSpaces.explorer && viewItem == codeFolderSpaces.spaceRoot",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "%configuration.title%",
+      "properties": {
+        "codeFolderSpaces.spaces": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "%configuration.spaces.description%",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "path"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "%configuration.spaces.path.description%"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "%configuration.spaces.name.description%"
+                  },
+                  "icon": {
+                    "type": "string",
+                    "description": "%configuration.spaces.icon.description%"
+                  },
+                  "showFiles": {
+                    "type": "boolean",
+                    "description": "%configuration.spaces.showFiles.description%"
+                  },
+                  "include": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "%configuration.spaces.include.description%"
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "%configuration.spaces.exclude.description%"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "codeFolderSpaces.view.showFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.showFiles.description%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "package:vsix": "node esbuild.mjs --production && vsce package",
+    "check:project": "node scripts/check-project.mjs",
+    "check": "npm run typecheck && npm run test:unit && npm run build && npm run check:project"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.0",
+    "mocha": "^10.8.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

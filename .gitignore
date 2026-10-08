@@ -1,0 +1,29 @@
+# Build output
+node_modules/
+/out/
+/dist/
+*.vsix
+*.vsix.sha256
+/coverage/
+/.vscode-test/
+/test-results/
+
+# Internal development workspace (physical data lives in the workspace private repo)
+/dev/
+
+# Local research material (non-uniform third-party licenses)
+/references/
+
+# Local tool artifacts & diagnostic files
+/tools/*.png
+vitest-out.txt
+
+# AI-only directories (keep .vscode/ for contributors)
+.agents/
+.commandcode/
+.crush/
+.pi/
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,22 @@
+{
+  "extension.displayName": "Folder Spaces",
+  "extension.description": "資料夾範圍的檔案總管空間：一次專注一個資料夾，不必離開目前工作區。",
+  "container.title": "Folder Spaces",
+  "view.explorer.name": "空間",
+  "viewsWelcome.empty": "尚無資料夾空間。\n[新增資料夾空間](command:codeFolderSpaces.addSpace)\n請先開啟資料夾或工作區，或在設定中配置 `codeFolderSpaces.spaces`。",
+  "command.refresh.title": "Folder Spaces: 重新整理",
+  "command.addSpace.title": "Folder Spaces: 新增資料夾空間...",
+  "command.removeSpace.title": "Folder Spaces: 移除資料夾空間",
+  "command.revealActiveFile.title": "Folder Spaces: 在空間中顯示目前檔案",
+  "configuration.title": "Folder Spaces",
+  "configuration.spaces.description": "資料夾範圍的檔案總管空間。每個項目可為路徑字串，或含 `path`、`name`、`icon`、`showFiles`、`include`、`exclude` 的物件。路徑可使用 `${workspaceFolder}`、`${workspaceFolders[0]}` 與 `${userHome}`。",
+  "configuration.spaces.path.description": "資料夾路徑（絕對路徑或使用支援的變數）。",
+  "configuration.spaces.name.description": "此空間的顯示名稱（預設為資料夾名稱）。",
+  "configuration.spaces.icon.description": "選用的 ThemeIcon id 或 SVG/PNG 圖示的絕對路徑。",
+  "configuration.spaces.showFiles.description": "此空間是否在樹中顯示檔案（覆寫全域設定）。",
+  "configuration.spaces.include.description": "選用的 glob 樣式；僅顯示符合的檔案。",
+  "configuration.spaces.exclude.description": "選用的 glob 樣式；符合的檔案與資料夾將被隱藏。",
+  "configuration.showFiles.description": "在樹中除了資料夾外也顯示檔案。",
+  "capabilities.untrustedWorkspaces.description": "受限模式（Restricted Mode）下可瀏覽與開啟檔案；會修改磁碟的檔案操作（重新命名、刪除、移動）在工作區受信任前停用。",
+  "capabilities.virtualWorkspaces.description": "資料夾空間目前需要本機資料夾路徑；尚不支援虛擬工作區。"
+}

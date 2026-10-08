@@ -1,0 +1,28 @@
+# Source & tests (never ship)
+src/
+tests/
+scripts/
+dev/
+references/
+node_modules/
+coverage/
+test-results/
+.vscode-test/
+.github/
+
+# Build artifacts that should not ship
+dist/**/*.map
+
+# Config files not needed at runtime
+tsconfig*.json
+esbuild.mjs
+vitest.config.*
+eslint.config.*
+.gitignore
+.git/**
+.vscode/**
+*.vsix
+*.vsix.sha256
+**/*.log
+.DS_Store
+Thumbs.db
