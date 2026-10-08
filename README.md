@@ -29,6 +29,17 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 - Linked spaces as stacked panes: the default layout shows two identical panes (parent above, child below) that follow each other, forming a cascading chain — the product's signature interaction. The "files pane" effect comes from view presets (Files / Contents / List flat lists) instead of a webview.
 - Full Traditional Chinese / English localization.
 
+## Known limitations
+
+- **Glob subset**: supports `*`, `**`, `**/` (including zero directory levels), `?` and character escaping. Brace patterns (`{a,b}`) and character classes (`[abc]`) are unsupported; `src/**` does not match the `src` directory itself.
+- **Restricted Mode**: browsing, expanding and opening files work. Disk-modifying operations are not implemented yet; future CRUD and drag-and-drop will be disabled in untrusted workspaces (Stage 3).
+- **Single pane**: the current extension has one pane. Multiple panes (up to 8) and linked spaces are planned for Stage 4 (F-47/F-40).
+- **Workspace support**: virtual workspaces are unsupported; remote scenarios have not been validated.
+- **Large directories**: visible-child probing is concurrency-limited to 16. Caching has not been added; it will be evaluated in Stage 4 (F-44).
+- **External folders**: folders outside the workspace can be used as space roots; reading and watching them have been tested.
+
+For implementation-level details, see the Known pitfalls section in `AGENTS.md`.
+
 See `CHANGELOG.md` for details as they land.
 
 ## Development
