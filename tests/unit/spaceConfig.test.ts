@@ -79,9 +79,21 @@ describe('glob matching', () => {
     expect(globToRegExp('**/dist/**').test('packages/app/dist/out.js')).toBe(true);
   });
 
+  it('allows **/ to match zero or more directory levels', () => {
+    expect(globToRegExp('**/*.log').test('skip.log')).toBe(true);
+    expect(globToRegExp('**/*.log').test('a/skip.log')).toBe(true);
+    expect(globToRegExp('**/a/**').test('a/y')).toBe(true);
+    expect(globToRegExp('**/a/**').test('x/a/y')).toBe(true);
+    expect(globToRegExp('a/**/b.txt').test('a/b.txt')).toBe(true);
+    expect(globToRegExp('a/**/b.txt').test('a/x/b.txt')).toBe(true);
+    expect(globToRegExp('src/**').test('src')).toBe(false);
+    expect(globToRegExp('src/**').test('src/x.ts')).toBe(true);
+  });
+
   it('matches name or relative path', () => {
     expect(matchesAnyPattern('app.log', 'logs/app.log', ['logs/*.log'])).toBe(true);
     expect(matchesAnyPattern('app.log', 'logs/app.log', ['*.txt'])).toBe(false);
+    expect(matchesAnyPattern('skip.log', 'skip.log', ['**/*.log'])).toBe(true);
   });
 
   it('applies include and exclude rules to files', () => {

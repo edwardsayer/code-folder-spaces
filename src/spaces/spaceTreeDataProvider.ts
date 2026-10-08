@@ -1,10 +1,13 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { SpaceDefinition } from '../types';
+import { mapWithConcurrency } from '../util/concurrency';
 import { isVisibleDirectory, isVisibleFile } from './spaceConfig';
 import type { SpaceStore } from './spaceStore';
 
 export type SpaceNode = SpaceRootNode | SpaceEntryNode;
+
+const DIRECTORY_CHILD_CHECK_CONCURRENCY = 16;
 
 async function readDirectorySafe(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
   try {
@@ -168,7 +171,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const space = element instanceof SpaceRootNode ? element.definition : element.space;
     const entries = await readDirectorySafe(element.uri);
     const parentRelative = path.relative(space.basePath, element.uri.fsPath).replace(/\\/g, '/');
-    const directories: SpaceNode[] = [];
+    const directories: { name: string; uri: vscode.Uri; relativePath: string }[] = [];
     const files: SpaceNode[] = [];
 
     for (const [name, type] of entries) {
@@ -178,8 +181,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         if (!isVisibleDirectory(name, relativePath, space.exclude)) {
           continue;
         }
-        const hasChildren = await this._directoryHasVisibleChildren(uri, space, relativePath);
-        directories.push(new SpaceEntryNode(uri, true, space, element, hasChildren));
+        directories.push({ name, uri, relativePath });
       } else if (type & vscode.FileType.File) {
         if (!space.showFiles || !isVisibleFile(name, relativePath, space.include, space.exclude)) {
           continue;
@@ -188,11 +190,15 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       }
     }
 
+    const directoryNodes = await mapWithConcurrency(directories, DIRECTORY_CHILD_CHECK_CONCURRENCY, async (directory) => {
+      const hasChildren = await this._directoryHasVisibleChildren(directory.uri, space, directory.relativePath);
+      return new SpaceEntryNode(directory.uri, true, space, element, hasChildren);
+    });
     const byLabel = (a: SpaceNode, b: SpaceNode): number =>
       String(a.label ?? '').localeCompare(String(b.label ?? ''), undefined, { sensitivity: 'base' });
-    directories.sort(byLabel);
+    directoryNodes.sort(byLabel);
     files.sort(byLabel);
-    return [...directories, ...files];
+    return [...directoryNodes, ...files];
   }
 
   private async _directoryHasVisibleChildren(

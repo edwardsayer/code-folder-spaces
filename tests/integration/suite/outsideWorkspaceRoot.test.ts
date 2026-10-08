@@ -1,4 +1,5 @@
 import * as assert from 'node:assert/strict';
+import * as childProcess from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -34,8 +35,7 @@ suite('工作區外空間根', () => {
     const store = new SpaceStore();
     let provider: SpaceTreeDataProvider | undefined;
     try {
-      // 雙 pattern 是因為 **/ 目前需至少一層目錄才命中（已知缺陷 F-R3-1）。
-      await config.update('spaces', [{ path: tmpRoot, exclude: ['*.log', '**/*.log'] }], vscode.ConfigurationTarget.Global);
+      await config.update('spaces', [{ path: tmpRoot, exclude: ['**/*.log'] }], vscode.ConfigurationTarget.Global);
       provider = new SpaceTreeDataProvider(store);
       const roots = await provider.getChildren();
       assert.equal(roots.length, 1);
@@ -60,16 +60,53 @@ suite('工作區外空間根', () => {
     }
   });
 
-  test('**/*.log 應匹配頂層檔案（已知缺陷，待 S1-9 修正）', function () {
-    // pattern `**/*.log`、相對路徑 `skip.log`，目前實際結果是不匹配；
-    // 這與 VS Code `files.exclude`／`search.exclude` 中 `**/` 可匹配零層的語意不符。
-    this.skip();
-  });
-
-  test('工作區外 root 的 FileSystemWatcher 事件（自動化 harness 無法穩定觀察）', function () {
-    // trusted harness 兩次各等候 15 秒皆未收到 onDidCreate；EDH probe trusted 曾觀察到事件，
-    // restricted 曾逾時（詳見 dev/tests/s1-3-s1-4-runtime-evidence.md），證據強度不足，待後續裁決。
-    this.skip();
+  test('工作區外 root 的 FileSystemWatcher 事件', async () => {
+    // FileSystemWatcher 的通知時序受 OS／檔案系統影響；測試同時使用工作區內對照組，最多等待 20 秒。
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    assert.ok(workspaceRoot, 'integration harness workspace is required');
+    const outsideName = `watcher-outside-${Date.now()}.txt`;
+    const insideName = `watcher-inside-${Date.now()}.txt`;
+    const outsideWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(tmpRoot, outsideName));
+    const insideWatcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(workspaceRoot, insideName));
+    const observed = new Set<string>();
+    const subscriptions = [
+      outsideWatcher.onDidCreate(() => observed.add('outside')),
+      insideWatcher.onDidCreate(() => observed.add('inside')),
+    ];
+    const startedAt = Date.now();
+    try {
+      const script = 'const fs = require("node:fs"); for (const p of process.argv.slice(1)) fs.writeFileSync(p, "watcher diagnostic");';
+      const child = childProcess.spawn(process.execPath, [
+        '-e', script, path.join(tmpRoot, outsideName), path.join(workspaceRoot, insideName),
+      ], { stdio: 'ignore' });
+      const exitCode = await new Promise<number>((resolve, reject) => {
+        child.once('error', reject);
+        child.once('exit', (code) => resolve(code ?? -1));
+      });
+      assert.equal(exitCode, 0, 'external writer process must succeed');
+      while (Date.now() - startedAt < 20_000 && observed.size < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      const diagnostic = {
+        label: 'S1-10 watcher diagnostic',
+        platform: process.platform,
+        node: process.version,
+        vscode: vscode.version,
+        externalProcessExitCode: exitCode,
+        waitMilliseconds: Date.now() - startedAt,
+        observed: [...observed].sort(),
+        outsidePath: path.join(tmpRoot, outsideName),
+        insidePath: path.join(workspaceRoot, insideName),
+      };
+      console.log(`S1-10-DIAGNOSTIC ${JSON.stringify(diagnostic)}`);
+      assert.deepEqual([...observed].sort(), ['inside', 'outside']);
+    } finally {
+      subscriptions.forEach((subscription) => subscription.dispose());
+      outsideWatcher.dispose();
+      insideWatcher.dispose();
+      fs.rmSync(path.join(tmpRoot, outsideName), { force: true });
+      fs.rmSync(path.join(workspaceRoot, insideName), { force: true });
+    }
   });
 });
 

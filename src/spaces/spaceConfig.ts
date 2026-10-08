@@ -115,14 +115,17 @@ function toStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
 }
 
-/** Converts a small glob subset (`*`, `**`, `?`) into a RegExp. */
+/** Converts the supported glob subset: single/double stars, double-star slash, and question mark. */
 export function globToRegExp(pattern: string): RegExp {
   const normalized = pattern.replace(/\\/g, '/');
   let source = '';
   for (let i = 0; i < normalized.length; i += 1) {
     const char = normalized[i];
     if (char === '*') {
-      if (normalized[i + 1] === '*') {
+      if (normalized[i + 1] === '*' && normalized[i + 2] === '/') {
+        source += '(?:.*/)?';
+        i += 2;
+      } else if (normalized[i + 1] === '*') {
         source += '.*';
         i += 1;
       } else {

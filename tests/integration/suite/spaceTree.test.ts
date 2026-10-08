@@ -74,7 +74,7 @@ suite('空間樹 provider', () => {
     const nestedChildren = await provider.getChildren(alphaChildren[0]) as Node[];
     assert.deepEqual(nestedChildren.map((node) => node.label), ['deep.md']);
     const betaChildren = await provider.getChildren(roots[1]) as Node[];
-    assert.deepEqual(betaChildren.map((node) => node.label), ['nested']);
+    assert.deepEqual(betaChildren.map((node) => node.label), ['nested', 'b.md']);
     assert.equal(betaChildren[0].collapsibleState, vscode.TreeItemCollapsibleState.None);
   }));
 
