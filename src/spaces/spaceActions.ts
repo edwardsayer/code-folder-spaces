@@ -7,7 +7,8 @@ export function isAllowedSpaceRoot(basePath: string, candidate: string): boolean
   const relative = path.relative(base, target);
   const prefix = process.platform === 'win32' ? base.toLowerCase() : base;
   const targetPrefix = process.platform === 'win32' ? target.toLowerCase() : target;
-  return (targetPrefix === prefix || targetPrefix.startsWith(prefix + path.sep)) &&
+  const descendantPrefix = prefix.endsWith(path.sep) ? prefix : prefix + path.sep;
+  return (targetPrefix === prefix || targetPrefix.startsWith(descendantPrefix)) &&
     (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative)));
 }
 

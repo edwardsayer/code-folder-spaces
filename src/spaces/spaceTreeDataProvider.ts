@@ -155,14 +155,23 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     if (!definition) {
       return undefined;
     }
-    if (samePath(definition.basePath, normalized)) {
-      return new SpaceRootNode(definition, undefined);
+    const viewState = this._viewState?.get(definition.basePath);
+    const activeRoot = viewState?.root ?? definition.basePath;
+    if (!isInsideOrEqual(activeRoot, normalized)) {
+      return undefined;
     }
+    if (samePath(activeRoot, normalized)) {
+      return new SpaceRootNode(definition, undefined, activeRoot);
+    }
+    const settings = VIEW_PRESETS[viewState?.preset ?? 'Explorer'];
     const segments = path
-      .relative(definition.basePath, normalized)
+      .relative(activeRoot, normalized)
       .split(/[\\/]+/)
       .filter(Boolean);
-    let current: SpaceRootNode | SpaceEntryNode = new SpaceRootNode(definition, undefined);
+    if (settings.level !== 'all' && segments.length > settings.level) {
+      return undefined;
+    }
+    let current: SpaceRootNode | SpaceEntryNode = new SpaceRootNode(definition, undefined, activeRoot);
     let relativePath = '';
     for (const segment of segments) {
       relativePath = relativePath ? `${relativePath}/${segment}` : segment;
@@ -177,6 +186,9 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
           return undefined;
         }
       } else if (!definition.showFiles || !isVisibleFile(segment, relativePath, definition.include, definition.exclude)) {
+        return undefined;
+      }
+      if (viewState?.filter && !matchesPathFilter(relativePath, viewState.filter)) {
         return undefined;
       }
       current = new SpaceEntryNode(uri, isDirectory, definition, current, isDirectory);

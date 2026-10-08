@@ -219,13 +219,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         void vscode.window.showErrorMessage(vscode.l10n.t('Could not rename space: {0}', String(error)));
       }
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.resetStaleSpace', async (basePath?: string) => {
-      if (!basePath) return;
-      await viewState.resetRoot(basePath);
-      provider.clearStale(basePath);
-      treeView.message = '';
-      provider.refresh();
-    }),
     vscode.commands.registerCommand('codeFolderSpaces.setPreset', async (preset?: unknown) => {
       const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
       const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];

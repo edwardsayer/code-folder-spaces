@@ -153,6 +153,24 @@ suite('空間樹 provider', () => {
     }, false);
   });
 
+  test('下鑽後 findNodeByPath 以有效根解析並拒絕空間外或過濾路徑', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    const values = new Map<string, unknown>();
+    const state = new PaneStateStore({ get: key => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
+    const provider = new SpaceTreeDataProvider(store, state);
+    try {
+      await state.drillDown(alpha, path.join(alpha, 'nested'));
+      const filePath = path.join(alpha, 'nested/deep.md');
+      const file = await provider.findNodeByPath(filePath) as Node | undefined;
+      assert.ok(file);
+      assert.equal(file.contextValue, 'codeFolderSpaces.file');
+      assert.equal(file.resourceUri?.fsPath, filePath);
+      assert.equal(await provider.findNodeByPath(path.join(alpha, 'a.txt')), undefined);
+      await state.setFilter(alpha, 'not-a-match');
+      assert.equal(await provider.findNodeByPath(filePath), undefined);
+    } finally { provider.dispose(); store.dispose(); }
+  }));
+
   test('findNodeByPath 解析可見路徑並拒絕過濾或外部路徑', async () => withProvider([
     alpha,
     { path: path.dirname(logs), exclude: ['**/*.log'] },

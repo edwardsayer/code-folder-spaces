@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { classifySpaceRename, normalizePaneState, normalizeSpaceKey, PaneStateStore, PANE_STATE_KEY, renameSpaceKeys, rewriteRenamedPath } from '../../src/spaces/viewState';
 import { isAllowedSpaceRoot, isValidSpaceRoot, validateSpaceName } from '../../src/spaces/spaceActions';
@@ -56,6 +57,12 @@ describe('pane view state', () => {
     expect(isAllowedSpaceRoot(base, base)).toBe(true);
     expect(isAllowedSpaceRoot(base, inside)).toBe(true);
     expect(isAllowedSpaceRoot(base, outside)).toBe(false);
+  });
+
+  it('allows descendants when the space root is the filesystem root', () => {
+    const filesystemRoot = path.parse(path.resolve(path.sep)).root;
+    const child = path.join(filesystemRoot, 'folder');
+    expect(isAllowedSpaceRoot(filesystemRoot, child)).toBe(true);
   });
 
   it('rejects non-directories and missing paths when validating root candidates', async () => {
