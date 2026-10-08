@@ -21,6 +21,7 @@
 - `spaces/spaceStore.ts`：`codeFolderSpaces.spaces` 設定的讀寫封裝與變更事件；寫入目標為 Workspace（有工作區時）或 Global。
 - `spaces/spaceTreeDataProvider.ts`：`TreeDataProvider<SpaceNode>`；以 `vscode.workspace.fs` 讀取目錄，`resourceUri` 驅動原生圖示／Git／問題裝飾；`findNodeByPath()` 供 `TreeView.reveal` 使用。
 - `util/log.ts`：`LogOutputChannel` 封裝。
+- `util/concurrency.ts`：保序併發 map helper，供目錄可見子項探測使用（S1-5）。
 - `types.ts`：設定與節點型別。
 
 ## 關鍵技術決策（不可逕行推翻，需先更新 spec）
@@ -69,5 +70,6 @@ node tools/vscode-debug.mjs close
 - **檔案嵌套（file nesting）不會自動套用**：TreeView 不是內建 Explorer，`explorer.fileNesting.*` 需自行實作（參考 Secondary Explorer 的做法）。
 - **Workspace Trust 與磁碟修改**：目前尚無修改磁碟的操作，因此尚無需 gating；S3 的 CRUD／拖放實作必須以 `vscode.workspace.isTrusted` 或 `when: isWorkspaceTrusted` 停用，`capabilities.untrustedWorkspaces` 描述已承諾此行為。`@vscode/test-electron` 固定以 `--disable-workspace-trust` 執行，使其整合測試為 trusted；restricted 行為須以 EDH probe 驗證，證據見 `dev/tests/s1-3-s1-4-runtime-evidence.md`。
 - **工作區外的資料夾**：space 根可位於工作區外，`workspace.fs` 讀取及瀏覽／開檔已由 QA 實測可用。排除 glob 的 `**/` 已修正為可匹配零或多層目錄；`**/*.log` 可排除頂層及巢狀 `.log` 檔案。工作區外 watcher：實機 EDH（restricted）3/3 收到 `onDidCreate`（約 0.5–1.1 秒，工作區內對照組亦全收），故「受限模式會阻斷工作區外 watcher」不成立；惟先前 4.5 秒逾時**未能重現、成因未定**（不可逕認為單純時序問題）。整合 harness（test-cli，trusted）使用外部行程寫入檔案後，工作區外 watcher 與工作區內對照組均收到事件（S1-10）；restricted 模式仍以 EDH probe 取證。監看器與檔案操作仍須注意權限，且不應假設 `workspaceFolders` 涵蓋外部根。
+- **glob 子集邊界**：支援 `*`、`**`、`**/`（可匹配零層）、`?` 與字元跳脫；未支援 brace `{a,b}` 與 character class `[abc]`。`src/**` 不匹配目錄本身（僅其下內容）。
 - **大型目錄**：展開時各可見子目錄的可見子項探測採保序併發上限 16；S1-5 實測（Windows 本機 FS、1,500 子目錄各 1 檔與 3,000 頂層檔）單層展開中位數由 979 ms 降至 312 ms（約 68%）；逐次數據見 `dev/tests/s1-5-large-directory-measurement.md`。本輪不加快照／快取：尚無產品延遲目標可判定 312 ms 是否超標，且快取會增加失效一致性負擔；若後續目標或量測顯示有需要，再於 S4 F-44 評估。
 

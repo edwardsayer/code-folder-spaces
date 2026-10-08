@@ -20,11 +20,26 @@ describe('mapWithConcurrency', () => {
       running -= 1;
       return value;
     });
-    expect(maximumRunning).toBeLessThanOrEqual(3);
+    expect(maximumRunning).toBe(3);
     expect(results).toEqual(Array.from({ length: 20 }, (_, index) => index));
   });
 
-  it('propagates mapper errors and rejects invalid limits', async () => {
+  it('returns an empty result without calling the mapper for an empty input', async () => {
+    let mapperCalls = 0;
+    const result = await mapWithConcurrency([], 3, async (value) => {
+      mapperCalls += 1;
+      return value;
+    });
+    expect(result).toEqual([]);
+    expect(mapperCalls).toBe(0);
+  });
+
+  it('rejects NaN and zero concurrency limits', async () => {
+    await expect(mapWithConcurrency([], Number.NaN, async (value) => value)).rejects.toThrow(RangeError);
+    await expect(mapWithConcurrency([], 0, async (value) => value)).rejects.toThrow(RangeError);
+  });
+
+  it('propagates mapper errors', async () => {
     const error = new Error('mapper failed');
     await expect(mapWithConcurrency([1, 2, 3], 2, async (value) => {
       if (value === 2) {
@@ -32,6 +47,5 @@ describe('mapWithConcurrency', () => {
       }
       return value;
     })).rejects.toBe(error);
-    await expect(mapWithConcurrency([], 0, async (value) => value)).rejects.toThrow(RangeError);
   });
 });

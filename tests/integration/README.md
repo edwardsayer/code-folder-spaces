@@ -27,7 +27,7 @@ npm run test:integration
 
 `@vscode/test-electron` 的 `node_modules/@vscode/test-electron/out/runTest.js` 固定傳入 `--disable-workspace-trust`，因此整合測試 Extension Host 是 trusted，`trust.test.ts` 以 `vscode.workspace.isTrusted === true` 明確記錄此限制。受限模式無法由本自動化套件涵蓋，須透過 Extension Development Host（EDH）probe 手動取證，結果見 `dev/tests/s1-3-s1-4-runtime-evidence.md`。
 
-工作區外根的自動化涵蓋 `workspace.fs` provider 讀取／樹節點、排序與篩選、`findNodeByPath`。排除使用單一 `**/*.log` pattern 驗證頂層及巢狀檔案。watcher 診斷由外部行程建立工作區外與工作區內檔案，最多等候 20 秒；這些測試不代表 restricted 模式，受限模式的 watcher 與瀏覽／開檔實機證據見 EDH probe 報告。測試設定會還原 workspace/global 值，不在 committed fixture 留下設定變更。
+工作區外根的自動化涵蓋 `workspace.fs` provider 讀取／樹節點、排序與篩選、`findNodeByPath`。排除使用單一 `**/*.log` pattern 驗證頂層及巢狀檔案。watcher 診斷由外部行程建立工作區外與工作區內檔案，最多等候 20 秒；這些測試不代表 restricted 模式，受限模式的 watcher 與瀏覽／開檔實機證據見 EDH probe 報告。測試設定會還原 workspace/global 值，不在 committed fixture 留下設定變更。watcher 案例會在工作區 fixture 根建立 `watcher-*.txt` 並於 `finally` 刪除；若 Extension Host 崩潰可能殘留未追蹤檔，需人工刪除。
 
 ## 已知平台行為／限制
 
