@@ -155,6 +155,11 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     return element.parent;
   }
 
+  /** 目前 pane 應顯示的根（依 spec §3.3）；供 extension 組節點時重用同一解析。 */
+  activeRootFor(definition: SpaceDefinition): string {
+    return this._activeRoot(definition);
+  }
+
   private _activeRoot(definition: SpaceDefinition): string {
     const state = this._viewState?.get(definition.basePath);
     const scopeMatchesDefinition = Boolean(this._paneScope && samePath(definition.basePath, this._paneScope.basePath));

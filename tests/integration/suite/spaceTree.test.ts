@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
-import { SpaceRootNode, SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
+import { SpaceTreeDataProvider, SpaceRootNode, resolveActiveRoot } from '../../../src/spaces/spaceTreeDataProvider';
 import { PaneStateStore } from '../../../src/spaces/viewState';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceConfigEntry } from '../../../src/types';
@@ -85,6 +85,21 @@ suite('空間樹 provider', () => {
       assert.equal((await scoped.findNodeByPath(path.join(alpha, 'a.txt')))?.label, 'a.txt');
     } finally { scoped.dispose(); store.dispose(); }
   }));
+
+  test('resolveActiveRoot 依 spec §3.3 解析鏈結根與下鑽根', () => {
+    const basePath = 'C:\\ws\\space';
+    const chainRoot = 'C:\\ws\\space\\one';
+    const drillRoot = 'C:\\ws\\space\\one\\two';
+    // 未下鑽 → 鏈結根優先
+    assert.equal(resolveActiveRoot({ root: basePath, drillStack: [] }, basePath, chainRoot), chainRoot);
+    // 未下鑽且無鏈結根 → 下鑽根（或 basePath）
+    assert.equal(resolveActiveRoot({ root: drillRoot, drillStack: [] }, basePath, null), drillRoot);
+    assert.equal(resolveActiveRoot({ drillStack: [] }, basePath, null), basePath);
+    // 已下鑽 → 下鑽根優先，即使鏈結根非 null
+    assert.equal(resolveActiveRoot({ root: drillRoot, drillStack: [{}] }, basePath, chainRoot), drillRoot);
+    // 無狀態 → basePath
+    assert.equal(resolveActiveRoot(undefined, basePath, null), basePath);
+  });
 
   test('下鑽後 provider 從新根列舉，返回還原原檢視狀態', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
     const store = new SpaceStore();

@@ -179,7 +179,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const definition = store.getDefinitions().find(item => item.basePath === runtime.scope!.basePath);
     const state = definition ? viewState.get(definition.basePath) : undefined;
     const target = runtime.treeView.selection[0];
-    const refresh = (): void => runtime.provider.refresh();
+    // bySpace 狀態為每空間共用：pane menu 寫入的 preset／filter／sort／下鑽會影響同空間的所有 pane。
+    const refresh = (): void => refreshPanesForSpace(runtime.scope!.basePath);
     if (action === 'Refresh') { refresh(); return; }
     if (action === 'Toggle follow') { await createPaneHandlers(paneId, runtime).toggleFollow(); return; }
     if (action === 'Reveal in Explorer' || action === 'Reveal in OS') {
@@ -341,7 +342,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   context.subscriptions.push(provider.onDidChangeTreeData(() => {
     const selected = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
     const definition = selected instanceof SpaceRootNode ? selected.definition : selected && 'space' in selected ? selected.space : store.getDefinitions()[0];
-    if (definition) void provider.getChildren(new SpaceRootNode(definition, undefined, firstPaneScope?.root ?? definition.basePath)).then(() => {
+    if (definition) void provider.getChildren(new SpaceRootNode(definition, undefined, provider.activeRootFor(definition))).then(() => {
       const stalePath = provider.staleRoots.values().next().value as string | undefined;
       treeView.message = stalePath ? vscode.l10n.t('Space path is stale: {0}. Update the space path to restore it.', stalePath) : provider.filterMessage;
     });
