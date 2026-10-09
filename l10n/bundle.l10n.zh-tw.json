@@ -32,8 +32,10 @@
   "Choose a destination folder within this space": "選擇此空間內的目的地資料夾",
   "A folder cannot be moved into itself or one of its subfolders.": "無法將資料夾移至自身或其子資料夾中。",
   "Moving {0}": "正在移動 {0}",
-  "Moving dropped items": "正在移動拖放項目",
-  "Cannot move items between different file system providers.": "無法在不同檔案系統提供者之間移動項目。",
+  "Processing dropped items": "正在處理拖放項目",
+  "Copied {0} item(s). Copies cannot be undone.": "已複製 {0} 個項目。複製操作無法復原。",
+
+  "Cannot transfer items between different file system providers.": "無法在不同檔案系統提供者之間傳輸項目。",
   "The source no longer exists: {0}": "來源已不存在：{0}",
   "This file system provider does not expose trash support; the item was not deleted.": "此檔案系統提供者未提供垃圾桶支援；未刪除該項目。",
   "Delete \"{0}\"?": "要刪除「{0}」嗎？",

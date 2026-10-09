@@ -69,9 +69,9 @@ export function resolvePasteTarget(target: DropTargetCandidate | undefined): str
   return target.isRoot || target.isDirectory ? target.path : path.dirname(target.path);
 }
 
-/** Different configured roots are still valid move endpoints; definitions themselves remain unchanged. */
-export function isCrossSpaceMove(sourceSpaceRoot: string, destinationSpaceRoot: string): boolean {
-  return !isSamePath(sourceSpaceRoot, destinationSpaceRoot);
+/** A moved path invalidates a pane root when it is that path or a descendant. */
+export function hasDrillStateWithinMovedSources(stateRoots: string[], sources: string[]): boolean {
+  return stateRoots.some(candidate => sources.some(source => isSamePath(candidate, source) || isAllowedSpaceRoot(source, candidate)));
 }
 
 export function uniqueEntryName(name: string, exists: (candidate: string) => boolean): string {

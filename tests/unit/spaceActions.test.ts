@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isCrossSpaceMove, isSafeMove, isSamePath, isValidEntryName, resolveDropTarget, resolveOpenBeside, resolvePasteTarget, SpaceClipboard, UndoStack, uniqueEntryName } from '../../src/spaces/spaceActions';
+import { hasDrillStateWithinMovedSources, isSafeMove, isSamePath, isValidEntryName, resolveDropTarget, resolveOpenBeside, resolvePasteTarget, SpaceClipboard, UndoStack, uniqueEntryName } from '../../src/spaces/spaceActions';
 
 describe('spaceActions file operations', () => {
   it('validates single-segment names', () => {
@@ -28,9 +28,13 @@ describe('spaceActions file operations', () => {
     expect(resolvePasteTarget(undefined)).toBeUndefined();
   });
 
-  it('allows moves across distinct configured space roots', () => {
-    expect(isCrossSpaceMove('/space/a', '/space/b')).toBe(true);
-    expect(isCrossSpaceMove('/space/a', '/space/a')).toBe(false);
+  it('resolves paste destinations for selected file rows with platform separators', () => {
+    expect(resolvePasteTarget({ path: '/space/folder/file.txt', isDirectory: false })).toBe('/space/folder');
+  });
+
+  it('detects drill roots invalidated by moved sources', () => {
+    expect(hasDrillStateWithinMovedSources(['/source/nested', '/other'], ['/source'])).toBe(true);
+    expect(hasDrillStateWithinMovedSources(['/source-parent', '/other'], ['/source'])).toBe(false);
   });
 
   it('finds a unique suffixed name without losing extension', () => {

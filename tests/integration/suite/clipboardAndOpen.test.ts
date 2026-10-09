@@ -39,10 +39,12 @@ suite('剪貼簿與檔案開啟位置', () => {
       await setting.update('openFilesIn', 'current', target);
       const currentColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
       await vscode.commands.executeCommand('codeFolderSpaces.openEntry', vscode.Uri.file(tempPath));
-      assert.equal(vscode.window.activeTextEditor?.viewColumn, currentColumn);
+      assert.ok(vscode.window.activeTextEditor, 'current editor should be active after opening');
+      assert.equal(vscode.window.activeTextEditor.viewColumn, currentColumn);
       await setting.update('openFilesIn', 'beside', target);
       await vscode.commands.executeCommand('codeFolderSpaces.openEntry', vscode.Uri.file(tempPath));
-      assert.ok(vscode.window.activeTextEditor?.viewColumn !== currentColumn);
+      assert.ok(vscode.window.activeTextEditor, 'beside editor should be active after opening');
+      assert.ok(vscode.window.activeTextEditor.viewColumn !== currentColumn);
     } finally {
       await setting.update('openFilesIn', previous?.workspaceValue ?? previous?.globalValue ?? 'current', target);
       await fs.rm(tempPath, { force: true });

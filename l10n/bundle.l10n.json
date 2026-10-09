@@ -32,8 +32,10 @@
   "Choose a destination folder within this space": "Choose a destination folder within this space",
   "A folder cannot be moved into itself or one of its subfolders.": "A folder cannot be moved into itself or one of its subfolders.",
   "Moving {0}": "Moving {0}",
-  "Moving dropped items": "Moving dropped items",
-  "Cannot move items between different file system providers.": "Cannot move items between different file system providers.",
+  "Processing dropped items": "Processing dropped items",
+  "Copied {0} item(s). Copies cannot be undone.": "Copied {0} item(s). Copies cannot be undone.",
+
+  "Cannot transfer items between different file system providers.": "Cannot transfer items between different file system providers.",
   "The source no longer exists: {0}": "The source no longer exists: {0}",
   "This file system provider does not expose trash support; the item was not deleted.": "This file system provider does not expose trash support; the item was not deleted.",
   "Delete \"{0}\"?": "Delete \"{0}\"?",
