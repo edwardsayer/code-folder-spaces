@@ -531,6 +531,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await syncPaneContexts(); syncPaneViews();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane.remove', async () => {
+      // 下限保護：不可移除 pane1（唯一可見 pane），避免留下 0 個 pane 或刪除 pane1 的鏈結。
+      if (configuredPaneCount() <= 1) return;
       const config = vscode.workspace.getConfiguration('codeFolderSpaces');
       const count = Math.max(1, configuredPaneCount() - 1);
       const links = { ...(viewState.getPaneLinks() ?? {}) };

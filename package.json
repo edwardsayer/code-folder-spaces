@@ -210,6 +210,16 @@
     "menus": {
       "view/title": [
         {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.canAddPane",
+          "group": "navigation@9"
+        },
+        {
+          "command": "codeFolderSpaces.pane.remove",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.canRemovePane",
+          "group": "navigation@10"
+        },
+        {
           "command": "codeFolderSpaces.addSpace",
           "when": "view == codeFolderSpaces.pane1",
           "group": "navigation@1"
