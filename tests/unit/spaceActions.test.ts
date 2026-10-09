@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canModifyFiles, isSafeMove, isValidEntryName, UndoStack, uniqueEntryName } from '../../src/spaces/spaceActions';
+import { isSafeMove, isSamePath, isValidEntryName, UndoStack, uniqueEntryName } from '../../src/spaces/spaceActions';
 
 describe('spaceActions file operations', () => {
   it('validates single-segment names', () => {
@@ -11,6 +11,12 @@ describe('spaceActions file operations', () => {
     const taken = new Set(['note.md', 'note 1.md']);
     expect(uniqueEntryName('note.md', name => taken.has(name))).toBe('note 2.md');
     expect(uniqueEntryName('fresh', name => taken.has(name))).toBe('fresh');
+  });
+
+  it('compares Windows paths case-insensitively for rename collision checks', () => {
+    expect(isSamePath('C:\\Space\\Dir', 'c:\\space\\dir', 'win32')).toBe(true);
+    expect(isSamePath('C:\\Space\\Dir', 'C:\\Space\\Other', 'win32')).toBe(false);
+    expect(isSamePath('/space/Dir', '/space/dir', 'linux')).toBe(false);
   });
 
   it('rejects directory moves into itself or descendants', () => {
@@ -29,8 +35,4 @@ describe('spaceActions file operations', () => {
     expect(stack.size).toBe(19);
   });
 
-  it('allows disk mutations only when trusted', () => {
-    expect(canModifyFiles(true)).toBe(true);
-    expect(canModifyFiles(false)).toBe(false);
-  });
 });

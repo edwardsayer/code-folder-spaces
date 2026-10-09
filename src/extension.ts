@@ -4,7 +4,7 @@ import { SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProv
 import { SpaceStore } from './spaces/spaceStore';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
 import { classifySpaceRename, PaneStateStore } from './spaces/viewState';
-import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isValidEntryName, isValidSpaceRoot, UndoStack, validateSpaceName } from './spaces/spaceActions';
+import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, isValidSpaceRoot, UndoStack, validateSpaceName } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 
@@ -227,6 +227,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     } catch (error) { operationError(error); }
   };
   const renameEntry = async (node: unknown): Promise<void> => {
+    // Command palette invocations have no node; reject space roots as defense in depth.
+    if (node instanceof SpaceRootNode) return;
     if (!requireTrust()) return;
     const entry = getEntry(node); if (!entry) return;
     const name = await vscode.window.showInputBox({ prompt: vscode.l10n.t('Enter a new name'), value: path.basename(entry.uri.fsPath) });
@@ -236,12 +238,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (!isAllowedSpaceRoot(entry.basePath, target.fsPath)) { void vscode.window.showErrorMessage(vscode.l10n.t('The destination is outside the folder space.')); return; }
     try {
       await vscode.workspace.fs.stat(entry.uri);
-      if (await exists(target)) { void vscode.window.showErrorMessage(vscode.l10n.t('The target already exists: {0}', target.fsPath)); return; }
+      if (!isSamePath(entry.uri.fsPath, target.fsPath) && await exists(target)) { void vscode.window.showErrorMessage(vscode.l10n.t('The target already exists: {0}', target.fsPath)); return; }
       await vscode.workspace.fs.rename(entry.uri, target, { overwrite: false });
       undoStack.push({ kind: 'rename', from: entry.uri.fsPath, to: target.fsPath }); provider.refresh();
     } catch (error) { operationError(error); }
   };
   const moveEntry = async (node: unknown): Promise<void> => {
+    // Command palette invocations have no node; reject space roots as defense in depth.
+    if (node instanceof SpaceRootNode) return;
     if (!requireTrust()) return;
     const entry = getEntry(node); if (!entry) return;
     const folders: Array<vscode.QuickPickItem & { uri: vscode.Uri }> = [];
@@ -273,6 +277,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     } catch (error) { operationError(error); }
   };
   const deleteEntry = async (node: unknown): Promise<void> => {
+    // Command palette invocations have no node; reject space roots as defense in depth.
+    if (node instanceof SpaceRootNode) return;
     if (!requireTrust()) return;
     const entry = getEntry(node); if (!entry) return;
     try {

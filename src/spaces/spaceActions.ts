@@ -33,6 +33,16 @@ export function isValidEntryName(name: string): boolean {
   return Boolean(name.trim() && name === name.trim() && name !== '.' && name !== '..' && !/[\\/\\0]/.test(name));
 }
 
+/** Compare paths using the host platform's case rules (Windows paths are case-insensitive). */
+export function isSamePath(source: string, target: string, platform: NodeJS.Platform = process.platform): boolean {
+  const pathApi = platform === 'win32' ? path.win32 : path;
+  const normalizedSource = pathApi.normalize(source);
+  const normalizedTarget = pathApi.normalize(target);
+  return platform === 'win32'
+    ? normalizedSource.toLowerCase() === normalizedTarget.toLowerCase()
+    : normalizedSource === normalizedTarget;
+}
+
 /** Prevent moving a directory into itself or any descendant. */
 export function isSafeMove(source: string, target: string, isDirectory: boolean): boolean {
   if (!isDirectory) return true;
