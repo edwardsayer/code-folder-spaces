@@ -108,6 +108,20 @@ export interface PaneProviderScope {
   root: string | null;
 }
 
+/**
+ * 依設計 spec §3.3 解析一個空間在目前 pane 應顯示的根：
+ * `drillStack` 非空（已就地下鑽）→ 顯示下鑽根；否則顯示 pane 的鏈結根。
+ * 鏈結根不適用（例：非此 pane 的空間）時回退為下鑽根或空間 basePath。
+ */
+export function resolveActiveRoot(
+  state: { root?: string; drillStack?: readonly unknown[] } | undefined,
+  basePath: string,
+  paneRoot?: string | null,
+): string {
+  if ((state?.drillStack?.length ?? 0) === 0 && paneRoot) return paneRoot;
+  return state?.root ?? basePath;
+}
+
 export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<SpaceNode | undefined | void>();
   readonly onDidChangeTreeData: vscode.Event<SpaceNode | undefined | void> = this._onDidChangeTreeData.event;
@@ -141,19 +155,18 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     return element.parent;
   }
 
+  private _activeRoot(definition: SpaceDefinition): string {
+    const state = this._viewState?.get(definition.basePath);
+    const scopeMatchesDefinition = Boolean(this._paneScope && samePath(definition.basePath, this._paneScope.basePath));
+    return resolveActiveRoot(state, definition.basePath, scopeMatchesDefinition ? this._paneScope!.root : null);
+  }
+
   async getChildren(element?: SpaceNode): Promise<SpaceNode[]> {
     if (!element) {
       const definitions = this._paneScope
         ? this._definitions.filter(definition => samePath(definition.basePath, this._paneScope!.basePath))
         : this._definitions;
-      return definitions.map((definition) => {
-        const state = this._viewState?.get(definition.basePath);
-        const scopeMatchesDefinition = this._paneScope && samePath(definition.basePath, this._paneScope.basePath);
-        const root = scopeMatchesDefinition && this._paneScope.root !== null
-          ? this._paneScope.root
-          : state?.root ?? definition.basePath;
-        return new SpaceRootNode(definition, undefined, root);
-      });
+      return definitions.map((definition) => new SpaceRootNode(definition, undefined, this._activeRoot(definition)));
     }
     return this._listChildren(element);
   }
@@ -171,7 +184,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       return undefined;
     }
     const viewState = this._viewState?.get(definition.basePath);
-    const activeRoot = this._paneScope?.root ?? viewState?.root ?? definition.basePath;
+    const activeRoot = this._activeRoot(definition);
     if (!isInsideOrEqual(activeRoot, normalized)) {
       return undefined;
     }
@@ -221,7 +234,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     }
     if (settings.content === 'files' && element instanceof SpaceEntryNode && element.isDirectory) return [];
     if (settings.content === 'folders' && element instanceof SpaceEntryNode && !element.isDirectory) return [];
-    const activeRoot = element instanceof SpaceRootNode ? element.rootPath : this._paneScope?.root ?? this._viewState?.get(space.basePath).root ?? space.basePath;
+    const activeRoot = element instanceof SpaceRootNode ? element.rootPath : this._activeRoot(space);
     const elementDepth = element instanceof SpaceRootNode ? 0 : path.relative(activeRoot, element.uri.fsPath).split(/[\\/]+/).filter(Boolean).length;
     if (settings.level !== 'all' && elementDepth >= settings.level) return [];
     const entries = await readDirectorySafe(element.uri);

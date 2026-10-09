@@ -62,6 +62,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     onChanged: () => { for (const runtime of paneRuntime.values()) runtime.provider.refresh(); rebuildWatchers(); },
     onError: error => operationError(error),
   });
+  // bySpace 檢視狀態為每空間共用，下鑽會影響同空間的所有 pane，故一併重繪。
+  const refreshPanesForSpace = (basePath: string): void => {
+    for (const runtime of paneRuntime.values()) {
+      if (runtime.scope && isSamePath(runtime.scope.basePath, basePath)) runtime.provider.refresh();
+    }
+  };
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
     showCollapseAll: true,
@@ -631,19 +637,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.drillDown', async (node?: unknown) => {
       const target = node && typeof node === 'object' && 'space' in node ? node as { space: import('./types').SpaceDefinition; uri: vscode.Uri; isDirectory: boolean } : undefined;
       if (!target?.isDirectory) return;
-      const state = viewState.get(target.space.basePath);
-      const activeRoot = state.root ?? target.space.basePath;
-      const relative = path.relative(activeRoot, target.uri.fsPath);
+      // 下鑽對象一定來自樹內節點，故以空間 basePath 為守門基準，不依賴 bySpace.root
+      // （後者可能已被其他 pane 的 switchRoot 或下鑽改變）。
+      const relative = path.relative(target.space.basePath, target.uri.fsPath);
       if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return;
       await viewState.drillDown(target.space.basePath, target.uri.fsPath);
-      provider.refresh();
+      refreshPanesForSpace(target.space.basePath);
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.drillUp', async () => {
       const target = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
       const definition = target instanceof SpaceRootNode ? target.definition : target && 'space' in target ? target.space : store.getDefinitions()[0];
       if (!definition || !(await viewState.drillUp(definition.basePath))) return;
-      provider.refresh();
+      refreshPanesForSpace(definition.basePath);
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.switchRoot', async (node?: SpaceRootNode) => {

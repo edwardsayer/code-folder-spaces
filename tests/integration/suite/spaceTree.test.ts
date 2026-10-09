@@ -56,6 +56,36 @@ suite('空間樹 provider', () => {
     } finally { scoped.dispose(); store.dispose(); }
   }));
 
+  test('已下鑽的 pane 顯示下鑽根，返回後回復 pane 鏈結根（spec §3.3）', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    let document: unknown;
+    const state = new PaneStateStore({ get: <T>() => document as T | undefined, update: async (_key, value) => { document = value; } });
+    const chainRoot = alpha;
+    const drillRoot = path.join(alpha, 'nested');
+    const scoped = new SpaceTreeDataProvider(store, state, { basePath: alpha, root: chainRoot });
+    try {
+      // drillStack 空 → 顯示 pane 鏈結根（非 null），可解析其可見路徑。
+      const initial = await scoped.getChildren();
+      assert.equal((initial[0] as SpaceRootNode).rootPath, chainRoot);
+      assert.equal((await scoped.findNodeByPath(path.join(alpha, 'a.txt')))?.label, 'a.txt');
+
+      // 就地下鑽後 → 下鑽根優先於 pane 鏈結根（原缺陷：鏈結根遮蔽下鑽根）。
+      await state.drillDown(alpha, drillRoot);
+      const drilled = await scoped.getChildren();
+      assert.equal((drilled[0] as SpaceRootNode).rootPath, drillRoot);
+      assert.equal((drilled[0] as SpaceRootNode).rootPath, state.get(alpha).root);
+      assert.equal((await scoped.findNodeByPath(path.join(alpha, 'nested/deep.md')))?.label, 'deep.md');
+      // 下鑽根之外的路徑不得被視為可見。
+      assert.equal(await scoped.findNodeByPath(path.join(alpha, 'a.txt')), undefined);
+
+      // drillUp 後 stack 清空 → 回復鏈結根。
+      assert.equal(await state.drillUp(alpha), true);
+      const restored = await scoped.getChildren();
+      assert.equal((restored[0] as SpaceRootNode).rootPath, chainRoot);
+      assert.equal((await scoped.findNodeByPath(path.join(alpha, 'a.txt')))?.label, 'a.txt');
+    } finally { scoped.dispose(); store.dispose(); }
+  }));
+
   test('下鑽後 provider 從新根列舉，返回還原原檢視狀態', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
     const store = new SpaceStore();
     let document: unknown;
