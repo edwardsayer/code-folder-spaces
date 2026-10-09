@@ -4,8 +4,10 @@ import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider } from './spaces/s
 import { SpaceStore } from './spaces/spaceStore';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
 import { classifySpaceRename, getEnabledPaneCount, PaneStateStore } from './spaces/viewState';
-import { getFollowingChildPaneIds, isPaneRootDirectory, shouldCascadeSelection } from './spaces/paneLinks';
-import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, isValidSpaceRoot, resolveDropTarget, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack, uniqueEntryName, validateSpaceName } from './spaces/spaceActions';
+import { isPaneRootDirectory } from './spaces/paneLinks';
+import { PaneCascadeController } from './spaces/paneCascade';
+import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
+import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, isValidSpaceRoot, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack, validateSpaceName } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 
@@ -50,46 +52,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     ? { basePath: firstDefinition.basePath, root: viewState.getPaneLinks()?.pane1?.root ?? null }
     : undefined;
   const provider = new SpaceTreeDataProvider(store, viewState, firstPaneScope);
+  // 所有 pane 與命令共用 session-only undo；回呼延後取用後方建立的服務。
+  const undoStack = new UndoStack();
+  const createPaneDragAndDrop = (paneId: string) => createTreeDragAndDropController(paneId, {
+    getDefinitions: () => store.getDefinitions(),
+    undoStack,
+    requireTrust: () => requireTrust(),
+    clearDrillStateForMovedSources: sources => clearDrillStateForMovedSources(sources),
+    onChanged: () => { for (const runtime of paneRuntime.values()) runtime.provider.refresh(); rebuildWatchers(); },
+    onError: error => operationError(error),
+  });
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
     showCollapseAll: true,
-    dragAndDropController: {
-      dragMimeTypes: ['text/uri-list', 'application/vnd.code.tree.codeFolderSpaces.pane1'],
-      dropMimeTypes: ['text/uri-list', 'application/vnd.code.tree.codeFolderSpaces.pane1'],
-      handleDrag: async (source, dataTransfer) => {
-        const uris = source.map(node => node instanceof SpaceRootNode ? undefined : (node as { uri?: vscode.Uri }).uri)
-          .filter((uri): uri is vscode.Uri => uri instanceof vscode.Uri && uri.scheme === 'file');
-        if (!uris.length) return;
-        const serialized = uris.map(uri => uri.toString()).join('\r\n');
-        dataTransfer.set('text/uri-list', new vscode.DataTransferItem(serialized));
-        dataTransfer.set('application/vnd.code.tree.codeFolderSpaces.pane1', new vscode.DataTransferItem(serialized));
-      },
-      handleDrop: async (target, dataTransfer) => {
-        if (!target) return;
-        const destinationPath = resolveDropTarget(target instanceof SpaceRootNode
-          ? { path: target.uri.fsPath, isDirectory: true, isRoot: true }
-          : { path: (target as { uri?: vscode.Uri }).uri?.fsPath ?? '', isDirectory: Boolean((target as { isDirectory?: boolean }).isDirectory) });
-        const destination = destinationPath ? vscode.Uri.file(destinationPath) : undefined;
-        if (!destination || destination.scheme !== 'file') return;
-        try {
-          const destinationStat = await vscode.workspace.fs.stat(destination);
-          if (!(destinationStat.type & vscode.FileType.Directory)) return;
-        } catch { return; }
-        if (!requireTrust()) return;
-        const item = dataTransfer.get('application/vnd.code.tree.codeFolderSpaces.pane1') ?? dataTransfer.get('text/uri-list');
-        if (!item) return;
-        try {
-          const raw = await item.asString();
-          const sources = raw.split(/\r?\n/).filter(line => line && !line.startsWith('#')).map(line => vscode.Uri.parse(line));
-          await moveDroppedEntries(sources, destination);
-        } catch (error) { operationError(error); }
-      },
-    },
+    dragAndDropController: createPaneDragAndDrop('pane1'),
   });
   context.subscriptions.push(store, provider, treeView);
-  interface PaneRuntime { id: string; provider: SpaceTreeDataProvider; treeView: vscode.TreeView<import('./spaces/spaceTreeDataProvider').SpaceNode>; scope?: { basePath: string; root: string | null }; selectionGeneration: number; expectedRoot?: string; expectedRootTimer?: ReturnType<typeof setTimeout>; staleRoot?: string; selectionTimer?: ReturnType<typeof setTimeout> }
-  const paneRuntime = new Map<string, PaneRuntime>([['pane1', { id: 'pane1', provider, treeView, scope: firstPaneScope, selectionGeneration: 0 }]]);
+  interface PaneRuntime { id: string; provider: SpaceTreeDataProvider; treeView: vscode.TreeView<import('./spaces/spaceTreeDataProvider').SpaceNode>; scope?: { basePath: string; root: string | null }; staleRoot?: string }
+  const paneRuntime = new Map<string, PaneRuntime>([['pane1', { id: 'pane1', provider, treeView, scope: firstPaneScope }]]);
   const cascadeDisposables = new Map<string, vscode.Disposable>();
+  const cascadeController = new PaneCascadeController({
+    state: viewState,
+    getRuntime: id => paneRuntime.get(id),
+    isAllowedRoot: isAllowedSpaceRoot,
+    stat: async uri => await vscode.workspace.fs.stat(uri),
+    directoryType: vscode.FileType.Directory,
+    onError: error => { void vscode.window.showErrorMessage(vscode.l10n.t('Invalid pane link: {0}', String(error))); },
+  });
+  context.subscriptions.push(cascadeController);
   const syncPaneViews = (): void => {
     const definitions = store.getDefinitions();
     const count = getEnabledPaneCount(definitions.length, configuredPaneCount());
@@ -112,7 +102,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const existing = paneRuntime.get(id);
       const definition = definitions[index - 1];
       if (index > count || !definition) {
-        if (existing) { cascadeDisposables.get(id)?.dispose(); cascadeDisposables.delete(id); if (existing.selectionTimer) clearTimeout(existing.selectionTimer); existing.treeView.dispose(); existing.provider.dispose(); paneRuntime.delete(id); }
+        if (existing) { cascadeDisposables.get(id)?.dispose(); cascadeDisposables.delete(id); existing.treeView.dispose(); existing.provider.dispose(); paneRuntime.delete(id); }
         continue;
       }
       if (existing) continue;
@@ -121,90 +111,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const paneProvider = new SpaceTreeDataProvider(store, viewState, scope);
       const paneTreeView = vscode.window.createTreeView(`codeFolderSpaces.${id}`, {
         treeDataProvider: paneProvider, showCollapseAll: true,
-        dragAndDropController: {
-          dragMimeTypes: ['text/uri-list', `application/vnd.code.tree.codeFolderSpaces.${id}`],
-          dropMimeTypes: ['text/uri-list', `application/vnd.code.tree.codeFolderSpaces.${id}`],
-          handleDrag: async (source, transfer) => {
-            const uris = source.filter((node): node is SpaceEntryNode => node instanceof SpaceEntryNode && node.uri.scheme === 'file').map(node => node.uri);
-            if (!uris.length) return;
-            const serialized = uris.map(uri => uri.toString()).join('\r\n');
-            transfer.set('text/uri-list', new vscode.DataTransferItem(serialized));
-            transfer.set(`application/vnd.code.tree.codeFolderSpaces.${id}`, new vscode.DataTransferItem(serialized));
-          },
-          handleDrop: async (target, transfer) => {
-            if (!target) return;
-            const targetUri = target instanceof SpaceRootNode ? target.uri : (target as { uri?: vscode.Uri }).uri;
-            if (!targetUri) return;
-            const destinationPath = resolveDropTarget(target instanceof SpaceRootNode
-              ? { path: targetUri.fsPath, isDirectory: true, isRoot: true }
-              : { path: targetUri.fsPath, isDirectory: Boolean((target as { isDirectory?: boolean }).isDirectory) });
-            if (!destinationPath || !requireTrust()) return;
-            const item = transfer.get(`application/vnd.code.tree.codeFolderSpaces.${id}`) ?? transfer.get('text/uri-list');
-            if (!item) return;
-            try { await moveDroppedEntries((await item.asString()).split(/\r?\n/).filter(line => line && !line.startsWith('#')).map(line => vscode.Uri.parse(line)), vscode.Uri.file(destinationPath)); }
-            catch (error) { operationError(error); }
-          },
-        },
+        dragAndDropController: createPaneDragAndDrop(id),
       });
       context.subscriptions.push(paneProvider, paneTreeView);
-      paneRuntime.set(id, { id, provider: paneProvider, treeView: paneTreeView, scope, selectionGeneration: 0 });
+      paneRuntime.set(id, { id, provider: paneProvider, treeView: paneTreeView, scope });
     }
   };
   const attachPaneCascade = (runtime: PaneRuntime): void => {
     if (cascadeDisposables.has(runtime.id)) return;
-    const disposable = runtime.treeView.onDidChangeSelection(event => {
+    const disposable = cascadeController.attach(runtime.id, listener => runtime.treeView.onDidChangeSelection(event => {
       const selected = event.selection[0];
-      const selectedUri = selected instanceof SpaceRootNode || selected instanceof SpaceEntryNode ? selected.uri : undefined;
-      if (runtime.expectedRoot) {
-        const suppress = selectedUri?.fsPath === runtime.expectedRoot;
-        runtime.expectedRoot = undefined;
-        if (runtime.expectedRootTimer) clearTimeout(runtime.expectedRootTimer);
-        runtime.expectedRootTimer = undefined;
-        if (suppress) return;
-      }
-      const links = viewState.getPaneLinks() ?? {};
-      const childIds = getFollowingChildPaneIds(links, runtime.id);
-      if (!childIds.length) return;
-      runtime.selectionGeneration++;
-      const generation = runtime.selectionGeneration;
-      if (runtime.selectionTimer) clearTimeout(runtime.selectionTimer);
-      runtime.selectionTimer = setTimeout(() => {
-        runtime.selectionTimer = undefined;
-        void (async () => {
-          const isFolder = selected instanceof SpaceRootNode || (selected instanceof SpaceEntryNode && selected.isDirectory);
-          if (generation !== runtime.selectionGeneration || !selectedUri || !shouldCascadeSelection(isFolder, true)) return;
-          let stat: vscode.FileStat;
-          try { stat = await vscode.workspace.fs.stat(selectedUri); } catch { return; }
-          if (generation !== runtime.selectionGeneration || !isPaneRootDirectory(stat.type, vscode.FileType.Directory)) return;
-          for (const childId of childIds) {
-            if (generation !== runtime.selectionGeneration) return;
-            const child = paneRuntime.get(childId);
-            if (!child?.scope) continue;
-            const currentLinks = { ...(viewState.getPaneLinks() ?? {}) };
-            const childLink = currentLinks[childId];
-            if (!childLink || childLink.parentPaneId !== runtime.id || !childLink.follow) continue;
-            // 空間歸屬守門：子 pane 若已被 switchRoot 切到其他空間（scope.basePath 改變），
-            // 其 root 必須留在該空間之內，不得被父 pane 的選取注入外來路徑（避免 filter 與
-            // findNodeByPath 前後不一致）。
-            if (!isAllowedSpaceRoot(child.scope.basePath, selectedUri.fsPath)) continue;
-            childLink.root = selectedUri.fsPath;
-            try { await viewState.setPaneLinks(currentLinks); }
-            catch (error) { void vscode.window.showErrorMessage(vscode.l10n.t('Invalid pane link: {0}', String(error))); return; }
-            if (generation !== runtime.selectionGeneration) return;
-            child.expectedRoot = selectedUri.fsPath;
-            if (child.expectedRootTimer) clearTimeout(child.expectedRootTimer);
-            child.expectedRootTimer = setTimeout(() => { child.expectedRoot = undefined; child.expectedRootTimer = undefined; }, 500);
-            child.scope.root = selectedUri.fsPath;
-            child.staleRoot = undefined;
-            child.provider.clearStale(child.scope.basePath);
-            child.provider.refresh();
-            child.treeView.message = '';
-          }
-        })();
-      }, 100);
-    });
+      listener(selected instanceof SpaceRootNode
+        ? { uri: selected.uri, isDirectory: true }
+        : selected instanceof SpaceEntryNode ? { uri: selected.uri, isDirectory: selected.isDirectory } : undefined);
+    }));
     cascadeDisposables.set(runtime.id, disposable);
-    context.subscriptions.push(disposable, new vscode.Disposable(() => { if (runtime.selectionTimer) clearTimeout(runtime.selectionTimer); }));
   };
   const reconcilePaneRoots = async (): Promise<void> => {
     for (const [id, link] of Object.entries(viewState.getPaneLinks() ?? {})) {
@@ -475,8 +396,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     })
   );
 
-  // Session-only history; undo records are intentionally cleared on extension reload and never persisted to mementos.
-  const undoStack = new UndoStack();
   const clipboard = new SpaceClipboard();
   const selectedUri = (node: unknown): vscode.Uri | undefined => {
     if (node instanceof SpaceRootNode) return node.uri;
@@ -511,63 +430,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       }
     }
   };
-  const moveDroppedEntries = async (sources: vscode.Uri[], destination: vscode.Uri): Promise<void> => {
-    const destinationStat = await vscode.workspace.fs.stat(destination);
-    if (!(destinationStat.type & vscode.FileType.Directory)) return;
-    const entries = await vscode.workspace.fs.readDirectory(destination);
-    const occupied = new Set(entries.map(([name]) => process.platform === 'win32' ? name.toLowerCase() : name));
-    let copiedCount = 0;
-    await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Processing dropped items'), cancellable: false }, async progress => {
-      for (let index = 0; index < sources.length; index++) {
-        const source = sources[index];
-        if (source.scheme !== 'file' || source.authority !== destination.authority) {
-          void vscode.window.showErrorMessage(vscode.l10n.t('Cannot transfer items between different file system providers.'));
-          continue;
-        }
-        let stat: vscode.FileStat;
-        try { stat = await vscode.workspace.fs.stat(source); }
-        catch { void vscode.window.showErrorMessage(vscode.l10n.t('The source no longer exists: {0}', source.fsPath)); continue; }
-        const name = path.basename(source.fsPath);
-        const external = !store.getDefinitions().some(definition => isAllowedSpaceRoot(definition.basePath, source.fsPath));
-        const sourceTargetPath = path.join(destination.fsPath, name);
-        if (!external && !isSafeMove(source.fsPath, sourceTargetPath, Boolean(stat.type & vscode.FileType.Directory))) {
-          void vscode.window.showErrorMessage(vscode.l10n.t('A folder cannot be moved into itself or one of its subfolders.'));
-          continue;
-        }
-        if (!external && isSamePath(source.fsPath, sourceTargetPath)) continue;
-        const uniqueName = uniqueEntryName(name, candidate => occupied.has(process.platform === 'win32' ? candidate.toLowerCase() : candidate));
-        const targetUri = vscode.Uri.joinPath(destination, uniqueName);
-        progress.report({ message: `${index + 1}/${sources.length}: ${name}` });
-        try {
-          if (external) {
-            try { await copyTreeEntry(source, targetUri); }
-            catch (error) {
-              try { await vscode.workspace.fs.delete(targetUri, { recursive: true, useTrash: false }); } catch { /* Keep the original copy failure as the reported error. */ }
-              throw error;
-            }
-            occupied.add(process.platform === 'win32' ? uniqueName.toLowerCase() : uniqueName);
-            copiedCount++;
-          } else {
-            await vscode.workspace.fs.rename(source, targetUri, { overwrite: false });
-            occupied.add(process.platform === 'win32' ? uniqueName.toLowerCase() : uniqueName);
-            undoStack.push({ kind: 'move', from: source.fsPath, to: targetUri.fsPath });
-            await clearDrillStateForMovedSources([source]);
-          }
-        } catch (error) { operationError(error); }
-      }
-    });
-    if (copiedCount) void vscode.window.showInformationMessage(vscode.l10n.t('Copied {0} item(s). Copies cannot be undone.', copiedCount));
-    provider.refresh();
-    rebuildWatchers();
-  };
   const selectionTarget = (node?: unknown): unknown => node ?? treeView.selection[0];
-  const copyTreeEntry = async (source: vscode.Uri, destination: vscode.Uri): Promise<void> => {
-    const stat = await vscode.workspace.fs.stat(source);
-    if (stat.type & vscode.FileType.Directory) {
-      await vscode.workspace.fs.createDirectory(destination);
-      for (const [name] of await vscode.workspace.fs.readDirectory(source)) await copyTreeEntry(vscode.Uri.joinPath(source, name), vscode.Uri.joinPath(destination, name));
-    } else await vscode.workspace.fs.writeFile(destination, await vscode.workspace.fs.readFile(source));
-  };
   const pasteEntries = async (node?: unknown): Promise<void> => {
     const payload = clipboard.get();
     const target = selectionTarget(node);
