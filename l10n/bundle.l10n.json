@@ -32,10 +32,16 @@
   "Choose a destination folder within this space": "Choose a destination folder within this space",
   "A folder cannot be moved into itself or one of its subfolders.": "A folder cannot be moved into itself or one of its subfolders.",
   "Moving {0}": "Moving {0}",
+  "Moving dropped items": "Moving dropped items",
+  "Cannot move items between different file system providers.": "Cannot move items between different file system providers.",
+  "The source no longer exists: {0}": "The source no longer exists: {0}",
+  "This file system provider does not expose trash support; the item was not deleted.": "This file system provider does not expose trash support; the item was not deleted.",
   "Delete \"{0}\"?": "Delete \"{0}\"?",
   "Delete": "Delete",
   "There is no file operation to undo.": "There is no file operation to undo.",
   "Cannot undo: the original path already exists: {0}": "Cannot undo: the original path already exists: {0}",
   "Enter folder name": "Enter folder name",
-  "Enter file name": "Enter file name"
+  "Enter file name": "Enter file name",
+  "Cannot paste between different file system providers.": "Cannot paste between different file system providers.",
+  "A folder cannot be pasted into itself or one of its subfolders.": "A folder cannot be pasted into itself or one of its subfolders."
 }

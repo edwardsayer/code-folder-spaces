@@ -85,7 +85,7 @@ export class SpaceEntryNode extends vscode.TreeItem {
     this.tooltip = uri.fsPath;
     if (!isDirectory) {
       this.command = {
-        command: 'vscode.open',
+        command: 'codeFolderSpaces.openEntry',
         title: vscode.l10n.t('Open File'),
         arguments: [uri],
       };

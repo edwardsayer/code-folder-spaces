@@ -156,6 +156,11 @@ if (!pkg) {
     errors.push('package.json contributes.commands 為空');
   }
 
+  const contributedCommands = new Set((pkg.contributes?.commands ?? []).map(({ command }) => command));
+  for (const binding of pkg.contributes?.keybindings ?? []) {
+    if (!contributedCommands.has(binding.command)) errors.push(`keybinding 指向未貢獻的 command：${binding.command}`);
+  }
+
   const engines = String(pkg.engines?.vscode ?? '').replace(/^[\^~]/, '');
   const types = String(pkg.devDependencies?.['@types/vscode'] ?? '').replace(/^[\^~]/, '');
   const enginesMinor = engines.split('.').slice(0, 2).join('.');
@@ -208,6 +213,7 @@ if (!pkg) {
 
 const mode = errors.length ? 'FAIL' : warnings.length ? 'PASS (warnings)' : 'PASS';
 console.log(`[check-project] ${mode} — ${root}`);
+console.log('  ℹ️  l10n 掃描僅辨識字面形式 vscode.l10n.t(...)；destructured l10n.t(...)、條件運算式及註解中的假字串不保證正確識別。');
 for (const error of errors) console.log(`  ❌ ${error}`);
 for (const warning of warnings) console.log(`  ⚠️  ${warning}`);
 if (!errors.length && !warnings.length) console.log('  ✅ 所有檢查通過');

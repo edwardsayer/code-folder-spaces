@@ -29,8 +29,12 @@ export function validateSpaceName(currentName: string, proposedName: string): st
 }
 
 /** File-operation names must be a single non-special path segment. */
-export function isValidEntryName(name: string): boolean {
-  return Boolean(name.trim() && name === name.trim() && name !== '.' && name !== '..' && !/[\\/\\0]/.test(name));
+export function isValidEntryName(name: string, platform: NodeJS.Platform = process.platform): boolean {
+  if (!(name.trim() && name === name.trim() && name !== '.' && name !== '..' && !/[\\/\\0]/.test(name))) return false;
+  if (platform !== 'win32') return true;
+  if (/[<>:"|?*]/.test(name) || /[. ]$/.test(name)) return false;
+  const deviceName = name.split('.')[0].replace(/[. ]+$/, '').toUpperCase();
+  return !/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/.test(deviceName);
 }
 
 /** Compare paths using the host platform's case rules (Windows paths are case-insensitive). */
@@ -52,6 +56,24 @@ export function isSafeMove(source: string, target: string, isDirectory: boolean)
   return relative !== '' && (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative));
 }
 
+export interface DropTargetCandidate { path: string; isDirectory: boolean; isRoot?: boolean; }
+
+/** Resolve supported TreeView drop targets; blank space and file rows are intentionally no-ops. */
+export function resolveDropTarget(target: DropTargetCandidate | undefined): string | undefined {
+  return target && (target.isRoot || target.isDirectory) ? target.path : undefined;
+}
+
+/** Paste accepts a space root or folder; selecting a file resolves to its parent folder. */
+export function resolvePasteTarget(target: DropTargetCandidate | undefined): string | undefined {
+  if (!target) return undefined;
+  return target.isRoot || target.isDirectory ? target.path : path.dirname(target.path);
+}
+
+/** Different configured roots are still valid move endpoints; definitions themselves remain unchanged. */
+export function isCrossSpaceMove(sourceSpaceRoot: string, destinationSpaceRoot: string): boolean {
+  return !isSamePath(sourceSpaceRoot, destinationSpaceRoot);
+}
+
 export function uniqueEntryName(name: string, exists: (candidate: string) => boolean): string {
   if (!exists(name)) return name;
   const extension = path.extname(name);
@@ -61,6 +83,23 @@ export function uniqueEntryName(name: string, exists: (candidate: string) => boo
     if (!exists(candidate)) return candidate;
   }
 }
+
+export interface ClipboardEntry { uris: string[]; mode: 'cut' | 'copy'; }
+
+/** Session-only internal clipboard; cut entries are consumed individually after successful moves. */
+export class SpaceClipboard {
+  private value: ClipboardEntry | undefined;
+  set(uris: string[], mode: 'cut' | 'copy'): void { this.value = uris.length ? { uris: [...new Set(uris)], mode } : undefined; }
+  get(): ClipboardEntry | undefined { return this.value && { uris: [...this.value.uris], mode: this.value.mode }; }
+  consume(uri: string): void {
+    if (this.value?.mode !== 'cut') return;
+    this.value.uris = this.value.uris.filter(candidate => candidate !== uri);
+    if (!this.value.uris.length) this.value = undefined;
+  }
+}
+
+/** VS Code opens Beside in the adjacent editor group, reusing it when present. */
+export function resolveOpenBeside(value: string | undefined): boolean { return value === 'beside'; }
 
 export interface UndoEntry { from: string; to: string; kind: 'move' | 'rename'; }
 export const UNDO_STACK_LIMIT = 20;

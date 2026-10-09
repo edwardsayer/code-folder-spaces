@@ -18,6 +18,7 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 - **Native tree experience**: file icons, git decorations and problem badges come from `resourceUri`.
 - **Live updates**: recursive file system watchers per space.
 - **Commands**: add space, remove space, refresh, reveal active file.
+- **File operations**: session-only cut/copy/paste, with cut/move undo; file opening defaults to the current editor group and can be configured to open beside.
 
 ## Planned
 
@@ -32,7 +33,7 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 ## Known limitations
 
 - **Glob subset**: supports `*`, `**`, `**/` (including zero directory levels), `?` and character escaping. Brace patterns (`{a,b}`) and character classes (`[abc]`) are unsupported; `src/**` does not match the `src` directory itself.
-- **Restricted Mode**: browsing, expanding and opening files work. Disk-modifying operations are not implemented yet; future CRUD and drag-and-drop will be disabled in untrusted workspaces (Stage 3).
+- **Clipboard undo**: cut/move operations share the session undo stack; copied files/folders are not undoable. Ctrl+C/X/V, Ctrl+N, F2, Delete and Ctrl+Z bindings apply only while the Folder Spaces tree has focus.
 - **Single pane**: the current extension has one pane. Multiple panes (up to 8) and linked spaces are planned for Stage 4 (F-47/F-40).
 - **Workspace support**: virtual workspaces are unsupported; remote scenarios have not been validated.
 - **Large directories**: visible-child probing is concurrency-limited to 16. Caching has not been added; it will be evaluated in Stage 4 (F-44).

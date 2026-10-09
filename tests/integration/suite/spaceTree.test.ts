@@ -109,7 +109,7 @@ suite('空間樹 provider', () => {
     assert.equal(children[0].collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
     assert.equal(children[1].collapsibleState, vscode.TreeItemCollapsibleState.None);
     assert.equal(children[1].contextValue, 'codeFolderSpaces.file');
-    assert.equal(children[1].command?.command, 'vscode.open');
+    assert.equal(children[1].command?.command, 'codeFolderSpaces.openEntry');
   }));
 
   test('exclude 過濾檔案且空目錄不可展開', async () => withProvider([{ path: path.dirname(logs), exclude: ['**/*.log'] }], async (provider) => {

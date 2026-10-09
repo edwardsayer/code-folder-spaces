@@ -132,6 +132,10 @@
         "title": "%command.renameSpace.title%",
         "icon": "$(edit)"
       },
+      { "command": "codeFolderSpaces.openEntry", "title": "%command.openEntry.title%" },
+      { "command": "codeFolderSpaces.copyEntry", "title": "%command.copyEntry.title%" },
+      { "command": "codeFolderSpaces.cutEntry", "title": "%command.cutEntry.title%" },
+      { "command": "codeFolderSpaces.pasteEntries", "title": "%command.pasteEntries.title%" },
       { "command": "codeFolderSpaces.newFile", "title": "%command.newFile.title%" },
       { "command": "codeFolderSpaces.newFolder", "title": "%command.newFolder.title%" },
       { "command": "codeFolderSpaces.renameEntry", "title": "%command.renameEntry.title%" },
@@ -144,6 +148,15 @@
       { "command": "codeFolderSpaces.findInFolder", "title": "%command.findInFolder.title%" },
       { "command": "codeFolderSpaces.copyFilePath", "title": "%command.copyFilePath.title%" },
       { "command": "codeFolderSpaces.copyRelativeFilePath", "title": "%command.copyRelativeFilePath.title%" }
+    ],
+    "keybindings": [
+      { "command": "codeFolderSpaces.newFile", "key": "ctrl+n", "when": "focusedView == codeFolderSpaces.explorer && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)" },
+      { "command": "codeFolderSpaces.copyEntry", "key": "ctrl+c", "when": "focusedView == codeFolderSpaces.explorer && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)" },
+      { "command": "codeFolderSpaces.cutEntry", "key": "ctrl+x", "when": "focusedView == codeFolderSpaces.explorer && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)" },
+      { "command": "codeFolderSpaces.pasteEntries", "key": "ctrl+v", "when": "focusedView == codeFolderSpaces.explorer && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)" },
+      { "command": "codeFolderSpaces.renameEntry", "key": "f2", "when": "focusedView == codeFolderSpaces.explorer && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)" },
+      { "command": "codeFolderSpaces.deleteEntry", "key": "delete", "when": "focusedView == codeFolderSpaces.explorer && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)" },
+      { "command": "codeFolderSpaces.undoFileOperation", "key": "ctrl+z", "when": "focusedView == codeFolderSpaces.explorer && listFocus && isWorkspaceTrusted" }
     ],
     "menus": {
       "view/title": [
@@ -291,6 +304,13 @@
           "type": "boolean",
           "default": true,
           "description": "%configuration.showFiles.description%"
+        },
+        "codeFolderSpaces.openFilesIn": {
+          "type": "string",
+          "enum": ["current", "beside"],
+          "default": "current",
+          "enumDescriptions": ["%configuration.openFilesIn.current%", "%configuration.openFilesIn.beside%"],
+          "description": "%configuration.openFilesIn.description%"
         },
         "codeFolderSpaces.followActiveFile": {
           "type": "boolean",

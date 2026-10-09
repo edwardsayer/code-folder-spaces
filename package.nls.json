@@ -60,5 +60,16 @@
   "command.moveTo.title": "Folder Spaces: Move To...",
   "Choose a destination folder within this space": "Choose a destination folder within this space",
   "A folder cannot be moved into itself or one of its subfolders.": "A folder cannot be moved into itself or one of its subfolders.",
-  "Moving {0}": "Moving {0}"
+  "Moving {0}": "Moving {0}",
+  "Moving dropped items": "Moving dropped items",
+  "Cannot move items between different file system providers.": "Cannot move items between different file system providers.",
+  "The source no longer exists: {0}": "The source no longer exists: {0}",
+  "This file system provider does not expose trash support; the item was not deleted.": "This file system provider does not expose trash support; the item was not deleted.",
+  "command.openEntry.title": "Folder Spaces: Open File",
+  "command.copyEntry.title": "Folder Spaces: Copy",
+  "command.cutEntry.title": "Folder Spaces: Cut",
+  "command.pasteEntries.title": "Folder Spaces: Paste",
+  "configuration.openFilesIn.description": "Choose where files opened from Folder Spaces appear.",
+  "configuration.openFilesIn.current": "Open in the current editor group.",
+  "configuration.openFilesIn.beside": "Open in the adjacent editor group, reusing it when available."
 }
