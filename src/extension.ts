@@ -127,7 +127,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
           handleDrag: async (source, transfer) => {
             const uris = source.filter((node): node is SpaceEntryNode => node instanceof SpaceEntryNode && node.uri.scheme === 'file').map(node => node.uri);
             if (!uris.length) return;
-            const serialized = uris.map(uri => uri.toString()).join('\\r\\n');
+            const serialized = uris.map(uri => uri.toString()).join('\r\n');
             transfer.set('text/uri-list', new vscode.DataTransferItem(serialized));
             transfer.set(`application/vnd.code.tree.codeFolderSpaces.${id}`, new vscode.DataTransferItem(serialized));
           },
@@ -141,7 +141,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
             if (!destinationPath || !requireTrust()) return;
             const item = transfer.get(`application/vnd.code.tree.codeFolderSpaces.${id}`) ?? transfer.get('text/uri-list');
             if (!item) return;
-            try { await moveDroppedEntries((await item.asString()).split(/\\r?\\n/).filter(line => line && !line.startsWith('#')).map(line => vscode.Uri.parse(line)), vscode.Uri.file(destinationPath)); }
+            try { await moveDroppedEntries((await item.asString()).split(/\r?\n/).filter(line => line && !line.startsWith('#')).map(line => vscode.Uri.parse(line)), vscode.Uri.file(destinationPath)); }
             catch (error) { operationError(error); }
           },
         },
@@ -183,6 +183,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
             const currentLinks = { ...(viewState.getPaneLinks() ?? {}) };
             const childLink = currentLinks[childId];
             if (!childLink || childLink.parentPaneId !== runtime.id || !childLink.follow) continue;
+            // 空間歸屬守門：子 pane 若已被 switchRoot 切到其他空間（scope.basePath 改變），
+            // 其 root 必須留在該空間之內，不得被父 pane 的選取注入外來路徑（避免 filter 與
+            // findNodeByPath 前後不一致）。
+            if (!isAllowedSpaceRoot(child.scope.basePath, selectedUri.fsPath)) continue;
             childLink.root = selectedUri.fsPath;
             try { await viewState.setPaneLinks(currentLinks); }
             catch (error) { void vscode.window.showErrorMessage(vscode.l10n.t('Invalid pane link: {0}', String(error))); return; }
@@ -410,7 +414,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   context.subscriptions.push(provider.onDidChangeTreeData(() => {
     const selected = treeView.selection.find((item) => item instanceof SpaceRootNode || 'space' in item);
     const definition = selected instanceof SpaceRootNode ? selected.definition : selected && 'space' in selected ? selected.space : store.getDefinitions()[0];
-    if (definition) void provider.getChildren(new SpaceRootNode(definition, undefined)).then(() => {
+    if (definition) void provider.getChildren(new SpaceRootNode(definition, undefined, firstPaneScope?.root ?? definition.basePath)).then(() => {
       const stalePath = provider.staleRoots.values().next().value as string | undefined;
       treeView.message = stalePath ? vscode.l10n.t('Space path is stale: {0}. Update the space path to restore it.', stalePath) : provider.filterMessage;
     });
