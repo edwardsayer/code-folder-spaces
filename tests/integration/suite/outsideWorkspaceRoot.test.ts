@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import { UndoStack } from '../../../src/spaces/spaceActions';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
@@ -25,6 +26,42 @@ suite('工作區外空間根', () => {
   suiteTeardown(async () => {
     await clearGlobalSettings();
     fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  test('暫存空間根 CRUD 冒煙與衝突／缺失錯誤不破壞原狀態', async () => {
+    const root = vscode.Uri.file(fs.mkdtempSync(path.join(os.tmpdir(), 'code-folder-spaces-crud-')));
+    const folder = vscode.Uri.joinPath(root, 'created');
+    const file = vscode.Uri.joinPath(folder, 'note.txt');
+    try {
+      await vscode.workspace.fs.createDirectory(folder);
+      await vscode.workspace.fs.writeFile(file, new TextEncoder().encode('original'));
+      assert.equal(new TextDecoder().decode(await vscode.workspace.fs.readFile(file)), 'original');
+      const occupied = vscode.Uri.joinPath(root, 'occupied');
+      await vscode.workspace.fs.createDirectory(occupied);
+      await vscode.workspace.fs.writeFile(vscode.Uri.joinPath(occupied, 'note.txt'), new TextEncoder().encode('occupied'));
+      await assert.rejects(() => Promise.resolve(vscode.workspace.fs.rename(file, vscode.Uri.joinPath(occupied, 'note.txt'), { overwrite: false })));
+      assert.equal(new TextDecoder().decode(await vscode.workspace.fs.readFile(file)), 'original');
+      await assert.rejects(() => Promise.resolve(vscode.workspace.fs.rename(vscode.Uri.joinPath(root, 'missing'), file, { overwrite: false })));
+      await assert.rejects(() => Promise.resolve(vscode.workspace.fs.rename(folder, vscode.Uri.joinPath(folder, 'child'), { overwrite: false })));
+      const undo = new UndoStack();
+      const moved = vscode.Uri.joinPath(occupied, 'created');
+      await vscode.workspace.fs.rename(folder, moved, { overwrite: false });
+      undo.push({ kind: 'move', from: folder.fsPath, to: moved.fsPath });
+      const operation = undo.peek();
+      assert.ok(operation);
+      await vscode.workspace.fs.rename(vscode.Uri.file(operation.to), vscode.Uri.file(operation.from), { overwrite: false });
+      undo.pop();
+      assert.equal(new TextDecoder().decode(await vscode.workspace.fs.readFile(file)), 'original');
+      const renamed = vscode.Uri.joinPath(folder, 'renamed.txt');
+      await vscode.workspace.fs.rename(file, renamed, { overwrite: false });
+      assert.equal(new TextDecoder().decode(await vscode.workspace.fs.readFile(renamed)), 'original');
+      await vscode.workspace.fs.delete(renamed, { useTrash: false });
+      await vscode.workspace.fs.delete(occupied, { recursive: true, useTrash: false });
+      await vscode.workspace.fs.delete(folder, { recursive: true, useTrash: false });
+      await assert.rejects(() => Promise.resolve(vscode.workspace.fs.stat(renamed)));
+    } finally {
+      await vscode.workspace.fs.delete(root, { recursive: true, useTrash: false }).then(() => undefined, () => undefined);
+    }
   });
 
   test('provider 列出外部根、排序並解析可見路徑', async () => {

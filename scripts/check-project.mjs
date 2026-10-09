@@ -3,7 +3,7 @@
  * Folder Spaces 專案健康度檢查（zero-dependency，Node 20+）。
  *
  * 檢查必要檔案、manifest 契約（engines.vscode／main／publisher／capabilities／
- * @types/vscode 對齊）、i18n 檔案與打包進入點。
+ * @types/vscode 對齊）、i18n bundle 對稱及 src 中 l10n 訊息 key 覆蓋與打包進入點。
  * 用法：npm run check:project
  */
 import fs from 'node:fs';
@@ -20,6 +20,85 @@ const readJson = (file) => {
   } catch {
     return null;
   }
+};
+
+const listTypeScriptFiles = (directory) => fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+  const fullPath = path.join(directory, entry.name);
+  return entry.isDirectory() ? listTypeScriptFiles(fullPath) : entry.isFile() && entry.name.endsWith('.ts') ? [fullPath] : [];
+});
+
+const decodeStringLiteral = (literal) => {
+  if (literal.startsWith('`')) return literal.slice(1, -1);
+  if (literal.startsWith('"')) return JSON.parse(literal);
+  const body = literal.slice(1, -1).replace(/\\'/g, "'").replace(/\\"/g, '\\"');
+  return JSON.parse(`"${body.replace(/\\/g, '\\\\').replace(/\\\\'/g, "'").replace(/"/g, '\\"')}"`);
+};
+
+// Parse a static string or a chain of adjacent string literals; dynamic expressions are intentionally unsupported.
+const parseLiteralConcatenation = (expression) => {
+  const tokenPattern = /\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[()+]))/gy;
+  const meaningful = [];
+  let cursor = 0;
+  while (cursor < expression.length) {
+    tokenPattern.lastIndex = cursor;
+    const match = tokenPattern.exec(expression);
+    if (!match) return null;
+    cursor = tokenPattern.lastIndex;
+    const token = match[0].trim();
+    if (token && !token.startsWith('//') && !token.startsWith('/*')) meaningful.push(token);
+  }
+  let index = 0;
+  const primary = () => {
+    if (meaningful[index] === '(') {
+      index += 1;
+      const value = sum();
+      if (meaningful[index++] !== ')') throw new Error('unclosed parenthesis');
+      return value;
+    }
+    const token = meaningful[index++];
+    if (!token || !/^['"`]/.test(token) || (token.startsWith('`') && token.includes('${'))) throw new Error('not a static string');
+    return decodeStringLiteral(token);
+  };
+  const sum = () => {
+    let value = primary();
+    while (meaningful[index] === '+') { index += 1; value += primary(); }
+    return value;
+  };
+  try {
+    const value = sum();
+    return index === meaningful.length ? value : null;
+  } catch { return null; }
+};
+
+const scanL10nMessages = (file, source) => {
+  const messages = [];
+  const call = /vscode\.l10n\.t\s*\(/g;
+  let match;
+  while ((match = call.exec(source))) {
+    const start = call.lastIndex;
+    let quote = '';
+    let escaped = false;
+    let depth = 0;
+    let end = -1;
+    for (let i = start; i < source.length; i += 1) {
+      const character = source[i];
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (character === '\\') escaped = true;
+        else if (character === quote) quote = '';
+      } else if (character === '"' || character === "'" || character === '`') quote = character;
+      else if (character === '(') depth += 1;
+      else if (character === ')') {
+        if (depth === 0) { end = i; break; }
+        depth -= 1;
+      } else if (character === ',' && depth === 0) { end = i; break; }
+    }
+    const line = source.slice(0, match.index).split('\n').length;
+    const message = end < 0 ? null : parseLiteralConcatenation(source.slice(start, end));
+    if (message === null) warnings.push(`無法解析 l10n 訊息：${path.relative(root, file)}:${line}`);
+    else messages.push({ file: path.relative(root, file), line, message });
+  }
+  return messages;
 };
 
 const requiredPaths = [
@@ -108,6 +187,12 @@ if (!pkg) {
   const bundleMissing = Object.keys(bundle).filter((key) => !(key in bundleZh));
   if (bundleMissing.length) {
     errors.push(`l10n/bundle.l10n.zh-tw.json 缺少 ${bundleMissing.length} 個訊息`);
+  }
+
+  for (const file of listTypeScriptFiles(path.join(root, 'src'))) {
+    for (const { file: relative, line, message } of scanL10nMessages(file, fs.readFileSync(file, 'utf8'))) {
+      if (!(message in bundle)) errors.push(`l10n/bundle.l10n.json 缺少 key：${relative}:${line} — ${message.slice(0, 100)}`);
+    }
   }
 
   if (!fs.existsSync(path.join(root, 'dist', 'extension.js'))) {

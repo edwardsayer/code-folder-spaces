@@ -131,7 +131,19 @@
         "command": "codeFolderSpaces.renameSpace",
         "title": "%command.renameSpace.title%",
         "icon": "$(edit)"
-      }
+      },
+      { "command": "codeFolderSpaces.newFile", "title": "%command.newFile.title%" },
+      { "command": "codeFolderSpaces.newFolder", "title": "%command.newFolder.title%" },
+      { "command": "codeFolderSpaces.renameEntry", "title": "%command.renameEntry.title%" },
+      { "command": "codeFolderSpaces.moveTo", "title": "%command.moveTo.title%" },
+      { "command": "codeFolderSpaces.deleteEntry", "title": "%command.deleteEntry.title%" },
+      { "command": "codeFolderSpaces.undoFileOperation", "title": "%command.undo.title%" },
+      { "command": "codeFolderSpaces.revealInExplorer", "title": "%command.revealInExplorer.title%" },
+      { "command": "codeFolderSpaces.revealFileInOS", "title": "%command.revealFileInOS.title%" },
+      { "command": "codeFolderSpaces.openInTerminal", "title": "%command.openInTerminal.title%" },
+      { "command": "codeFolderSpaces.findInFolder", "title": "%command.findInFolder.title%" },
+      { "command": "codeFolderSpaces.copyFilePath", "title": "%command.copyFilePath.title%" },
+      { "command": "codeFolderSpaces.copyRelativeFilePath", "title": "%command.copyRelativeFilePath.title%" }
     ],
     "menus": {
       "view/title": [
@@ -207,7 +219,19 @@
           "command": "codeFolderSpaces.removeSpace",
           "when": "view == codeFolderSpaces.explorer && viewItem == codeFolderSpaces.spaceRoot",
           "group": "inline@2"
-        }
+        },
+        { "command": "codeFolderSpaces.newFile", "when": "view == codeFolderSpaces.explorer && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "1_modification@1" },
+        { "command": "codeFolderSpaces.newFolder", "when": "view == codeFolderSpaces.explorer && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "1_modification@2" },
+        { "command": "codeFolderSpaces.renameEntry", "when": "view == codeFolderSpaces.explorer && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)", "group": "1_modification@3" },
+        { "command": "codeFolderSpaces.moveTo", "when": "view == codeFolderSpaces.explorer && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)", "group": "1_modification@4" },
+        { "command": "codeFolderSpaces.deleteEntry", "when": "view == codeFolderSpaces.explorer && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)", "group": "1_modification@5" },
+        { "command": "codeFolderSpaces.undoFileOperation", "when": "view == codeFolderSpaces.explorer && isWorkspaceTrusted", "group": "1_modification@6" },
+        { "command": "codeFolderSpaces.revealInExplorer", "when": "view == codeFolderSpaces.explorer && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "2_navigation@1" },
+        { "command": "codeFolderSpaces.revealFileInOS", "when": "view == codeFolderSpaces.explorer && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "2_navigation@2" },
+        { "command": "codeFolderSpaces.openInTerminal", "when": "view == codeFolderSpaces.explorer && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "2_navigation@3" },
+        { "command": "codeFolderSpaces.findInFolder", "when": "view == codeFolderSpaces.explorer && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "2_navigation@4" },
+        { "command": "codeFolderSpaces.copyFilePath", "when": "view == codeFolderSpaces.explorer && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "3_clipboard@1" },
+        { "command": "codeFolderSpaces.copyRelativeFilePath", "when": "view == codeFolderSpaces.explorer && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "3_clipboard@2" }
       ]
     },
     "configuration": {

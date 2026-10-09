@@ -41,7 +41,7 @@
 npm run typecheck       # tsc --noEmit
 npm run test:unit       # vitest run
 npm run build           # esbuild → dist/extension.js
-npm run check:project   # 專案健康度與 manifest 契約
+npm run check:project   # 專案健康度、manifest 契約與 l10n bundle key 覆蓋
 npm run check           # 以上全部
 npm run test:integration # 隔離 profile 啟動 VS Code 執行整合測試；優先使用本機安裝
 npm run package:vsix    # production bundle + vsce package
@@ -73,5 +73,6 @@ node tools/vscode-debug.mjs close
 - **glob 子集邊界**：支援 `*`、`**`、`**/`（可匹配零層）、`?` 與字元跳脫；未支援 brace `{a,b}` 與 character class `[abc]`。`src/**` 不匹配目錄本身（僅其下內容）。
 - **大型目錄**：展開時各可見子目錄的可見子項探測採保序併發上限 16；S1-5 實測（Windows 本機 FS、1,500 子目錄各 1 檔與 3,000 頂層檔）單層展開中位數由 979 ms 降至 312 ms（約 68%）；逐次數據見 `dev/tests/s1-5-large-directory-measurement.md`。本輪不加快照／快取：尚無產品延遲目標可判定 312 ms 是否超標，且快取會增加失效一致性負擔；若後續目標或量測顯示有需要，再於 S4 F-44 評估。
 - **大型樹時間排序成本**：S2R1 實測 4,501 節點的 `mtime` 排序中位數約 1.37 秒（三次 1,370.4／2,144.3／1,123.6 ms）；依 `stat` 併發上限 16，並以每次 refresh 的 URI 備忘錄去重，沒有持久快取。無排序的展開本身約 330 ms；此量測不代表其他檔案系統或硬體的效能。
-- **檔案系統更名 vs 空間設定**：監聽更名事件時自動遷移每空間檢視狀態；空間根更名會標記定義 stale。設定僅在使用者明確點擊更新動作後才寫回，避免靜默修改版控中的工作區設定；空間根內子路徑更名只改寫狀態中對應路徑。
+- **檔案操作 undo 範圍**：undo 僅支援此工作階段內成功的 move／rename；記錄只存在記憶體，擴充套件重載即清空，不屬於 VS Code 編輯器 undo。create／delete 不支援 undo，move／rename 的 undo 遇到來源或目標衝突會拒絕而不覆寫。命令式 Move To 是 F-32 的 undo 覆蓋；F-31 TreeView 拖放仍屬 S3R2。
+- **檔案系統更名 vs 空間設定**：監聽更名事件時自動遷移每空間檢視狀態；空間根更名會標記定義 stale。設定僅在使用者明確點擊更新動作後才寫回，避免靜默修改版控中的工作區設定；空間根內子路徑更名只改寫狀態中對應路徑。`workspace.fs.rename` 的 provider／OS 實作可能限制跨磁碟區搬移；移動失敗會保留 undo 記錄與來源狀態，不提供跨磁碟複製刪除 fallback。
 

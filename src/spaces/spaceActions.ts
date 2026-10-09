@@ -27,3 +27,45 @@ export function validateSpaceName(currentName: string, proposedName: string): st
   const name = proposedName.trim();
   return name && name !== currentName ? name : undefined;
 }
+
+/** File-operation names must be a single non-special path segment. */
+export function isValidEntryName(name: string): boolean {
+  return Boolean(name.trim() && name === name.trim() && name !== '.' && name !== '..' && !/[\\/\\0]/.test(name));
+}
+
+/** Prevent moving a directory into itself or any descendant. */
+export function isSafeMove(source: string, target: string, isDirectory: boolean): boolean {
+  if (!isDirectory) return true;
+  const sourcePath = path.resolve(source);
+  const targetPath = path.resolve(target);
+  const relative = path.relative(sourcePath, targetPath);
+  return relative !== '' && (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative));
+}
+
+export function uniqueEntryName(name: string, exists: (candidate: string) => boolean): string {
+  if (!exists(name)) return name;
+  const extension = path.extname(name);
+  const stem = extension ? name.slice(0, -extension.length) : name;
+  for (let index = 1; ; index++) {
+    const candidate = `${stem} ${index}${extension}`;
+    if (!exists(candidate)) return candidate;
+  }
+}
+
+export interface UndoEntry { from: string; to: string; kind: 'move' | 'rename'; }
+export const UNDO_STACK_LIMIT = 20;
+
+/** Bounded operation history; deliberately independent of VS Code's editor undo stack. */
+export class UndoStack {
+  private entries: UndoEntry[] = [];
+  push(entry: UndoEntry): void {
+    this.entries.push(entry);
+    if (this.entries.length > UNDO_STACK_LIMIT) this.entries.shift();
+  }
+  peek(): UndoEntry | undefined { return this.entries[this.entries.length - 1]; }
+  pop(): UndoEntry | undefined { return this.entries.pop(); }
+  get size(): number { return this.entries.length; }
+}
+
+/** Trust is the sole authorization gate for extension-owned disk mutations. */
+export function canModifyFiles(isTrusted: boolean): boolean { return isTrusted; }

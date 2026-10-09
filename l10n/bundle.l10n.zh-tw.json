@@ -22,5 +22,20 @@
   "Enter a new space name": "輸入新的空間名稱",
   "Renamed space to: {0}": "已將空間重新命名為：{0}",
   "Could not rename space: {0}": "無法重新命名空間：{0}",
-  "{0} / {1} matches": "符合 {0} / {1} 項"
+  "{0} / {1} matches": "符合 {0} / {1} 項",
+  "Trust the workspace before modifying files.": "請先信任此工作區，再修改檔案。",
+  "File operation failed: {0}": "檔案操作失敗：{0}",
+  "Enter a valid single file or folder name.": "請輸入有效的單一檔案或資料夾名稱。",
+  "The destination is outside the folder space.": "目的地位於資料夾空間範圍之外。",
+  "The target already exists: {0}": "目標已存在：{0}",
+  "Enter a new name": "輸入新名稱",
+  "Choose a destination folder within this space": "選擇此空間內的目的地資料夾",
+  "A folder cannot be moved into itself or one of its subfolders.": "無法將資料夾移至自身或其子資料夾中。",
+  "Moving {0}": "正在移動 {0}",
+  "Delete \"{0}\"?": "要刪除「{0}」嗎？",
+  "Delete": "刪除",
+  "There is no file operation to undo.": "沒有可復原的檔案操作。",
+  "Cannot undo: the original path already exists: {0}": "無法復原：原始路徑已存在：{0}",
+  "Enter folder name": "輸入資料夾名稱",
+  "Enter file name": "輸入檔案名稱"
 }

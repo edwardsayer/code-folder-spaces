@@ -4,7 +4,7 @@ import { SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProv
 import { SpaceStore } from './spaces/spaceStore';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
 import { classifySpaceRename, PaneStateStore } from './spaces/viewState';
-import { isAllowedSpaceRoot, isValidSpaceRoot, validateSpaceName } from './spaces/spaceActions';
+import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isValidEntryName, isValidSpaceRoot, UndoStack, validateSpaceName } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 
@@ -185,7 +185,133 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     })
   );
 
+  // Session-only history; undo records are intentionally cleared on extension reload and never persisted to mementos.
+  const undoStack = new UndoStack();
+  const selectedUri = (node: unknown): vscode.Uri | undefined => {
+    if (node instanceof SpaceRootNode) return node.uri;
+    if (node && typeof node === 'object' && 'uri' in node && (node as { uri?: unknown }).uri instanceof vscode.Uri) return (node as { uri: vscode.Uri }).uri;
+    return undefined;
+  };
+  const requireTrust = (): boolean => {
+    if (canModifyFiles(vscode.workspace.isTrusted)) return true;
+    void vscode.window.showWarningMessage(vscode.l10n.t('Trust the workspace before modifying files.'));
+    return false;
+  };
+  const operationError = (error: unknown): void => {
+    log.error(`File operation failed: ${String(error)}`);
+    void vscode.window.showErrorMessage(vscode.l10n.t('File operation failed: {0}', String(error)));
+  };
+  const getEntry = (node: unknown): { uri: vscode.Uri; isDirectory: boolean; basePath: string } | undefined => {
+    if (node instanceof SpaceRootNode) return { uri: node.uri, isDirectory: true, basePath: node.definition.basePath };
+    if (node && typeof node === 'object' && 'uri' in node && 'space' in node && 'isDirectory' in node) {
+      const item = node as { uri: vscode.Uri; isDirectory: boolean; space: import('./types').SpaceDefinition };
+      return { uri: item.uri, isDirectory: item.isDirectory, basePath: item.space.basePath };
+    }
+    return undefined;
+  };
+  const exists = async (uri: vscode.Uri): Promise<boolean> => { try { await vscode.workspace.fs.stat(uri); return true; } catch { return false; } };
+  const createEntry = async (node: unknown, directory: boolean): Promise<void> => {
+    if (!requireTrust()) return;
+    const entry = getEntry(node); if (!entry) return;
+    const destination = entry.isDirectory ? entry.uri : vscode.Uri.file(path.dirname(entry.uri.fsPath));
+    const name = await vscode.window.showInputBox({ prompt: vscode.l10n.t(directory ? 'Enter folder name' : 'Enter file name') });
+    if (name === undefined) return;
+    if (!isValidEntryName(name)) { void vscode.window.showErrorMessage(vscode.l10n.t('Enter a valid single file or folder name.')); return; }
+    const target = vscode.Uri.joinPath(destination, name);
+    if (!isAllowedSpaceRoot(entry.basePath, target.fsPath)) { void vscode.window.showErrorMessage(vscode.l10n.t('The destination is outside the folder space.')); return; }
+    try {
+      if (await exists(target)) { void vscode.window.showErrorMessage(vscode.l10n.t('The target already exists: {0}', target.fsPath)); return; }
+      if (directory) await vscode.workspace.fs.createDirectory(target);
+      else await vscode.workspace.fs.writeFile(target, new Uint8Array());
+      provider.refresh();
+    } catch (error) { operationError(error); }
+  };
+  const renameEntry = async (node: unknown): Promise<void> => {
+    if (!requireTrust()) return;
+    const entry = getEntry(node); if (!entry) return;
+    const name = await vscode.window.showInputBox({ prompt: vscode.l10n.t('Enter a new name'), value: path.basename(entry.uri.fsPath) });
+    if (name === undefined) return;
+    if (!isValidEntryName(name)) { void vscode.window.showErrorMessage(vscode.l10n.t('Enter a valid single file or folder name.')); return; }
+    const target = vscode.Uri.joinPath(vscode.Uri.file(path.dirname(entry.uri.fsPath)), name);
+    if (!isAllowedSpaceRoot(entry.basePath, target.fsPath)) { void vscode.window.showErrorMessage(vscode.l10n.t('The destination is outside the folder space.')); return; }
+    try {
+      await vscode.workspace.fs.stat(entry.uri);
+      if (await exists(target)) { void vscode.window.showErrorMessage(vscode.l10n.t('The target already exists: {0}', target.fsPath)); return; }
+      await vscode.workspace.fs.rename(entry.uri, target, { overwrite: false });
+      undoStack.push({ kind: 'rename', from: entry.uri.fsPath, to: target.fsPath }); provider.refresh();
+    } catch (error) { operationError(error); }
+  };
+  const moveEntry = async (node: unknown): Promise<void> => {
+    if (!requireTrust()) return;
+    const entry = getEntry(node); if (!entry) return;
+    const folders: Array<vscode.QuickPickItem & { uri: vscode.Uri }> = [];
+    const pending = [vscode.Uri.file(entry.basePath)];
+    try {
+      while (pending.length) {
+        const folder = pending.pop()!;
+        const stat = await vscode.workspace.fs.stat(folder);
+        if (!(stat.type & vscode.FileType.Directory)) continue;
+        folders.push({ label: folder.fsPath === entry.basePath ? path.basename(entry.basePath) : path.relative(entry.basePath, folder.fsPath), description: folder.fsPath, uri: folder });
+        for (const [name, type] of await vscode.workspace.fs.readDirectory(folder)) {
+          if (type & vscode.FileType.Directory) pending.push(vscode.Uri.joinPath(folder, name));
+        }
+      }
+    } catch (error) { operationError(error); return; }
+    const selected = await vscode.window.showQuickPick(folders, { placeHolder: vscode.l10n.t('Choose a destination folder within this space') });
+    if (!selected) return;
+    if (!isSafeMove(entry.uri.fsPath, selected.uri.fsPath, entry.isDirectory)) {
+      void vscode.window.showErrorMessage(vscode.l10n.t('A folder cannot be moved into itself or one of its subfolders.')); return;
+    }
+    const target = vscode.Uri.joinPath(selected.uri, path.basename(entry.uri.fsPath));
+    if (await exists(target)) { void vscode.window.showErrorMessage(vscode.l10n.t('The target already exists: {0}', target.fsPath)); return; }
+    try {
+      await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: vscode.l10n.t('Moving {0}', path.basename(entry.uri.fsPath)), cancellable: false }, async () => {
+        await vscode.workspace.fs.stat(entry.uri);
+        await vscode.workspace.fs.rename(entry.uri, target, { overwrite: false });
+      });
+      undoStack.push({ kind: 'move', from: entry.uri.fsPath, to: target.fsPath }); provider.refresh();
+    } catch (error) { operationError(error); }
+  };
+  const deleteEntry = async (node: unknown): Promise<void> => {
+    if (!requireTrust()) return;
+    const entry = getEntry(node); if (!entry) return;
+    try {
+      await vscode.workspace.fs.stat(entry.uri);
+      const confirmDelete = vscode.workspace.getConfiguration('explorer').get<boolean>('confirmDelete', true);
+      if (confirmDelete) {
+        const answer = await vscode.window.showWarningMessage(vscode.l10n.t('Delete "{0}"?', path.basename(entry.uri.fsPath)), { modal: true }, vscode.l10n.t('Delete'));
+        if (answer !== vscode.l10n.t('Delete')) return;
+      }
+      const useTrash = vscode.workspace.getConfiguration('files').get<boolean>('enableTrash', true);
+      await vscode.workspace.fs.delete(entry.uri, { recursive: entry.isDirectory, useTrash });
+      provider.refresh();
+    } catch (error) { operationError(error); }
+  };
+
   context.subscriptions.push(
+    vscode.commands.registerCommand('codeFolderSpaces.revealInExplorer', (node?: unknown) => { const uri = selectedUri(node); if (uri) void vscode.commands.executeCommand('revealInExplorer', uri); }),
+    vscode.commands.registerCommand('codeFolderSpaces.revealFileInOS', (node?: unknown) => { const uri = selectedUri(node); if (uri) void vscode.commands.executeCommand('revealFileInOS', uri); }),
+    vscode.commands.registerCommand('codeFolderSpaces.copyFilePath', (node?: unknown) => { const uri = selectedUri(node); if (uri) void vscode.commands.executeCommand('copyFilePath', uri); }),
+    vscode.commands.registerCommand('codeFolderSpaces.copyRelativeFilePath', (node?: unknown) => { const uri = selectedUri(node); if (uri) void vscode.commands.executeCommand('copyRelativeFilePath', uri); }),
+    vscode.commands.registerCommand('codeFolderSpaces.openInTerminal', async (node?: unknown) => { const uri = selectedUri(node); if (uri) await vscode.commands.executeCommand('openInIntegratedTerminal', { cwd: uri.fsPath }); }),
+    vscode.commands.registerCommand('codeFolderSpaces.findInFolder', (node?: unknown) => { const uri = selectedUri(node); if (uri) void vscode.commands.executeCommand('filesExplorer.findInFolder', uri); }),
+    vscode.commands.registerCommand('codeFolderSpaces.newFile', (node?: unknown) => createEntry(node, false)),
+    vscode.commands.registerCommand('codeFolderSpaces.newFolder', (node?: unknown) => createEntry(node, true)),
+    vscode.commands.registerCommand('codeFolderSpaces.renameEntry', (node?: unknown) => renameEntry(node)),
+    vscode.commands.registerCommand('codeFolderSpaces.moveTo', (node?: unknown) => moveEntry(node)),
+    vscode.commands.registerCommand('codeFolderSpaces.deleteEntry', (node?: unknown) => deleteEntry(node)),
+    vscode.commands.registerCommand('codeFolderSpaces.undoFileOperation', async () => {
+      if (!requireTrust()) return;
+      const entry = undoStack.peek();
+      if (!entry) { void vscode.window.showInformationMessage(vscode.l10n.t('There is no file operation to undo.')); return; }
+      const source = vscode.Uri.file(entry.from); const target = vscode.Uri.file(entry.to);
+      try {
+        await vscode.workspace.fs.stat(target);
+        try { await vscode.workspace.fs.stat(source); void vscode.window.showErrorMessage(vscode.l10n.t('Cannot undo: the original path already exists: {0}', entry.from)); return; } catch { /* source is available */ }
+        await vscode.workspace.fs.rename(target, source, { overwrite: false });
+        undoStack.pop(); provider.refresh();
+      } catch (error) { operationError(error); }
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.refresh', () => provider.refresh()),
     vscode.commands.registerCommand('codeFolderSpaces.drillDown', async (node?: unknown) => {
       const target = node && typeof node === 'object' && 'space' in node ? node as { space: import('./types').SpaceDefinition; uri: vscode.Uri; isDirectory: boolean } : undefined;

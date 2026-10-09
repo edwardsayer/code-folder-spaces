@@ -22,5 +22,20 @@
   "Enter a new space name": "Enter a new space name",
   "Renamed space to: {0}": "Renamed space to: {0}",
   "Could not rename space: {0}": "Could not rename space: {0}",
-  "{0} / {1} matches": "{0} / {1} matches"
+  "{0} / {1} matches": "{0} / {1} matches",
+  "Trust the workspace before modifying files.": "Trust the workspace before modifying files.",
+  "File operation failed: {0}": "File operation failed: {0}",
+  "Enter a valid single file or folder name.": "Enter a valid single file or folder name.",
+  "The destination is outside the folder space.": "The destination is outside the folder space.",
+  "The target already exists: {0}": "The target already exists: {0}",
+  "Enter a new name": "Enter a new name",
+  "Choose a destination folder within this space": "Choose a destination folder within this space",
+  "A folder cannot be moved into itself or one of its subfolders.": "A folder cannot be moved into itself or one of its subfolders.",
+  "Moving {0}": "Moving {0}",
+  "Delete \"{0}\"?": "Delete \"{0}\"?",
+  "Delete": "Delete",
+  "There is no file operation to undo.": "There is no file operation to undo.",
+  "Cannot undo: the original path already exists: {0}": "Cannot undo: the original path already exists: {0}",
+  "Enter folder name": "Enter folder name",
+  "Enter file name": "Enter file name"
 }
