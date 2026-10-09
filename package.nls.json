@@ -84,5 +84,8 @@
   "command.pasteEntries.title": "Folder Spaces: Paste",
   "configuration.openFilesIn.description": "Choose where files opened from Folder Spaces appear.",
   "configuration.openFilesIn.current": "Open in the current editor group.",
-  "configuration.openFilesIn.beside": "Open in the adjacent editor group, reusing it when available."
+  "configuration.openFilesIn.beside": "Open in the adjacent editor group, reusing it when available.",
+  "pane.invalidLink": "Invalid pane link: {0}",
+  "pane.staleRoot": "Pane root is stale: {0}. Select a folder in its parent pane or reset the layout.",
+  "command.pane.menu.title": "Pane actions"
 }

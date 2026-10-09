@@ -84,5 +84,8 @@
   "command.pasteEntries.title": "Folder Spaces：貼上",
   "configuration.openFilesIn.description": "選擇從 Folder Spaces 開啟檔案的位置。",
   "configuration.openFilesIn.current": "在目前編輯器群組開啟。",
-  "configuration.openFilesIn.beside": "在相鄰編輯器群組開啟；若已存在則重用。"
+  "configuration.openFilesIn.beside": "在相鄰編輯器群組開啟；若已存在則重用。",
+  "pane.invalidLink": "窗格連結無效：{0}",
+  "pane.staleRoot": "窗格根目錄已失效：{0}。請在父窗格選取資料夾或重設版面。",
+  "command.pane.menu.title": "窗格操作"
 }

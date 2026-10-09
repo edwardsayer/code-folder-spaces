@@ -48,8 +48,11 @@ export class SpaceRootNode extends vscode.TreeItem {
     readonly parent: undefined,
     readonly rootPath = definition.basePath
   ) {
-    super(definition.name, vscode.TreeItemCollapsibleState.Collapsed);
-    this.id = `codeFolderSpaces.space:${definition.basePath}`;
+    super(
+      samePath(rootPath, definition.basePath) ? definition.name : path.basename(rootPath),
+      vscode.TreeItemCollapsibleState.Collapsed
+    );
+    this.id = `codeFolderSpaces.space:${rootPath}`;
     this.resourceUri = vscode.Uri.file(rootPath);
     this.contextValue = 'codeFolderSpaces.spaceRoot';
     this.tooltip = rootPath;
@@ -145,7 +148,10 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         : this._definitions;
       return definitions.map((definition) => {
         const state = this._viewState?.get(definition.basePath);
-        const root = this._paneScope?.root ?? state?.root ?? definition.basePath;
+        const scopeMatchesDefinition = this._paneScope && samePath(definition.basePath, this._paneScope.basePath);
+        const root = scopeMatchesDefinition && this._paneScope.root !== null
+          ? this._paneScope.root
+          : state?.root ?? definition.basePath;
         return new SpaceRootNode(definition, undefined, root);
       });
     }

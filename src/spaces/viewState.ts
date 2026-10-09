@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import type { ViewPresetName } from './viewPresets';
 import { DEFAULT_VIEW_PRESET, isViewPresetName } from './viewPresets';
+import { hasValidPaneLinks, rewritePaneRoots } from './paneLinks';
 
 export const PANE_STATE_KEY = 'codeFolderSpaces.panes.v1';
 
@@ -203,7 +204,14 @@ export class PaneStateStore {
   }
 
   async setPaneLinks(panes: Record<string, PaneLinkState>): Promise<void> {
+    if (!hasValidPaneLinks(panes)) throw new Error('Pane links must be acyclic, ordered, and no deeper than eight panes.');
     this.state.panes = panes;
+    await this.memento.update(PANE_STATE_KEY, this.state);
+  }
+
+  async rewritePaneRoots(oldPath: string, newPath: string): Promise<void> {
+    if (!this.state.panes) return;
+    this.state.panes = rewritePaneRoots(this.state.panes, oldPath, newPath);
     await this.memento.update(PANE_STATE_KEY, this.state);
   }
 

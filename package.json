@@ -190,13 +190,37 @@
       { "command": "codeFolderSpaces.pane.remove", "title": "%command.pane.remove.title%", "icon": "$(remove)" },
       { "command": "codeFolderSpaces.pane.resetLayout", "title": "%command.pane.resetLayout.title%" },
       { "command": "codeFolderSpaces.pane1.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
+      { "command": "codeFolderSpaces.pane1.menu", "title": "%command.pane.menu.title%" },
+      { "command": "codeFolderSpaces.pane2.menu", "title": "%command.pane.menu.title%" },
+      { "command": "codeFolderSpaces.pane3.menu", "title": "%command.pane.menu.title%" },
+      { "command": "codeFolderSpaces.pane4.menu", "title": "%command.pane.menu.title%" },
+      { "command": "codeFolderSpaces.pane5.menu", "title": "%command.pane.menu.title%" },
+      { "command": "codeFolderSpaces.pane6.menu", "title": "%command.pane.menu.title%" },
+      { "command": "codeFolderSpaces.pane7.menu", "title": "%command.pane.menu.title%" },
+      { "command": "codeFolderSpaces.pane8.menu", "title": "%command.pane.menu.title%" },
       { "command": "codeFolderSpaces.pane2.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
       { "command": "codeFolderSpaces.pane3.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
       { "command": "codeFolderSpaces.pane4.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
       { "command": "codeFolderSpaces.pane5.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
       { "command": "codeFolderSpaces.pane6.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
       { "command": "codeFolderSpaces.pane7.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane8.toggleFollow", "title": "%command.pane.toggleFollow.title%" }
+      { "command": "codeFolderSpaces.pane8.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
+      { "command": "codeFolderSpaces.pane1.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
+      { "command": "codeFolderSpaces.pane1.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
+      { "command": "codeFolderSpaces.pane2.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
+      { "command": "codeFolderSpaces.pane2.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
+      { "command": "codeFolderSpaces.pane3.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
+      { "command": "codeFolderSpaces.pane3.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
+      { "command": "codeFolderSpaces.pane4.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
+      { "command": "codeFolderSpaces.pane4.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
+      { "command": "codeFolderSpaces.pane5.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
+      { "command": "codeFolderSpaces.pane5.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
+      { "command": "codeFolderSpaces.pane6.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
+      { "command": "codeFolderSpaces.pane6.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
+      { "command": "codeFolderSpaces.pane7.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
+      { "command": "codeFolderSpaces.pane7.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
+      { "command": "codeFolderSpaces.pane8.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
+      { "command": "codeFolderSpaces.pane8.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" }
     ],
     "keybindings": [
       { "command": "codeFolderSpaces.newFile", "key": "ctrl+n", "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)" },
@@ -209,6 +233,14 @@
     ],
     "menus": {
       "view/title": [
+        { "command": "codeFolderSpaces.pane1.menu", "when": "view == codeFolderSpaces.pane1", "group": "navigation@0" },
+        { "command": "codeFolderSpaces.pane2.menu", "when": "view == codeFolderSpaces.pane2", "group": "navigation@0" },
+        { "command": "codeFolderSpaces.pane3.menu", "when": "view == codeFolderSpaces.pane3", "group": "navigation@0" },
+        { "command": "codeFolderSpaces.pane4.menu", "when": "view == codeFolderSpaces.pane4", "group": "navigation@0" },
+        { "command": "codeFolderSpaces.pane5.menu", "when": "view == codeFolderSpaces.pane5", "group": "navigation@0" },
+        { "command": "codeFolderSpaces.pane6.menu", "when": "view == codeFolderSpaces.pane6", "group": "navigation@0" },
+        { "command": "codeFolderSpaces.pane7.menu", "when": "view == codeFolderSpaces.pane7", "group": "navigation@0" },
+        { "command": "codeFolderSpaces.pane8.menu", "when": "view == codeFolderSpaces.pane8", "group": "navigation@0" },
         {
           "command": "codeFolderSpaces.pane.add",
           "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.canAddPane",
@@ -286,43 +318,83 @@
         }
 ,
         {
-          "command": "codeFolderSpaces.pane1.toggleFollow",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.hasParent",
+          "command": "codeFolderSpaces.pane1.followOn",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.hasParent && codeFolderSpaces.pane1.follow",
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane2.toggleFollow",
-          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.hasParent",
+          "command": "codeFolderSpaces.pane1.followOff",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.hasParent && !codeFolderSpaces.pane1.follow",
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane3.toggleFollow",
-          "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.hasParent",
+          "command": "codeFolderSpaces.pane2.followOn",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.hasParent && codeFolderSpaces.pane2.follow",
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane4.toggleFollow",
-          "when": "view == codeFolderSpaces.pane4 && codeFolderSpaces.pane4.hasParent",
+          "command": "codeFolderSpaces.pane2.followOff",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.hasParent && !codeFolderSpaces.pane2.follow",
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane5.toggleFollow",
-          "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.hasParent",
+          "command": "codeFolderSpaces.pane3.followOn",
+          "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.hasParent && codeFolderSpaces.pane3.follow",
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane6.toggleFollow",
-          "when": "view == codeFolderSpaces.pane6 && codeFolderSpaces.pane6.hasParent",
+          "command": "codeFolderSpaces.pane3.followOff",
+          "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.hasParent && !codeFolderSpaces.pane3.follow",
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane7.toggleFollow",
-          "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.hasParent",
+          "command": "codeFolderSpaces.pane4.followOn",
+          "when": "view == codeFolderSpaces.pane4 && codeFolderSpaces.pane4.hasParent && codeFolderSpaces.pane4.follow",
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane8.toggleFollow",
-          "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.hasParent",
+          "command": "codeFolderSpaces.pane4.followOff",
+          "when": "view == codeFolderSpaces.pane4 && codeFolderSpaces.pane4.hasParent && !codeFolderSpaces.pane4.follow",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.followOn",
+          "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.hasParent && codeFolderSpaces.pane5.follow",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.followOff",
+          "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.hasParent && !codeFolderSpaces.pane5.follow",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.followOn",
+          "when": "view == codeFolderSpaces.pane6 && codeFolderSpaces.pane6.hasParent && codeFolderSpaces.pane6.follow",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.followOff",
+          "when": "view == codeFolderSpaces.pane6 && codeFolderSpaces.pane6.hasParent && !codeFolderSpaces.pane6.follow",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.followOn",
+          "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.hasParent && codeFolderSpaces.pane7.follow",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.followOff",
+          "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.hasParent && !codeFolderSpaces.pane7.follow",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.followOn",
+          "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.hasParent && codeFolderSpaces.pane8.follow",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.followOff",
+          "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.hasParent && !codeFolderSpaces.pane8.follow",
           "group": "navigation@1"
         }      ],
       "view/item/context": [

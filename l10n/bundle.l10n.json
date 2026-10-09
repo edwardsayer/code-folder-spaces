@@ -34,7 +34,6 @@
   "Moving {0}": "Moving {0}",
   "Processing dropped items": "Processing dropped items",
   "Copied {0} item(s). Copies cannot be undone.": "Copied {0} item(s). Copies cannot be undone.",
-
   "Cannot transfer items between different file system providers.": "Cannot transfer items between different file system providers.",
   "The source no longer exists: {0}": "The source no longer exists: {0}",
   "This file system provider does not expose trash support; the item was not deleted.": "This file system provider does not expose trash support; the item was not deleted.",
@@ -45,5 +44,8 @@
   "Enter folder name": "Enter folder name",
   "Enter file name": "Enter file name",
   "Cannot paste between different file system providers.": "Cannot paste between different file system providers.",
-  "A folder cannot be pasted into itself or one of its subfolders.": "A folder cannot be pasted into itself or one of its subfolders."
+  "A folder cannot be pasted into itself or one of its subfolders.": "A folder cannot be pasted into itself or one of its subfolders.",
+  "Invalid pane link: {0}": "Invalid pane link: {0}",
+  "Pane root is stale: {0}. Select a folder in its parent pane or reset the layout.": "Pane root is stale: {0}. Select a folder in its parent pane or reset the layout.",
+  "Choose a pane action": "Choose a pane action"
 }

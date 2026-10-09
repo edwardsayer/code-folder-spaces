@@ -34,7 +34,6 @@
   "Moving {0}": "正在移動 {0}",
   "Processing dropped items": "正在處理拖放項目",
   "Copied {0} item(s). Copies cannot be undone.": "已複製 {0} 個項目。複製操作無法復原。",
-
   "Cannot transfer items between different file system providers.": "無法在不同檔案系統提供者之間傳輸項目。",
   "The source no longer exists: {0}": "來源已不存在：{0}",
   "This file system provider does not expose trash support; the item was not deleted.": "此檔案系統提供者未提供垃圾桶支援；未刪除該項目。",
@@ -45,5 +44,8 @@
   "Enter folder name": "輸入資料夾名稱",
   "Enter file name": "輸入檔案名稱",
   "Cannot paste between different file system providers.": "無法在不同檔案系統提供者之間貼上。",
-  "A folder cannot be pasted into itself or one of its subfolders.": "無法將資料夾貼入自身或其子資料夾。"
+  "A folder cannot be pasted into itself or one of its subfolders.": "無法將資料夾貼入自身或其子資料夾。",
+  "Invalid pane link: {0}": "窗格連結無效：{0}",
+  "Pane root is stale: {0}. Select a folder in its parent pane or reset the layout.": "窗格根目錄已失效：{0}。請在父窗格選取資料夾或重設版面。",
+  "Choose a pane action": "選擇窗格操作"
 }

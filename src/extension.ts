@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProvider';
+import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
 import { classifySpaceRename, getEnabledPaneCount, PaneStateStore } from './spaces/viewState';
+import { getFollowingChildPaneIds, isPaneRootDirectory, shouldCascadeSelection } from './spaces/paneLinks';
 import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, isValidSpaceRoot, resolveDropTarget, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack, uniqueEntryName, validateSpaceName } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
@@ -44,7 +45,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canRemovePane', configuredPaneCount() > 1);
   };
   await syncPaneContexts();
-  const provider = new SpaceTreeDataProvider(store, viewState);
+  const firstDefinition = store.getDefinitions()[0];
+  const firstPaneScope = firstDefinition
+    ? { basePath: firstDefinition.basePath, root: viewState.getPaneLinks()?.pane1?.root ?? null }
+    : undefined;
+  const provider = new SpaceTreeDataProvider(store, viewState, firstPaneScope);
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
     showCollapseAll: true,
@@ -82,28 +87,142 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     },
   });
   context.subscriptions.push(store, provider, treeView);
-  interface PaneRuntime { id: string; provider: SpaceTreeDataProvider; treeView: vscode.TreeView<import('./spaces/spaceTreeDataProvider').SpaceNode> }
-  const paneRuntime = new Map<string, PaneRuntime>([['pane1', { id: 'pane1', provider, treeView }]]);
+  interface PaneRuntime { id: string; provider: SpaceTreeDataProvider; treeView: vscode.TreeView<import('./spaces/spaceTreeDataProvider').SpaceNode>; scope?: { basePath: string; root: string | null }; selectionGeneration: number; expectedRoot?: string; expectedRootTimer?: ReturnType<typeof setTimeout>; staleRoot?: string; selectionTimer?: ReturnType<typeof setTimeout> }
+  const paneRuntime = new Map<string, PaneRuntime>([['pane1', { id: 'pane1', provider, treeView, scope: firstPaneScope, selectionGeneration: 0 }]]);
+  const cascadeDisposables = new Map<string, vscode.Disposable>();
   const syncPaneViews = (): void => {
     const definitions = store.getDefinitions();
     const count = getEnabledPaneCount(definitions.length, configuredPaneCount());
+    const first = paneRuntime.get('pane1');
+    if (first) {
+      if (definitions[0]) {
+        first.scope ??= { basePath: definitions[0].basePath, root: null };
+        first.scope.basePath = definitions[0].basePath;
+        first.scope.root = viewState.getPaneLinks()?.pane1?.root ?? null;
+      } else {
+        first.scope = undefined;
+      }
+      const rootPath = viewState.getPaneLinks()?.pane1?.root ?? definitions[0]?.basePath;
+      const rootName = rootPath ? path.basename(rootPath) : '';
+      first.treeView.title = count === 1 && rootName ? rootName : 'Folder Spaces 1';
+      first.treeView.description = rootPath ?? '';
+    }
     for (let index = 2; index <= 8; index++) {
       const id = `pane${index}`;
       const existing = paneRuntime.get(id);
       const definition = definitions[index - 1];
       if (index > count || !definition) {
-        if (existing) { existing.treeView.dispose(); existing.provider.dispose(); paneRuntime.delete(id); }
+        if (existing) { cascadeDisposables.get(id)?.dispose(); cascadeDisposables.delete(id); if (existing.selectionTimer) clearTimeout(existing.selectionTimer); existing.treeView.dispose(); existing.provider.dispose(); paneRuntime.delete(id); }
         continue;
       }
       if (existing) continue;
       const root = viewState.getPaneLinks()?.[id]?.root ?? definition.basePath;
-      const paneProvider = new SpaceTreeDataProvider(store, viewState, { basePath: definition.basePath, root });
-      const paneTreeView = vscode.window.createTreeView(`codeFolderSpaces.${id}`, { treeDataProvider: paneProvider, showCollapseAll: true });
+      const scope = { basePath: definition.basePath, root };
+      const paneProvider = new SpaceTreeDataProvider(store, viewState, scope);
+      const paneTreeView = vscode.window.createTreeView(`codeFolderSpaces.${id}`, {
+        treeDataProvider: paneProvider, showCollapseAll: true,
+        dragAndDropController: {
+          dragMimeTypes: ['text/uri-list', `application/vnd.code.tree.codeFolderSpaces.${id}`],
+          dropMimeTypes: ['text/uri-list', `application/vnd.code.tree.codeFolderSpaces.${id}`],
+          handleDrag: async (source, transfer) => {
+            const uris = source.filter((node): node is SpaceEntryNode => node instanceof SpaceEntryNode && node.uri.scheme === 'file').map(node => node.uri);
+            if (!uris.length) return;
+            const serialized = uris.map(uri => uri.toString()).join('\\r\\n');
+            transfer.set('text/uri-list', new vscode.DataTransferItem(serialized));
+            transfer.set(`application/vnd.code.tree.codeFolderSpaces.${id}`, new vscode.DataTransferItem(serialized));
+          },
+          handleDrop: async (target, transfer) => {
+            if (!target) return;
+            const targetUri = target instanceof SpaceRootNode ? target.uri : (target as { uri?: vscode.Uri }).uri;
+            if (!targetUri) return;
+            const destinationPath = resolveDropTarget(target instanceof SpaceRootNode
+              ? { path: targetUri.fsPath, isDirectory: true, isRoot: true }
+              : { path: targetUri.fsPath, isDirectory: Boolean((target as { isDirectory?: boolean }).isDirectory) });
+            if (!destinationPath || !requireTrust()) return;
+            const item = transfer.get(`application/vnd.code.tree.codeFolderSpaces.${id}`) ?? transfer.get('text/uri-list');
+            if (!item) return;
+            try { await moveDroppedEntries((await item.asString()).split(/\\r?\\n/).filter(line => line && !line.startsWith('#')).map(line => vscode.Uri.parse(line)), vscode.Uri.file(destinationPath)); }
+            catch (error) { operationError(error); }
+          },
+        },
+      });
       context.subscriptions.push(paneProvider, paneTreeView);
-      paneRuntime.set(id, { id, provider: paneProvider, treeView: paneTreeView });
+      paneRuntime.set(id, { id, provider: paneProvider, treeView: paneTreeView, scope, selectionGeneration: 0 });
+    }
+  };
+  const attachPaneCascade = (runtime: PaneRuntime): void => {
+    if (cascadeDisposables.has(runtime.id)) return;
+    const disposable = runtime.treeView.onDidChangeSelection(event => {
+      const selected = event.selection[0];
+      const selectedUri = selected instanceof SpaceRootNode || selected instanceof SpaceEntryNode ? selected.uri : undefined;
+      if (runtime.expectedRoot) {
+        const suppress = selectedUri?.fsPath === runtime.expectedRoot;
+        runtime.expectedRoot = undefined;
+        if (runtime.expectedRootTimer) clearTimeout(runtime.expectedRootTimer);
+        runtime.expectedRootTimer = undefined;
+        if (suppress) return;
+      }
+      const links = viewState.getPaneLinks() ?? {};
+      const childIds = getFollowingChildPaneIds(links, runtime.id);
+      if (!childIds.length) return;
+      runtime.selectionGeneration++;
+      const generation = runtime.selectionGeneration;
+      if (runtime.selectionTimer) clearTimeout(runtime.selectionTimer);
+      runtime.selectionTimer = setTimeout(() => {
+        runtime.selectionTimer = undefined;
+        void (async () => {
+          const isFolder = selected instanceof SpaceRootNode || (selected instanceof SpaceEntryNode && selected.isDirectory);
+          if (generation !== runtime.selectionGeneration || !selectedUri || !shouldCascadeSelection(isFolder, true)) return;
+          let stat: vscode.FileStat;
+          try { stat = await vscode.workspace.fs.stat(selectedUri); } catch { return; }
+          if (generation !== runtime.selectionGeneration || !isPaneRootDirectory(stat.type, vscode.FileType.Directory)) return;
+          for (const childId of childIds) {
+            if (generation !== runtime.selectionGeneration) return;
+            const child = paneRuntime.get(childId);
+            if (!child?.scope) continue;
+            const currentLinks = { ...(viewState.getPaneLinks() ?? {}) };
+            const childLink = currentLinks[childId];
+            if (!childLink || childLink.parentPaneId !== runtime.id || !childLink.follow) continue;
+            childLink.root = selectedUri.fsPath;
+            try { await viewState.setPaneLinks(currentLinks); }
+            catch (error) { void vscode.window.showErrorMessage(vscode.l10n.t('Invalid pane link: {0}', String(error))); return; }
+            if (generation !== runtime.selectionGeneration) return;
+            child.expectedRoot = selectedUri.fsPath;
+            if (child.expectedRootTimer) clearTimeout(child.expectedRootTimer);
+            child.expectedRootTimer = setTimeout(() => { child.expectedRoot = undefined; child.expectedRootTimer = undefined; }, 500);
+            child.scope.root = selectedUri.fsPath;
+            child.staleRoot = undefined;
+            child.provider.clearStale(child.scope.basePath);
+            child.provider.refresh();
+            child.treeView.message = '';
+          }
+        })();
+      }, 100);
+    });
+    cascadeDisposables.set(runtime.id, disposable);
+    context.subscriptions.push(disposable, new vscode.Disposable(() => { if (runtime.selectionTimer) clearTimeout(runtime.selectionTimer); }));
+  };
+  const reconcilePaneRoots = async (): Promise<void> => {
+    for (const [id, link] of Object.entries(viewState.getPaneLinks() ?? {})) {
+      const runtime = paneRuntime.get(id);
+      if (!runtime || !link.root) continue;
+      try {
+        const stat = await vscode.workspace.fs.stat(vscode.Uri.file(link.root));
+        if (!isPaneRootDirectory(stat.type, vscode.FileType.Directory)) throw new Error('not a directory');
+        if (runtime.scope) runtime.scope.root = link.root;
+        if (runtime.staleRoot) runtime.treeView.message = '';
+        runtime.staleRoot = undefined;
+        runtime.provider.refresh();
+      } catch {
+        runtime.treeView.message = vscode.l10n.t('Pane root is stale: {0}. Select a folder in its parent pane or reset the layout.', link.root);
+        if (runtime.staleRoot !== link.root) void vscode.window.showWarningMessage(runtime.treeView.message);
+        runtime.staleRoot = link.root;
+      }
     }
   };
   syncPaneViews();
+  for (const runtime of paneRuntime.values()) attachPaneCascade(runtime);
+  void reconcilePaneRoots();
   const createPaneHandlers = (paneId: string, runtime?: PaneRuntime) => ({
     refresh: (): void => runtime?.provider.refresh(),
     toggleFollow: async (): Promise<void> => {
@@ -115,6 +234,73 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await syncPaneContexts();
     },
   });
+  const paneMenu = async (paneId: string): Promise<void> => {
+    const runtime = paneRuntime.get(paneId);
+    if (!runtime?.scope) return;
+    const actions = [
+      'Preset', 'Mode', 'Level', 'Content', 'Filter', 'Clear filter', 'Sort',
+      'Drill up', 'Switch root', 'Expand level', 'Reveal active file', 'Refresh',
+      'New file', 'New folder', 'Rename', 'Delete', 'Copy', 'Cut', 'Paste',
+      'Undo', 'Reveal in Explorer', 'Reveal in OS', 'Toggle follow',
+    ];
+    const action = await vscode.window.showQuickPick(actions, { placeHolder: vscode.l10n.t('Choose a pane action') });
+    if (!action) return;
+    const definition = store.getDefinitions().find(item => item.basePath === runtime.scope!.basePath);
+    const state = definition ? viewState.get(definition.basePath) : undefined;
+    const target = runtime.treeView.selection[0];
+    const refresh = (): void => runtime.provider.refresh();
+    if (action === 'Refresh') { refresh(); return; }
+    if (action === 'Toggle follow') { await createPaneHandlers(paneId, runtime).toggleFollow(); return; }
+    if (action === 'Reveal in Explorer' || action === 'Reveal in OS') {
+      const uri = selectedUri(target); if (uri) await vscode.commands.executeCommand(action === 'Reveal in Explorer' ? 'revealInExplorer' : 'revealFileInOS', uri); return;
+    }
+    if (action === 'Copy' || action === 'Cut') { const entry = getEntry(target); if (entry && !(target instanceof SpaceRootNode)) clipboard.set([entry.uri.toString()], action === 'Copy' ? 'copy' : 'cut'); return; }
+    if (action === 'Paste') { await pasteEntries(target); refresh(); return; }
+    if (action === 'New file' || action === 'New folder') { await createEntry(target, action === 'New folder'); refresh(); return; }
+    if (action === 'Rename') { await renameEntry(target); refresh(); return; }
+    if (action === 'Delete') { await deleteEntry(target); refresh(); return; }
+    if (action === 'Undo') { await vscode.commands.executeCommand('codeFolderSpaces.undoFileOperation'); refresh(); return; }
+    if (!definition || !state) return;
+    if (action === 'Preset') {
+      const selected = await vscode.window.showQuickPick(Object.keys(VIEW_PRESETS), { placeHolder: vscode.l10n.t('Choose a view preset') });
+      if (isViewPresetName(selected)) { await viewState.setPreset(definition.basePath, selected); refresh(); }
+    } else if (action === 'Mode' || action === 'Level' || action === 'Content') {
+      const candidates = Object.entries(VIEW_PRESETS).filter(([, preset]) => action === 'Mode' ? preset.mode !== VIEW_PRESETS[state.preset].mode : action === 'Level' ? preset.level !== VIEW_PRESETS[state.preset].level : preset.content !== VIEW_PRESETS[state.preset].content);
+      const selected = await vscode.window.showQuickPick(candidates.map(([name]) => name));
+      if (isViewPresetName(selected)) { await viewState.setPreset(definition.basePath, selected); refresh(); }
+    } else if (action === 'Filter') {
+      const value = await vscode.window.showInputBox({ prompt: vscode.l10n.t('Filter by path substring'), value: state.filter });
+      if (value !== undefined) { await viewState.setFilter(definition.basePath, value.trim()); refresh(); }
+    } else if (action === 'Clear filter') { await viewState.clearFilter(definition.basePath); refresh(); }
+    else if (action === 'Sort') {
+      const key = await vscode.window.showQuickPick(['name', 'mtime', 'ctime']); if (!key) return;
+      const direction = await vscode.window.showQuickPick(['asc', 'desc']);
+      if (direction === 'asc' || direction === 'desc') { await viewState.setSort(definition.basePath, key as 'name' | 'mtime' | 'ctime', direction); refresh(); }
+    } else if (action === 'Drill up') { if (await viewState.drillUp(definition.basePath)) refresh(); }
+    else if (action === 'Switch root') {
+      const spaces = store.getDefinitions();
+      const picked = await vscode.window.showQuickPick(spaces.map(space => ({ label: space.name, description: space.basePath, space })), { placeHolder: vscode.l10n.t('Choose a new space root') });
+      if (picked) {
+        const links = { ...(viewState.getPaneLinks() ?? {}) };
+        if (!links[paneId]) return;
+        links[paneId] = { ...links[paneId], root: picked.space.basePath, follow: paneId === 'pane1' ? false : links[paneId].follow };
+        await viewState.setPaneLinks(links);
+        runtime.scope.basePath = picked.space.basePath; runtime.scope.root = picked.space.basePath;
+        await viewState.switchRoot(picked.space.basePath, picked.space.basePath); refresh();
+      }
+    } else if (action === 'Expand level') {
+      const selectedNode = target;
+      const parents = selectedNode instanceof SpaceRootNode || (selectedNode && 'isDirectory' in selectedNode && selectedNode.isDirectory)
+        ? [selectedNode as SpaceRootNode | SpaceEntryNode] : await runtime.provider.getChildren();
+      for (const parent of parents) for (const child of await runtime.provider.getChildren(parent)) {
+        if (child.collapsibleState !== vscode.TreeItemCollapsibleState.None) await runtime.treeView.reveal(child, { select: false, focus: false, expand: true });
+      }
+    } else if (action === 'Reveal active file') {
+      const uri = getActiveTabUri(); if (!uri) return;
+      const node = await runtime.provider.findNodeByPath(uri.fsPath);
+      if (node) await runtime.treeView.reveal(node, { select: true, focus: false, expand: true });
+    }
+  };
 
   let followTimer: ReturnType<typeof setTimeout> | undefined;
   let followGeneration = 0;
@@ -165,8 +351,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       refreshTimer = undefined;
       for (const runtime of paneRuntime.values()) {
         runtime.provider.refresh();
-        runtime.treeView.message = runtime.provider.filterMessage;
+        if (!runtime.staleRoot) runtime.treeView.message = runtime.provider.filterMessage;
       }
+      void reconcilePaneRoots();
       scheduleFollow();
     }, REFRESH_DEBOUNCE_MS);
   };
@@ -233,17 +420,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       provider.refresh();
       rebuildWatchers();
       void syncContext();
-      void syncPaneContexts().then(syncPaneViews);
+      void syncPaneContexts().then(() => { syncPaneViews(); for (const runtime of paneRuntime.values()) attachPaneCascade(runtime); void reconcilePaneRoots(); });
     },
     undefined,
     context.subscriptions
   );
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(event => {
-      if (event.affectsConfiguration('codeFolderSpaces.panes.count')) void syncPaneContexts().then(syncPaneViews);
+      if (event.affectsConfiguration('codeFolderSpaces.panes.count')) void syncPaneContexts().then(() => { syncPaneViews(); for (const runtime of paneRuntime.values()) attachPaneCascade(runtime); void reconcilePaneRoots(); });
     }),
     vscode.workspace.onDidRenameFiles(async event => {
       for (const file of event.files) {
+        await viewState.rewritePaneRoots(file.oldUri.fsPath, file.newUri.fsPath);
+        for (const runtime of paneRuntime.values()) {
+          const root = runtime.scope?.root;
+          if (root && (root === file.oldUri.fsPath || root.startsWith(`${file.oldUri.fsPath}${path.sep}`))) {
+            runtime.scope!.root = path.join(file.newUri.fsPath, path.relative(file.oldUri.fsPath, root));
+          }
+        }
         for (const definition of store.getDefinitions()) {
           const impact = classifySpaceRename([definition.basePath], file.oldUri.fsPath);
           if (impact.kind === 'space-root') {
@@ -268,6 +462,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
           }
         }
       }
+      await reconcilePaneRoots();
     }),
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       provider.refresh();
@@ -549,10 +744,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await viewState.initializePaneLinks(store.getDefinitions().map(definition => definition.basePath), paneFollowDefault, 2);
       await syncPaneContexts(); syncPaneViews();
     }),
-    ...Array.from({ length: 8 }, (_, index) => vscode.commands.registerCommand(`codeFolderSpaces.pane${index + 1}.toggleFollow`, () => {
+    ...Array.from({ length: 8 }, (_, index) => {
       const id = `pane${index + 1}`;
-      return createPaneHandlers(id, paneRuntime.get(id)).toggleFollow();
-    })),
+      const setFollow = async (follow: boolean): Promise<void> => {
+        const links = { ...(viewState.getPaneLinks() ?? {}) };
+        const pane = links[id];
+        if (!pane?.parentPaneId || pane.follow === follow) return;
+        links[id] = { ...pane, follow };
+        await viewState.setPaneLinks(links);
+        await syncPaneContexts();
+      };
+      return [
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.toggleFollow`, () => createPaneHandlers(id, paneRuntime.get(id)).toggleFollow()),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.menu`, () => paneMenu(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOn`, () => setFollow(false)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOff`, () => setFollow(true)),
+      ];
+    }).flat(),
     vscode.commands.registerCommand('codeFolderSpaces.drillDown', async (node?: unknown) => {
       const target = node && typeof node === 'object' && 'space' in node ? node as { space: import('./types').SpaceDefinition; uri: vscode.Uri; isDirectory: boolean } : undefined;
       if (!target?.isDirectory) return;
@@ -576,7 +784,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const definition = target?.definition ?? store.getDefinitions()[0];
       if (!definition) return;
       const currentRoot = viewState.get(definition.basePath).root ?? definition.basePath;
-      const items: Array<vscode.QuickPickItem & { rootPath: string }> = [];
+      const items: Array<vscode.QuickPickItem & { rootPath: string; spaceDefinition?: import('./types').SpaceDefinition }> = [];
+      for (const space of store.getDefinitions()) {
+        if (space.basePath !== definition.basePath) items.push({ label: space.name, description: space.basePath, rootPath: space.basePath, spaceDefinition: space });
+      }
       if (path.resolve(currentRoot) !== path.resolve(definition.basePath)) {
         const parent = path.dirname(currentRoot);
         if (isAllowedSpaceRoot(definition.basePath, parent)) items.push({ label: '..', description: parent, rootPath: parent });
@@ -594,13 +805,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       }
       const selected = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a new space root') });
       if (!selected) return;
-      if (!isAllowedSpaceRoot(definition.basePath, selected.rootPath)) {
+      const rootDefinition = selected.spaceDefinition ?? definition;
+      if (!isAllowedSpaceRoot(rootDefinition.basePath, selected.rootPath)) {
         void vscode.window.showErrorMessage(vscode.l10n.t('The selected folder is outside the space root.'));
         return;
       }
       let selectedStat: vscode.FileStat | undefined;
       try { selectedStat = await vscode.workspace.fs.stat(vscode.Uri.file(selected.rootPath)); } catch { /* missing paths are rejected below */ }
-      const validRoot = await isValidSpaceRoot(definition.basePath, selected.rootPath, async () => Boolean(selectedStat && (selectedStat.type & vscode.FileType.Directory)));
+      const validRoot = await isValidSpaceRoot(rootDefinition.basePath, selected.rootPath, async () => Boolean(selectedStat && (selectedStat.type & vscode.FileType.Directory)));
       if (!selectedStat) {
         void vscode.window.showErrorMessage(vscode.l10n.t('The selected folder does not exist.'));
         return;
@@ -610,7 +822,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         return;
       }
       // 切換根＝重置 stack；drillDown／drillUp＝堆疊操作，避免混淆兩種 root 語意。
-      await viewState.switchRoot(definition.basePath, selected.rootPath);
+      await viewState.switchRoot(rootDefinition.basePath, selected.rootPath);
       provider.refresh();
       await syncContext();
     }),

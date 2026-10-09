@@ -45,6 +45,18 @@ describe('pane view state', () => {
     const result = normalizePaneState({ version: 1, bySpace: {}, panes: { pane1: { root: '/a/../a', parentPaneId: null, follow: true, future: 1 } } });
     expect(result.panes?.pane1).toMatchObject({ root: normalizeSpaceKey('/a'), parentPaneId: null, follow: true, future: 1 });
   });
+
+  it('round-trips parentPaneId and follow while rejecting invalid links', async () => {
+    const persisted = memory(undefined);
+    const state = new PaneStateStore(persisted);
+    const panes = {
+      pane1: { root: '/space', parentPaneId: null, follow: false },
+      pane2: { root: '/space/child', parentPaneId: 'pane1', follow: true },
+    };
+    await state.setPaneLinks(panes);
+    expect((persisted.read() as { panes: unknown }).panes).toEqual(panes);
+    await expect(state.setPaneLinks({ ...panes, pane1: { ...panes.pane1, parentPaneId: 'pane2' } })).rejects.toThrow(/acyclic/);
+  });
   it('preserves unknown pane and per-space fields after view state updates', async () => {
     const source = {
       version: 1,

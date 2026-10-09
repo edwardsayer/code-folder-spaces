@@ -44,7 +44,15 @@ suite('空間樹 provider', () => {
       const roots = await scoped.getChildren();
       assert.equal(roots.length, 1);
       assert.ok(roots[0] instanceof SpaceRootNode);
-      assert.equal((roots[0] as SpaceRootNode).uri.fsPath, path.join(beta, 'nested'));
+      const root = roots[0] as SpaceRootNode;
+      const scopedRoot = path.join(beta, 'nested');
+      assert.equal(root.rootPath, scopedRoot);
+      assert.equal(root.uri.fsPath, scopedRoot);
+      assert.equal(root.resourceUri?.fsPath, scopedRoot);
+      assert.equal(root.tooltip, scopedRoot);
+      assert.equal(root.id, `codeFolderSpaces.space:${scopedRoot}`);
+      assert.equal(root.label, 'nested');
+      assert.deepEqual((await scoped.getChildren(root)).map(node => node.label), ['c.txt']);
     } finally { scoped.dispose(); store.dispose(); }
   }));
 
@@ -110,6 +118,9 @@ suite('空間樹 provider', () => {
     assert.deepEqual(roots.map((node) => node.label), ['alpha', 'beta']);
     assert.ok(roots.every((node) => node.contextValue === 'codeFolderSpaces.spaceRoot'));
     assert.deepEqual(roots.map((node) => node.resourceUri?.fsPath), spaces);
+    assert.deepEqual(roots.map((node) => (node as SpaceRootNode).rootPath), spaces);
+    assert.deepEqual(roots.map((node) => node.tooltip), spaces);
+    assert.deepEqual(roots.map((node) => node.id), spaces.map(root => `codeFolderSpaces.space:${root}`));
     assert.ok(roots.every((node) => node.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed));
   }));
 
