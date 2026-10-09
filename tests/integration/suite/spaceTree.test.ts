@@ -36,6 +36,18 @@ suite('空間樹 provider', () => {
   const logs = path.join(fixtureWorkspace, 'spaces/logs');
   const spaces = [alpha, beta];
 
+  test('pane scoped provider 只呈現指定空間並使用 pane 根引用', async () => withGlobalSettings({ spaces: [alpha, beta] }, async () => {
+    const store = new SpaceStore();
+    const state = new PaneStateStore({ get: <T>() => undefined as T | undefined, update: async () => undefined });
+    const scoped = new SpaceTreeDataProvider(store, state, { basePath: beta, root: path.join(beta, 'nested') });
+    try {
+      const roots = await scoped.getChildren();
+      assert.equal(roots.length, 1);
+      assert.ok(roots[0] instanceof SpaceRootNode);
+      assert.equal((roots[0] as SpaceRootNode).uri.fsPath, path.join(beta, 'nested'));
+    } finally { scoped.dispose(); store.dispose(); }
+  }));
+
   test('下鑽後 provider 從新根列舉，返回還原原檢視狀態', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
     const store = new SpaceStore();
     let document: unknown;

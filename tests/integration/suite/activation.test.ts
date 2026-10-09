@@ -25,8 +25,10 @@ suite('擴充套件啟用', () => {
   test('manifest 包含 view 且已註冊 focus 命令', async () => {
     const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
     assert.ok(extension);
-    const views = Object.values(extension.packageJSON.contributes.views as Record<string, Array<{ id: string }>> ?? {}).flat();
-    assert.ok(views.length > 0, 'manifest 未貢獻任何 view');
+    const views = Object.values(extension.packageJSON.contributes.views as Record<string, Array<{ id: string; when?: string }>> ?? {}).flat();
+    assert.equal(views.length, 8, 'manifest 應貢獻 8 個固定 pane 插槽');
+    assert.deepEqual(views.map(view => view.id), Array.from({ length: 8 }, (_, index) => `codeFolderSpaces.pane${index + 1}`));
+    for (const [index, view] of views.entries()) assert.equal(view.when, `codeFolderSpaces.pane${index + 1}.enabled`);
     const commands = await vscode.commands.getCommands(true);
     for (const view of views) {
       const focusCommand = `${view.id}.focus`;

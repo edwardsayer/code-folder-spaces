@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { classifySpaceRename, normalizePaneState, normalizeSpaceKey, PaneStateStore, PANE_STATE_KEY, renameSpaceKeys, rewriteRenamedPath } from '../../src/spaces/viewState';
+import { clampPaneCount, classifySpaceRename, getEnabledPaneCount, migratePaneLinks, normalizePaneState, normalizeSpaceKey, PaneStateStore, PANE_STATE_KEY, renameSpaceKeys, rewriteRenamedPath } from '../../src/spaces/viewState';
 import { isAllowedSpaceRoot, isValidSpaceRoot, validateSpaceName } from '../../src/spaces/spaceActions';
 
 function memory(initial: unknown) {
@@ -13,6 +13,38 @@ function memory(initial: unknown) {
 }
 
 describe('pane view state', () => {
+  it('migrates bySpace-only state to linked pane references and retains unknown fields', () => {
+    const source = { version: 1, future: 'retained', bySpace: { '/a': {}, '/b': {}, '/c': {} } };
+    const migrated = migratePaneLinks(source, ['/a', '/b', '/c'], true, 2);
+    expect(migrated.panes).toEqual({
+      pane1: { root: normalizeSpaceKey('/a'), parentPaneId: null, follow: false },
+      pane2: { root: normalizeSpaceKey('/b'), parentPaneId: 'pane1', follow: true },
+    });
+    expect(migrated.future).toBe('retained');
+    expect(migrated.bySpace).toEqual(normalizePaneState(source).bySpace);
+  });
+
+  it('clamps pane count and applies the welcome-pane activation policy', () => {
+    expect(clampPaneCount(99)).toBe(8);
+    expect(clampPaneCount(0)).toBe(1);
+    expect(clampPaneCount(Number.NaN)).toBe(2);
+    expect(getEnabledPaneCount(0, 2)).toBe(1);
+    expect(getEnabledPaneCount(1, 2)).toBe(1);
+    expect(getEnabledPaneCount(9, 99)).toBe(8);
+  });
+
+  it('persists initial pane migration, including the single empty welcome pane', async () => {
+    const persisted = memory(undefined);
+    const state = new PaneStateStore(persisted);
+    await state.initializePaneLinks([], false, 2);
+    expect((persisted.read() as { version: number; panes: unknown }).version).toBe(1);
+    expect((persisted.read() as { panes: unknown }).panes).toEqual({ pane1: { root: null, parentPaneId: null, follow: false } });
+  });
+
+  it('normalizes pane references without duplicating view-state fields', () => {
+    const result = normalizePaneState({ version: 1, bySpace: {}, panes: { pane1: { root: '/a/../a', parentPaneId: null, follow: true, future: 1 } } });
+    expect(result.panes?.pane1).toMatchObject({ root: normalizeSpaceKey('/a'), parentPaneId: null, follow: true, future: 1 });
+  });
   it('preserves unknown pane and per-space fields after view state updates', async () => {
     const source = {
       version: 1,

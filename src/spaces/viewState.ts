@@ -23,10 +23,46 @@ export interface SpaceViewState {
   sort: { key: SortKey; direction: SortDirection };
 }
 
-interface PaneStateDocument {
+export interface PaneLinkState {
+  root: string | null;
+  parentPaneId: string | null;
+  follow: boolean;
+}
+
+export interface PaneStateDocument {
   [key: string]: unknown;
   version: 1;
   bySpace: Record<string, SpaceViewState>;
+  panes?: Record<string, PaneLinkState>;
+}
+
+export const MAX_PANE_COUNT = 8;
+
+/** Clamp the configured pane count to the supported static view slots. */
+export function clampPaneCount(value: number): number {
+  return Number.isFinite(value) ? Math.max(1, Math.min(MAX_PANE_COUNT, Math.floor(value))) : 2;
+}
+
+/** Select visible panes; transitional policy: show one welcome pane without spaces. */
+export function getEnabledPaneCount(spaceCount: number, configuredCount: number): number {
+  return Math.max(1, Math.min(Math.max(0, Math.floor(spaceCount)), clampPaneCount(configuredCount)));
+}
+
+/** Build pane references from existing bySpace-only state without duplicating view state. */
+export function migratePaneLinks(value: unknown, roots: string[], followDefault: boolean, configuredCount = 2): PaneStateDocument {
+  const document = normalizePaneState(value);
+  if (document.panes) return document;
+  const count = getEnabledPaneCount(roots.length, configuredCount);
+  const panes: Record<string, PaneLinkState> = {};
+  for (let index = 0; index < count; index++) {
+    panes[`pane${index + 1}`] = {
+      root: typeof roots[index] === 'string' ? normalizeSpaceKey(roots[index]) : null,
+      parentPaneId: index === 0 ? null : `pane${index}`,
+      follow: index > 0 ? followDefault : false,
+    };
+  }
+  document.panes = panes;
+  return document;
 }
 
 /** Normalize per-space keys consistently with the host platform's path semantics. */
@@ -67,8 +103,16 @@ export function normalizePaneState(value: unknown): PaneStateDocument {
       sort: { key, direction },
     };
   }
-  // 保留未知欄位，避免 S4 等後續版本新增的 pane／per-space 狀態在本版更新時被抹除。
-  return { ...source, version: 1, bySpace };
+  // 保留未知欄位，避免後續版本新增的 pane／per-space 狀態在本版更新時被抹除。
+  const panes: Record<string, PaneLinkState> | undefined = source.panes && typeof source.panes === 'object' && !Array.isArray(source.panes)
+    ? Object.fromEntries(Object.entries(source.panes as Record<string, unknown>).flatMap(([id, raw]) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+      const pane = raw as Record<string, unknown>;
+      return [[id, { ...pane, root: typeof pane.root === 'string' ? path.normalize(pane.root) : null,
+        parentPaneId: typeof pane.parentPaneId === 'string' ? pane.parentPaneId : null, follow: pane.follow === true } as PaneLinkState]];
+    }))
+    : undefined;
+  return { ...source, version: 1, bySpace, ...(panes ? { panes } : {}) };
 }
 
 /** Per-window state adapter. Schema normalization is isolated for unit testing. */
@@ -139,6 +183,28 @@ export class PaneStateStore {
 
   get(basePath: string): SpaceViewState {
     return this.state.bySpace[normalizeSpaceKey(basePath)] ?? { preset: DEFAULT_VIEW_PRESET, filter: '', sort: { key: 'name', direction: 'asc' } };
+  }
+
+  getPaneLinks(): Record<string, PaneLinkState> | undefined { return this.state.panes; }
+
+  async initializePaneLinks(roots: string[], followDefault: boolean, configuredCount = 2): Promise<Record<string, PaneLinkState>> {
+    this.state = migratePaneLinks(this.state, roots, followDefault, configuredCount);
+    const panes = this.state.panes ?? (this.state.panes = {});
+    const count = getEnabledPaneCount(roots.length, configuredCount);
+    for (let index = 0; index < count; index++) {
+      const id = `pane${index + 1}`;
+      const existing = panes[id];
+      panes[id] = existing
+        ? { ...existing, root: existing.root ?? (roots[index] ? normalizeSpaceKey(roots[index]) : null) }
+        : { root: roots[index] ? normalizeSpaceKey(roots[index]) : null, parentPaneId: index ? `pane${index}` : null, follow: index > 0 ? followDefault : false };
+    }
+    await this.memento.update(PANE_STATE_KEY, this.state);
+    return panes;
+  }
+
+  async setPaneLinks(panes: Record<string, PaneLinkState>): Promise<void> {
+    this.state.panes = panes;
+    await this.memento.update(PANE_STATE_KEY, this.state);
   }
 
   async ensureRoot(basePath: string): Promise<string> {

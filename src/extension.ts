@@ -3,12 +3,12 @@ import * as path from 'node:path';
 import { SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
-import { classifySpaceRename, PaneStateStore } from './spaces/viewState';
+import { classifySpaceRename, getEnabledPaneCount, PaneStateStore } from './spaces/viewState';
 import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, isValidSpaceRoot, resolveDropTarget, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack, uniqueEntryName, validateSpaceName } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 
-const VIEW_ID = 'codeFolderSpaces.explorer';
+const VIEW_ID = 'codeFolderSpaces.pane1';
 const REFRESH_DEBOUNCE_MS = 200;
 const FOLLOW_DEBOUNCE_MS = 250;
 
@@ -24,20 +24,40 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   const store = new SpaceStore();
   const viewState = new PaneStateStore(context.workspaceState);
+  const configuredPaneCount = (): number => vscode.workspace.getConfiguration('codeFolderSpaces').get<number>('panes.count', 2);
+  const paneFollowDefault = vscode.workspace.getConfiguration('codeFolderSpaces').get<boolean>('followActiveFile', false);
+  await viewState.initializePaneLinks(store.getDefinitions().map(definition => definition.basePath), paneFollowDefault, configuredPaneCount());
+  const syncPaneContexts = async (): Promise<void> => {
+    const definitions = store.getDefinitions();
+    await viewState.initializePaneLinks(definitions.map(definition => definition.basePath), paneFollowDefault, configuredPaneCount());
+    const count = getEnabledPaneCount(definitions.length, configuredPaneCount());
+    const panes = viewState.getPaneLinks() ?? {};
+    for (let index = 1; index <= 8; index++) {
+      const id = `pane${index}`;
+      const state = panes[id];
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.enabled`, index <= count);
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasRoot`, Boolean(state?.root));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasParent`, Boolean(state?.parentPaneId));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.follow`, Boolean(state?.follow));
+    }
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canAddPane', configuredPaneCount() < 8);
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canRemovePane', configuredPaneCount() > 1);
+  };
+  await syncPaneContexts();
   const provider = new SpaceTreeDataProvider(store, viewState);
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
     showCollapseAll: true,
     dragAndDropController: {
-      dragMimeTypes: ['text/uri-list', 'application/vnd.code.tree.codeFolderSpaces.explorer'],
-      dropMimeTypes: ['text/uri-list', 'application/vnd.code.tree.codeFolderSpaces.explorer'],
+      dragMimeTypes: ['text/uri-list', 'application/vnd.code.tree.codeFolderSpaces.pane1'],
+      dropMimeTypes: ['text/uri-list', 'application/vnd.code.tree.codeFolderSpaces.pane1'],
       handleDrag: async (source, dataTransfer) => {
         const uris = source.map(node => node instanceof SpaceRootNode ? undefined : (node as { uri?: vscode.Uri }).uri)
           .filter((uri): uri is vscode.Uri => uri instanceof vscode.Uri && uri.scheme === 'file');
         if (!uris.length) return;
         const serialized = uris.map(uri => uri.toString()).join('\r\n');
         dataTransfer.set('text/uri-list', new vscode.DataTransferItem(serialized));
-        dataTransfer.set('application/vnd.code.tree.codeFolderSpaces.explorer', new vscode.DataTransferItem(serialized));
+        dataTransfer.set('application/vnd.code.tree.codeFolderSpaces.pane1', new vscode.DataTransferItem(serialized));
       },
       handleDrop: async (target, dataTransfer) => {
         if (!target) return;
@@ -51,7 +71,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
           if (!(destinationStat.type & vscode.FileType.Directory)) return;
         } catch { return; }
         if (!requireTrust()) return;
-        const item = dataTransfer.get('application/vnd.code.tree.codeFolderSpaces.explorer') ?? dataTransfer.get('text/uri-list');
+        const item = dataTransfer.get('application/vnd.code.tree.codeFolderSpaces.pane1') ?? dataTransfer.get('text/uri-list');
         if (!item) return;
         try {
           const raw = await item.asString();
@@ -62,6 +82,39 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     },
   });
   context.subscriptions.push(store, provider, treeView);
+  interface PaneRuntime { id: string; provider: SpaceTreeDataProvider; treeView: vscode.TreeView<import('./spaces/spaceTreeDataProvider').SpaceNode> }
+  const paneRuntime = new Map<string, PaneRuntime>([['pane1', { id: 'pane1', provider, treeView }]]);
+  const syncPaneViews = (): void => {
+    const definitions = store.getDefinitions();
+    const count = getEnabledPaneCount(definitions.length, configuredPaneCount());
+    for (let index = 2; index <= 8; index++) {
+      const id = `pane${index}`;
+      const existing = paneRuntime.get(id);
+      const definition = definitions[index - 1];
+      if (index > count || !definition) {
+        if (existing) { existing.treeView.dispose(); existing.provider.dispose(); paneRuntime.delete(id); }
+        continue;
+      }
+      if (existing) continue;
+      const root = viewState.getPaneLinks()?.[id]?.root ?? definition.basePath;
+      const paneProvider = new SpaceTreeDataProvider(store, viewState, { basePath: definition.basePath, root });
+      const paneTreeView = vscode.window.createTreeView(`codeFolderSpaces.${id}`, { treeDataProvider: paneProvider, showCollapseAll: true });
+      context.subscriptions.push(paneProvider, paneTreeView);
+      paneRuntime.set(id, { id, provider: paneProvider, treeView: paneTreeView });
+    }
+  };
+  syncPaneViews();
+  const createPaneHandlers = (paneId: string, runtime?: PaneRuntime) => ({
+    refresh: (): void => runtime?.provider.refresh(),
+    toggleFollow: async (): Promise<void> => {
+      const links = { ...(viewState.getPaneLinks() ?? {}) };
+      const pane = links[paneId];
+      if (!pane?.parentPaneId) return;
+      links[paneId] = { ...pane, follow: !pane.follow };
+      await viewState.setPaneLinks(links);
+      await syncPaneContexts();
+    },
+  });
 
   let followTimer: ReturnType<typeof setTimeout> | undefined;
   let followGeneration = 0;
@@ -110,8 +163,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }
     refreshTimer = setTimeout(() => {
       refreshTimer = undefined;
-      provider.refresh();
-      treeView.message = provider.filterMessage;
+      for (const runtime of paneRuntime.values()) {
+        runtime.provider.refresh();
+        runtime.treeView.message = runtime.provider.filterMessage;
+      }
       scheduleFollow();
     }, REFRESH_DEBOUNCE_MS);
   };
@@ -178,11 +233,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       provider.refresh();
       rebuildWatchers();
       void syncContext();
+      void syncPaneContexts().then(syncPaneViews);
     },
     undefined,
     context.subscriptions
   );
   context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(event => {
+      if (event.affectsConfiguration('codeFolderSpaces.panes.count')) void syncPaneContexts().then(syncPaneViews);
+    }),
     vscode.workspace.onDidRenameFiles(async event => {
       for (const file of event.files) {
         for (const definition of store.getDefinitions()) {
@@ -465,6 +524,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       } catch (error) { operationError(error); }
     }),
     vscode.commands.registerCommand('codeFolderSpaces.refresh', () => provider.refresh()),
+    vscode.commands.registerCommand('codeFolderSpaces.pane.add', async () => {
+      const config = vscode.workspace.getConfiguration('codeFolderSpaces');
+      const count = Math.min(8, configuredPaneCount() + 1);
+      await config.update('panes.count', count, vscode.ConfigurationTarget.Global);
+      await syncPaneContexts(); syncPaneViews();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane.remove', async () => {
+      const config = vscode.workspace.getConfiguration('codeFolderSpaces');
+      const count = Math.max(1, configuredPaneCount() - 1);
+      const links = { ...(viewState.getPaneLinks() ?? {}) };
+      const removed = `pane${configuredPaneCount()}`;
+      delete links[removed];
+      for (const [id, link] of Object.entries(links)) if (link.parentPaneId === removed) links[id] = { ...link, parentPaneId: null, follow: false };
+      await viewState.setPaneLinks(links);
+      await config.update('panes.count', count, vscode.ConfigurationTarget.Global);
+      await syncPaneContexts(); syncPaneViews();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane.resetLayout', async () => {
+      await vscode.workspace.getConfiguration('codeFolderSpaces').update('panes.count', 2, vscode.ConfigurationTarget.Global);
+      await viewState.setPaneLinks({});
+      await viewState.initializePaneLinks(store.getDefinitions().map(definition => definition.basePath), paneFollowDefault, 2);
+      await syncPaneContexts(); syncPaneViews();
+    }),
+    ...Array.from({ length: 8 }, (_, index) => vscode.commands.registerCommand(`codeFolderSpaces.pane${index + 1}.toggleFollow`, () => {
+      const id = `pane${index + 1}`;
+      return createPaneHandlers(id, paneRuntime.get(id)).toggleFollow();
+    })),
     vscode.commands.registerCommand('codeFolderSpaces.drillDown', async (node?: unknown) => {
       const target = node && typeof node === 'object' && 'space' in node ? node as { space: import('./types').SpaceDefinition; uri: vscode.Uri; isDirectory: boolean } : undefined;
       if (!target?.isDirectory) return;
