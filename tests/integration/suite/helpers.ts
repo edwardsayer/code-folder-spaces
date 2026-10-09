@@ -16,16 +16,18 @@ export async function clearGlobalSettings(): Promise<void> {
   const config = vscode.workspace.getConfiguration('codeFolderSpaces');
   await config.update('spaces', undefined, vscode.ConfigurationTarget.Global);
   await config.update('view.showFiles', undefined, vscode.ConfigurationTarget.Global);
+  await config.update('followActiveFile', undefined, vscode.ConfigurationTarget.Global);
 }
 
 /** 僅操作 Global 設定，完成後逐項還原，不寫入工作區設定。 */
 export async function withGlobalSettings<T>(
-  values: { spaces?: SpaceConfigEntry[]; showFiles?: boolean },
+  values: { spaces?: SpaceConfigEntry[]; showFiles?: boolean; followActiveFile?: boolean },
   run: () => Promise<T>
 ): Promise<T> {
   const config = vscode.workspace.getConfiguration('codeFolderSpaces');
   const previousSpaces = config.inspect<SpaceConfigEntry[]>('spaces')?.globalValue;
   const previousShowFiles = config.inspect<boolean>('view.showFiles')?.globalValue;
+  const previousFollowActiveFile = config.inspect<boolean>('followActiveFile')?.globalValue;
   try {
     if (values.spaces !== undefined) {
       await config.update('spaces', values.spaces, vscode.ConfigurationTarget.Global);
@@ -33,9 +35,13 @@ export async function withGlobalSettings<T>(
     if (values.showFiles !== undefined) {
       await config.update('view.showFiles', values.showFiles, vscode.ConfigurationTarget.Global);
     }
+    if (values.followActiveFile !== undefined) {
+      await config.update('followActiveFile', values.followActiveFile, vscode.ConfigurationTarget.Global);
+    }
     return await run();
   } finally {
     await config.update('spaces', previousSpaces, vscode.ConfigurationTarget.Global);
     await config.update('view.showFiles', previousShowFiles, vscode.ConfigurationTarget.Global);
+    await config.update('followActiveFile', previousFollowActiveFile, vscode.ConfigurationTarget.Global);
   }
 }

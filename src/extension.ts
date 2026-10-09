@@ -6,9 +6,11 @@ import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/vi
 import { classifySpaceRename, PaneStateStore } from './spaces/viewState';
 import { isAllowedSpaceRoot, isValidSpaceRoot, validateSpaceName } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
+import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 
 const VIEW_ID = 'codeFolderSpaces.explorer';
 const REFRESH_DEBOUNCE_MS = 200;
+const FOLLOW_DEBOUNCE_MS = 250;
 
 /** Public surface returned from `activate()` for other extensions. */
 export interface FolderSpacesApi {
@@ -29,6 +31,46 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   });
   context.subscriptions.push(store, provider, treeView);
 
+  let followTimer: ReturnType<typeof setTimeout> | undefined;
+  let followGeneration = 0;
+  const followActiveFile = async (generation: number, uri: vscode.Uri | undefined): Promise<void> => {
+    const canFollow = (): boolean => shouldFollowActiveFile({
+      enabled: vscode.workspace.getConfiguration('codeFolderSpaces').get<boolean>('followActiveFile', false),
+      generation,
+      currentGeneration: followGeneration,
+      visible: treeView.visible,
+    });
+    if (!uri || !canFollow()) return;
+    const node = await provider.findNodeByPath(uri.fsPath);
+    if (!canFollow() || !sameUri(uri, getActiveTabUri())) return;
+    if (node) await treeView.reveal(node, { select: true, focus: false, expand: true });
+  };
+  const scheduleFollow = (): void => {
+    followGeneration++;
+    if (followTimer) clearTimeout(followTimer);
+    if (!vscode.workspace.getConfiguration('codeFolderSpaces').get<boolean>('followActiveFile', false)) return;
+    const generation = followGeneration;
+    followTimer = setTimeout(() => {
+      followTimer = undefined;
+      void followActiveFile(generation, getActiveTabUri());
+    }, FOLLOW_DEBOUNCE_MS);
+  };
+  const followConfiguration = vscode.workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration('codeFolderSpaces.followActiveFile')) {
+      void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', vscode.workspace.getConfiguration('codeFolderSpaces').get<boolean>('followActiveFile', false));
+      scheduleFollow();
+    }
+  });
+  context.subscriptions.push(
+    followConfiguration,
+    vscode.window.tabGroups.onDidChangeTabs(scheduleFollow),
+    vscode.window.tabGroups.onDidChangeTabGroups(scheduleFollow),
+    vscode.window.onDidChangeVisibleTextEditors(scheduleFollow),
+    treeView.onDidChangeVisibility(scheduleFollow),
+    new vscode.Disposable(() => { if (followTimer) clearTimeout(followTimer); followGeneration++; })
+  );
+  void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', vscode.workspace.getConfiguration('codeFolderSpaces').get<boolean>('followActiveFile', false));
+
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   const scheduleRefresh = (): void => {
     if (refreshTimer) {
@@ -38,6 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       refreshTimer = undefined;
       provider.refresh();
       treeView.message = provider.filterMessage;
+      scheduleFollow();
     }, REFRESH_DEBOUNCE_MS);
   };
   context.subscriptions.push(
@@ -312,8 +355,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       }
       await store.removeSpace(target.definition.basePath);
     }),
+    vscode.commands.registerCommand('codeFolderSpaces.toggleFollowActiveFile', async () => {
+      const config = vscode.workspace.getConfiguration('codeFolderSpaces');
+      const enabled = !config.get<boolean>('followActiveFile', false);
+      await config.update('followActiveFile', enabled, vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global);
+      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', enabled);
+      scheduleFollow();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.expandLevel', async () => {
+      // TreeView has no expandAll API. Expand only the selected directory (or space roots) one level;
+      // this avoids recursively materializing an unbounded filesystem tree.
+      const selection = treeView.selection[0];
+      const parents = selection instanceof SpaceRootNode || (selection && 'isDirectory' in selection && selection.isDirectory)
+        ? [selection as SpaceRootNode | import('./spaces/spaceTreeDataProvider').SpaceEntryNode]
+        : await provider.getChildren();
+      for (const parent of parents) {
+        const children = await provider.getChildren(parent);
+        for (const child of children) {
+          if (child.collapsibleState !== vscode.TreeItemCollapsibleState.None) {
+            await treeView.reveal(child, { select: false, focus: false, expand: true });
+          }
+        }
+      }
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.revealActiveFile', async () => {
-      const uri = getActiveFileUri();
+      const uri = getActiveTabUri();
       if (!uri) {
         void vscode.window.showInformationMessage(vscode.l10n.t('No active file to reveal.'));
         return;
@@ -330,6 +396,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   );
 
   rebuildWatchers();
+  scheduleFollow();
   await syncContext();
   treeView.message = provider.filterMessage;
   log.info('Folder Spaces activated');
@@ -341,12 +408,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 }
 
-function getActiveFileUri(): vscode.Uri | undefined {
-  const editor = vscode.window.activeTextEditor;
-  if (editor && editor.document.uri.scheme === 'file') {
-    return editor.document.uri;
-  }
+function getActiveTabUri(): vscode.Uri | undefined {
+  const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+  if (input instanceof vscode.TabInputText) return resolveActiveTabUri({ kind: 'text', uri: input.uri });
+  if (input instanceof vscode.TabInputCustom) return resolveActiveTabUri({ kind: 'custom', uri: input.uri });
+  if (input instanceof vscode.TabInputNotebook) return resolveActiveTabUri({ kind: 'notebook', uri: input.uri });
+  if (input instanceof vscode.TabInputTextDiff) return resolveActiveTabUri({ kind: 'text-diff', modified: input.modified });
+  if (input instanceof vscode.TabInputNotebookDiff) return resolveActiveTabUri({ kind: 'notebook-diff', modified: input.modified });
   return undefined;
+}
+
+function sameUri(left: vscode.Uri, right: vscode.Uri | undefined): boolean {
+  return Boolean(right && left.toString() === right.toString());
 }
 
 export function deactivate(): void {

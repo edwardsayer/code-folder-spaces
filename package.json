@@ -78,6 +78,16 @@
         "icon": "$(target)"
       },
       {
+        "command": "codeFolderSpaces.toggleFollowActiveFile",
+        "title": "%command.toggleFollowActiveFile.title%",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "codeFolderSpaces.expandLevel",
+        "title": "%command.expandLevel.title%",
+        "icon": "$(chevron-down)"
+      },
+      {
         "command": "codeFolderSpaces.setPreset",
         "title": "%command.setPreset.title%",
         "icon": "$(list-selection)"
@@ -131,6 +141,24 @@
         },
         {
           "command": "codeFolderSpaces.refresh",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.revealActiveFile",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.toggleFollowActiveFile",
+          "when": "!codeFolderSpaces.followActiveFile",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.toggleFollowActiveFile",
+          "when": "codeFolderSpaces.followActiveFile",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.expandLevel",
           "group": "navigation@2"
         },
         {
@@ -239,6 +267,11 @@
           "type": "boolean",
           "default": true,
           "description": "%configuration.showFiles.description%"
+        },
+        "codeFolderSpaces.followActiveFile": {
+          "type": "boolean",
+          "default": false,
+          "description": "%configuration.followActiveFile.description%"
         }
       }
     }
