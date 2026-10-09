@@ -1,4 +1,5 @@
 import * as assert from 'node:assert/strict';
+import { shouldFollowActiveFile } from '../../../src/spaces/followActiveFile';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
@@ -33,11 +34,13 @@ suite('follow 與標題列操作 provider 驗證', () => {
   })));
 
   test('follow 關閉時設定保持關閉且不產生選取變化', async () => withGlobalSettings({ spaces: [alpha], followActiveFile: false }, async () => {
-    // 自動 follow 的開關由設定控制；不呼叫 reveal，確保選取狀態不被這條路徑改變。
-    const beforeSelection: readonly vscode.TreeItem[] = [];
-    const afterSelection = beforeSelection;
-    assert.equal(afterSelection, beforeSelection);
+    // 自動 follow 的開關由設定控制：關閉時 provider 解析仍可運作，但 extension 的 follow 路徑
+    // 會因 enabled=false 而提前 return（見 followActiveFile.shouldFollow），故不會有任何 reveal 副作用。
     assert.equal(vscode.workspace.getConfiguration('codeFolderSpaces').get('followActiveFile', false), false);
+    assert.equal(shouldFollowActiveFile({ enabled: false, visible: true, generation: 1, currentGeneration: 1 }), false);
+    assert.equal(shouldFollowActiveFile({ enabled: true, visible: true, generation: 1, currentGeneration: 1 }), true);
+    assert.equal(shouldFollowActiveFile({ enabled: true, visible: false, generation: 1, currentGeneration: 1 }), false);
+    assert.equal(shouldFollowActiveFile({ enabled: true, visible: true, generation: 1, currentGeneration: 2 }), false);
   }));
 
   test('filter 排除時 findNodeByPath 不返回目標節點', async () => withStateProvider([alpha], async (provider, state) => {
