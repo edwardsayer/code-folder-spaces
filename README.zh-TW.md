@@ -39,7 +39,7 @@ VS Code 內建 Explorer 永遠顯示整個工作區。當 repo 包含多個專�
 - **工作區支援**：不支援虛擬工作區；remote 情境尚未驗證。
 - **大型目錄**：可見子項探測併發上限為 16；尚未加入快取，將於 Stage 4（F-44）評估。
 - **工作區外資料夾**：可作為空間根目錄；讀取與監看已實測。
-- **檔案嵌套**：跟隨 `explorer.fileNesting.enabled`／`patterns`／`expand`，因此內建 Explorer 未啟用嵌套時也不會生效。只比對同一目錄的兄弟檔，每個檔案最多嵌套在一個父項之下（依 pattern 宣告順序首個匹配者勝出），且路徑過濾啟用時會停用嵌套。巢狀父列因可折疊而使用通用檔案圖示，不套用檔案圖示主題的專屬圖示。扁平預設集（Contents／Files／List）不受影響。
+- **檔案嵌套**：跟隨 `explorer.fileNesting.enabled`／`patterns`／`expand`，因此內建 Explorer 未啟用嵌套時也不會生效。只比對同一目錄的兄弟檔，每個檔案最多嵌套在一個父項之下（依 pattern 宣告順序首個匹配者勝出）；支援無 `*` 的精確檔名父模式（如內建預設的 `package.json`／`tsconfig.json`，這類父項會略過含 `${capture}` 的子模式）；路徑過濾啟用時會停用嵌套。大小寫是否不敏感依平台判定（Windows／macOS），非逐目錄大小寫設定。扁平預設集（Contents／Files／List）不受影響。
 
 實作層細節請見 `AGENTS.md` 的 Known pitfalls 段落。
 

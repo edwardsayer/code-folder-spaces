@@ -7,9 +7,11 @@ import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
 import { PaneStateStore } from '../../../src/spaces/viewState';
 import { assertFixtureWorkspace, clearGlobalSettings, fixtureWorkspace, withGlobalSettings } from './helpers';
 
-// F-42 檔案嵌套整合測試（驗收矩陣 FN-I1～FN-I6，見 dev/specs/file-nesting-design.md §7）。
+// F-42 檔案嵌套整合測試（驗收矩陣 FN-I1～FN-I8，見 dev/specs/file-nesting-design.md §7）。
 // 與 spaceTree.test.ts 相同，直接建構 provider，透過真實 VS Code 設定驗證列舉語意；
 // explorer.fileNesting.* 一律寫入 Global 並在 finally 逐項還原，不留殘值。
+// 注意：`explorer.fileNesting.patterns` 的 Global 值會與內建預設 patterns **合併**，
+// 故本檔的 patterns 一律明確覆寫 `*.js`（空值＝零子模式、等效停用），不依賴預設鍵序。
 
 type Node = SpaceNode;
 
@@ -57,10 +59,14 @@ async function withNestingProvider<T>(run: (provider: SpaceTreeDataProvider) => 
   }
 }
 
-const TS_PATTERN = { '*.ts': '${capture}.js, ${capture}.d.ts, ${capture}.js.map' } as const;
+const TS_PATTERN = { '*.ts': '${capture}.js, ${capture}.d.ts, ${capture}.js.map', '*.js': '' } as const;
+const MANIFEST_PATTERN = { 'package.json': 'package-lock.json, pnpm-lock.yaml', 'tsconfig.json': '${capture}.alt.json, tsconfig.base.json', '*.js': '' } as const;
+// 產生 app.ts → app.js → app.js.map 三層鏈（供多層 reveal 父鏈使用）。
+const RECURSIVE_PATTERN = { '*.ts': '${capture}.js', '*.js': '${capture}.js.map' } as const;
 
 suite('檔案嵌套 provider 驗證（F-42）', () => {
   const nesting = path.join(fixtureWorkspace, 'spaces/nesting');
+  const manifest = path.join(fixtureWorkspace, 'spaces/nesting-manifest');
 
   suiteSetup(() => assertFixtureWorkspace());
   suiteTeardown(async () => {
@@ -137,6 +143,38 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
     });
   })));
 
+  test('FN-I7 findNodeByPath 對多層嵌套子檔重建完整父鏈（app.js.map → app.js → app.ts）', async () => withGlobalSettings({ spaces: [nesting] }, () => withExplorerNesting({ enabled: true, patterns: RECURSIVE_PATTERN }, async () => {
+    await withNestingProvider(async (provider) => {
+      const node = await provider.findNodeByPath(path.join(nesting, 'app.js.map')) as Node | undefined;
+      assert.ok(node);
+      assert.equal(node.label, 'app.js.map');
+      const parent = provider.getParent(node);
+      assert.ok(parent instanceof SpaceEntryNode && !parent.isDirectory);
+      assert.equal(parent.label, 'app.js');
+      const grandparent = provider.getParent(parent);
+      assert.ok(grandparent instanceof SpaceEntryNode && !grandparent.isDirectory);
+      assert.equal(grandparent.label, 'app.ts');
+      assert.ok(grandparent.parent instanceof SpaceRootNode);
+      // 鏈上每一層都要能列舉出下一層，否則 reveal 展開中斷。
+      assert.ok((await provider.getChildren(grandparent) as Node[]).some(child => child.id === parent.id));
+      assert.ok((await provider.getChildren(parent) as Node[]).some(child => child.id === node.id));
+    });
+  })));
+
+  test('FN-I8 無 `*` 的父模式（內建預設樣式如 package.json／tsconfig.json）同樣生效，且 ${capture} 子模式被略過', async () => withGlobalSettings({ spaces: [manifest] }, () => withExplorerNesting({ enabled: true, patterns: MANIFEST_PATTERN }, async () => {
+    await withNestingProvider(async (provider) => {
+      const root = (await provider.getChildren())[0];
+      const children = await provider.getChildren(root) as Node[];
+      // `tsconfig.dev.alt.json` 不屬於 `${capture}.alt.json`（無捕獲 → 子模式略過），留在同層。
+      assert.deepEqual(children.map(node => node.label), ['other.json', 'package.json', 'tsconfig.dev.alt.json', 'tsconfig.json']);
+      const pkg = children.find(node => node.label === 'package.json') as SpaceEntryNode;
+      assert.equal(pkg.collapsibleState, vscode.TreeItemCollapsibleState.Expanded);
+      assert.deepEqual((await provider.getChildren(pkg) as Node[]).map(node => node.label), ['package-lock.json', 'pnpm-lock.yaml']);
+      const tsc = children.find(node => node.label === 'tsconfig.json') as SpaceEntryNode;
+      assert.deepEqual((await provider.getChildren(tsc) as Node[]).map(node => node.label), ['tsconfig.base.json']);
+    });
+  })));
+
   test('FN-I5 過濾啟用時停用嵌套（D55），檔案平鋪', async () => withGlobalSettings({ spaces: [nesting] }, () => withExplorerNesting({ enabled: true, patterns: TS_PATTERN }, async () => {
     const values = new Map<string, unknown>();
     const state = new PaneStateStore({ get: key => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
@@ -173,8 +211,12 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
             // 使期望不受 VS Code 內建預設值影響（`*.ts` 預設為 `${capture}.js`）。
             await vscode.workspace.getConfiguration('explorer').update('fileNesting.patterns', { '*.ts': '${capture}.js', '*.js': '${capture}.js.map' }, vscode.ConfigurationTarget.Global);
             assert.equal(sawNestingEvent, true, 'explorer.fileNesting.patterns 變更應觸發 affectsConfiguration 條件');
-            provider.refresh();
 
+            // F-08：記憶化以 patterns JSON 為 key，故不呼叫 refresh() 也必須採用新值。
+            const withoutRefresh = await provider.getChildren(root) as Node[];
+            assert.deepEqual(withoutRefresh.map(node => node.label), ['app.d.ts', 'app.ts', 'notes.md', 'orphan.js']);
+
+            provider.refresh();
             const after = await provider.getChildren(root) as Node[];
             // 新 patterns：app.ts 收 app.js（遞迴），app.js 再收 app.js.map；app.d.ts 回到同層。
             assert.deepEqual(after.map(node => node.label), ['app.d.ts', 'app.ts', 'notes.md', 'orphan.js']);

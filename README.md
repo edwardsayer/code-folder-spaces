@@ -39,7 +39,7 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 - **Workspace support**: virtual workspaces are unsupported; remote scenarios have not been validated.
 - **Large directories**: visible-child probing is concurrency-limited to 16. Caching has not been added; it will be evaluated in Stage 4 (F-44).
 - **External folders**: folders outside the workspace can be used as space roots; reading and watching them have been tested.
-- **File nesting**: follows `explorer.fileNesting.enabled` / `patterns` / `expand`, so it stays off unless file nesting is enabled for the built-in Explorer. Only files in the same directory are matched, each file nests under at most one parent (the first matching pattern wins), and nesting is disabled while a path filter is active. A nested parent row is collapsible and therefore uses a generic file icon instead of the file-icon theme's specific icon. Flat presets (Contents / Files / List) are unaffected.
+- **File nesting**: follows `explorer.fileNesting.enabled` / `patterns` / `expand`, so it stays off unless file nesting is enabled for the built-in Explorer. Only files in the same directory are matched, each file nests under at most one parent (the first matching pattern wins), exact-name parent patterns such as the built-in `package.json` / `tsconfig.json` rules are supported (`${capture}` child patterns are skipped for those), and nesting is disabled while a path filter is active. Case-insensitive matching follows the platform (Windows / macOS) rather than per-folder case sensitivity. Flat presets (Contents / Files / List) are unaffected.
 
 For implementation-level details, see the Known pitfalls section in `AGENTS.md`.
 

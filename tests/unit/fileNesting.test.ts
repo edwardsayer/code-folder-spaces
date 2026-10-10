@@ -4,14 +4,19 @@ import { assignNestedChildren, parseNestingPatterns } from '../../src/spaces/fil
 const rulesOf = (patterns: Record<string, string>) => parseNestingPatterns(patterns);
 
 describe('parseNestingPatterns', () => {
-  it('FN-U6: skips parent patterns without exactly one `*`', () => {
+  it('FN-U6/FN-U9: keeps exact-name parents, skips multi-star/blank keys and trims keys', () => {
     const rules = rulesOf({
-      'README.md': '${basename}.txt',       // no star → skipped
-      '*.ts': '${capture}.js',              // valid
-      '*a*b*': 'x',                          // multiple stars → skipped
-      '': 'y',                               // empty parent → skipped
+      'README.md': '${basename}.txt',          // no star → kept (D57)
+      '*.ts': '${capture}.js',                 // valid
+      '*a*b*': 'x',                            // multiple stars → skipped
+      '': 'y',                                 // empty parent → skipped
+      '  package.json  ': 'package-lock.json', // trimmed (F-03)
     });
-    expect(rules).toEqual([{ parentPattern: '*.ts', childPatterns: ['${capture}.js'] }]);
+    expect(rules).toEqual([
+      { parentPattern: 'README.md', childPatterns: ['${basename}.txt'] },
+      { parentPattern: '*.ts', childPatterns: ['${capture}.js'] },
+      { parentPattern: 'package.json', childPatterns: ['package-lock.json'] },
+    ]);
   });
 
   it('FN-U8: splits values on commas, trims, drops empty items and dedupes', () => {
@@ -36,15 +41,35 @@ describe('assignNestedChildren', () => {
 
   it('FN-U2: expands $(x) and ${x} with capture/basename/extname/dirname', () => {
     const rules = rulesOf({ '*.ts': '$(capture).js, ${basename}.legacy.js, $(extname)-${dirname}.log' });
-    // Parent a.d.ts → capture 'a.d', basename 'a.d', extname '.ts', dirname 'docs'
+    // Parent a.d.ts → capture 'a.d', basename 'a.d', extname 'ts' (no leading dot, F-02), dirname 'docs'
     const result = assignNestedChildren(
-      ['a.d.ts', 'a.d.js', 'a.d.legacy.js', '.ts-docs.log', 'other.ts'],
+      ['a.d.ts', 'a.d.js', 'a.d.legacy.js', 'ts-docs.log', 'other.ts'],
       'docs',
       rules,
       false
     );
-    expect(result.childrenOf.get('a.d.ts')).toEqual(['a.d.js', 'a.d.legacy.js', '.ts-docs.log']);
+    expect(result.childrenOf.get('a.d.ts')).toEqual(['a.d.js', 'a.d.legacy.js', 'ts-docs.log']);
     expect(result.childrenOf.has('other.ts')).toBe(false);
+  });
+
+  it('FN-U9: exact-name parents nest literal children and drop ${capture} patterns (D57)', () => {
+    const rules = rulesOf({ 'package.json': 'package-lock.json, ${capture}.lock', 'tsconfig.json': 'tsconfig.base.json' });
+    const result = assignNestedChildren(
+      ['package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.base.json', 'other.json'],
+      'root',
+      rules,
+      false
+    );
+    // ${capture}.lock 無捕獲 → 該子模式略過（不得展開成 `.lock`）。
+    expect(result.childrenOf.get('package.json')).toEqual(['package-lock.json']);
+    expect(result.childrenOf.get('tsconfig.json')).toEqual(['tsconfig.base.json']);
+    expect([...result.nestedNames].sort()).toEqual(['package-lock.json', 'tsconfig.base.json']);
+  });
+
+  it('FN-U9: ${basename}/${extname} stay usable under exact-name parents', () => {
+    const rules = rulesOf({ 'index.html': '${basename}.js, ${extname}.txt' });
+    const result = assignNestedChildren(['index.html', 'index.js', 'html.txt'], 'src', rules, false);
+    expect(result.childrenOf.get('index.html')).toEqual(['index.js', 'html.txt']);
   });
 
   it('FN-U3: keeps children at top level when the parent does not exist', () => {
@@ -100,7 +125,7 @@ describe('assignNestedChildren', () => {
     expect(result.nestedNames.size).toBe(0);
   });
 
-  it('a parent never becomes its own child', () => {
+  it('a parent never becomes its own child (covered by the cycle check)', () => {
     const rules = rulesOf({ '*.ts': '*.ts' });
     const result = assignNestedChildren(['a.ts', 'b.ts'], 'src', rules, false);
     // a.ts claims b.ts only if it matched; same-name self-reference must be excluded.
