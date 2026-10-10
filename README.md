@@ -16,6 +16,7 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 - **Variables in paths**: `${workspaceFolder}`, `${workspaceFolders[N]}`, `${userHome}`.
 - **Per-space options**: custom name, icon, show/hide files, include/exclude glob patterns.
 - **Native tree experience**: file icons, git decorations and problem badges come from `resourceUri`.
+- **File nesting**: groups child files under their parent file inside space trees, mirroring the built-in `explorer.fileNesting.enabled` / `patterns` / `expand` settings (the extension re-reads them; nothing extra to configure).
 - **Live updates**: recursive file system watchers per space.
 - **Commands**: add space, remove space, refresh, reveal active file.
 - **File operations**: session-only cut/copy/paste, with cut/move undo; file opening defaults to the current editor group and can be configured to open beside.
@@ -38,6 +39,7 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 - **Workspace support**: virtual workspaces are unsupported; remote scenarios have not been validated.
 - **Large directories**: visible-child probing is concurrency-limited to 16. Caching has not been added; it will be evaluated in Stage 4 (F-44).
 - **External folders**: folders outside the workspace can be used as space roots; reading and watching them have been tested.
+- **File nesting**: follows `explorer.fileNesting.enabled` / `patterns` / `expand`, so it stays off unless file nesting is enabled for the built-in Explorer. Only files in the same directory are matched, each file nests under at most one parent (the first matching pattern wins), and nesting is disabled while a path filter is active. A nested parent row is collapsible and therefore uses a generic file icon instead of the file-icon theme's specific icon. Flat presets (Contents / Files / List) are unaffected.
 
 For implementation-level details, see the Known pitfalls section in `AGENTS.md`.
 

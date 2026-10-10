@@ -361,6 +361,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.workspace.onDidChangeConfiguration(event => {
       if (event.affectsConfiguration('codeFolderSpaces.panes.count')) void syncPaneContexts().then(() => { syncPaneViews(); for (const runtime of paneRuntime.values()) attachPaneCascade(runtime); void reconcilePaneRoots(); });
     }),
+    vscode.workspace.onDidChangeConfiguration(event => {
+      // F-42：explorer.fileNesting.* 是嵌套設定的唯一來源（D53），變更時刷新所有 pane。
+      if (event.affectsConfiguration('explorer.fileNesting')) scheduleRefresh();
+    }),
     vscode.workspace.onDidRenameFiles(async event => {
       for (const file of event.files) {
         await viewState.rewritePaneRoots(file.oldUri.fsPath, file.newUri.fsPath);
