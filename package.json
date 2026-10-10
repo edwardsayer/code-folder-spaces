@@ -515,7 +515,7 @@
     "build:tests": "node esbuild.tests.mjs",
     "test:integration": "npm run build && npm run build:tests && vscode-test --config .vscode-test.mjs",
     "test:unit:watch": "vitest",
-    "package:vsix": "node esbuild.mjs --production && vsce package",
+    "package:vsix": "node esbuild.mjs --production && vsce package --no-rewrite-relative-links",
     "check:project": "node scripts/check-project.mjs",
     "check": "npm run typecheck && npm run test:unit && npm run build && npm run check:project"
   },

@@ -3,6 +3,9 @@ src/
 tests/
 scripts/
 dev/
+dev
+.pi/
+AGENTS.md
 references/
 node_modules/
 coverage/
