@@ -189,6 +189,8 @@
       { "command": "codeFolderSpaces.pane.add", "title": "%command.pane.add.title%", "icon": "$(add)" },
       { "command": "codeFolderSpaces.pane.remove", "title": "%command.pane.remove.title%", "icon": "$(remove)" },
       { "command": "codeFolderSpaces.pane.resetLayout", "title": "%command.pane.resetLayout.title%" },
+      { "command": "codeFolderSpaces.pane.addChild", "title": "%command.pane.addChild.title%", "icon": "$(add)" },
+      { "command": "codeFolderSpaces.pane.setRoot", "title": "%command.pane.setRoot.title%", "icon": "$(root-folder)" },
       { "command": "codeFolderSpaces.pane1.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
       { "command": "codeFolderSpaces.pane1.menu", "title": "%command.pane.menu.title%" },
       { "command": "codeFolderSpaces.pane2.menu", "title": "%command.pane.menu.title%" },
@@ -402,6 +404,11 @@
           "command": "codeFolderSpaces.drillDown",
           "when": "view == codeFolderSpaces.pane1 && viewItem == codeFolderSpaces.folder",
           "group": "inline@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.addChild",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.canAddPane && viewItem == codeFolderSpaces.folder",
+          "group": "inline@2"
         },
         {
           "command": "codeFolderSpaces.renameSpace",

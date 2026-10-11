@@ -4,10 +4,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
-import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
-import { PaneStateStore } from '../../../src/spaces/viewState';
+import type { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
-import { clearGlobalSettings } from './helpers';
+import { clearGlobalSettings, createPaneProvider, createPaneStateHarness, seedPane } from './helpers';
 
 suite('S1-5 大型目錄量測', () => {
   let tmpRoot: string;
@@ -39,9 +38,10 @@ suite('S1-5 大型目錄量測', () => {
     let provider: SpaceTreeDataProvider | undefined;
     try {
       await config.update('spaces', [{ path: tmpRoot }], vscode.ConfigurationTarget.Global);
-      const stateValues = new Map<string, unknown>();
-      const viewState = new PaneStateStore({ get: (key) => stateValues.get(key) as never, update: async (key, value) => { stateValues.set(key, value); } });
-      provider = new SpaceTreeDataProvider(store, viewState);
+      // S4R6：provider 綁定單一 pane，scope 由 pane 狀態＋空間定義解析。
+      const { state: viewState } = createPaneStateHarness();
+      await seedPane(viewState, 'pane1', { root: tmpRoot });
+      provider = createPaneProvider(store, viewState, 'pane1');
       const root = (await provider.getChildren())[0];
       const deepPath = path.join(tmpRoot, 'deep', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'target.txt');
       await provider.getChildren(root); // warm-up
@@ -63,7 +63,7 @@ suite('S1-5 大型目錄量測', () => {
         samples.findPathMilliseconds.push(performance.now() - started);
         assert.ok(target);
       }
-      await viewState.setSort(tmpRoot, 'mtime', 'asc');
+      await viewState.setSort('pane1', 'mtime', 'asc');
       provider.refresh();
       const statSortMilliseconds: number[] = [];
       for (let iteration = 0; iteration < 3; iteration += 1) {

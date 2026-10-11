@@ -4,9 +4,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
-import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
-import { PaneStateStore } from '../../../src/spaces/viewState';
+import type { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
+import { createPaneProvider, createPaneStateHarness, seedPane } from './helpers';
 
 const enabled = process.env.S4_4_PERF === '1';
 const requestedPhase = process.env.S4_4_PERF_PHASE;
@@ -54,8 +54,9 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
       config = vscode.workspace.getConfiguration('codeFolderSpaces');
       previousSpaces = config.inspect<unknown[]>('spaces');
       store = new SpaceStore();
-      const stateValues = new Map<string, unknown>();
-      const viewState = new PaneStateStore({ get: (key) => stateValues.get(key) as never, update: async (key, value) => { stateValues.set(key, value); } });
+      // S4R6：provider 綁定單一 pane（paneId 為狀態 key）。
+      const { state: viewState } = createPaneStateHarness();
+      await seedPane(viewState, 'pane1', { root: tmpRoot });
       startHeap = process.memoryUsage();
       memoryStarted = performance.now();
       sampler = setInterval(() => {
@@ -65,7 +66,7 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
 
       settingsUpdateStarted = true;
       await config.update('spaces', [{ path: tmpRoot }], vscode.ConfigurationTarget.Global);
-      provider = new SpaceTreeDataProvider(store, viewState);
+      provider = createPaneProvider(store, viewState, 'pane1');
       const roots = await provider.getChildren() as SpaceNode[];
       assert.equal(roots.length, 1);
       const root = roots[0];
@@ -103,8 +104,8 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
         assert.equal(nodes[FILES_PER_DIRECTORY - 1].label, 'file-49.txt');
       });
 
-      await viewState.setPreset(tmpRoot, 'Files');
-      await viewState.setSort(tmpRoot, 'name', 'asc');
+      await viewState.setPreset('pane1', 'Files');
+      await viewState.setSort('pane1', 'name', 'asc');
       const flatName = await measureThree(async () => {
         provider!.refresh();
         return await provider!.getChildren(root) as SpaceNode[];
@@ -115,7 +116,7 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
         assert.ok(nodes.some(node => node.resourceUri?.fsPath.endsWith(path.join('directory-0500', 'file-00.txt'))));
       });
 
-      await viewState.setSort(tmpRoot, 'mtime', 'asc');
+      await viewState.setSort('pane1', 'mtime', 'asc');
       const flatMtime = await measureThree(async () => {
         provider!.refresh(); // 每次量測前清除 provider 的 stat 備忘錄
         return await provider!.getChildren(root) as SpaceNode[];

@@ -19,6 +19,7 @@
 - `extension.ts`：`activate()` 進入點。建立 `SpaceStore`、`SpaceTreeDataProvider`、`TreeView`，註冊指令與檔案監看器，回傳公開 API（`version`、`getSpaces()`）。
 - `spaces/spaceConfig.ts`：**純邏輯**（無 `vscode` 相依）——設定正規化、變數插值、glob 比對。所有可單元測試的邏輯放這裡。
 - `spaces/spaceStore.ts`：`codeFolderSpaces.spaces` 設定的讀寫封裝與變更事件；寫入目標為 Workspace（有工作區時）或 Global。
+- `spaces/viewState.ts`：**每窗格檢視狀態**（`codeFolderSpaces.panes.v2`：`root`／`preset`／`filter`／`sort`／`drillStack`／`parentPaneId`／`follow`／`name`／`icon`／`showFiles`／`include`／`exclude`）與 v1→v2 遷移；插槽分配（`allocatePaneId`）、啟用／關閉（`enablePane`／`disablePane`）與 `resolvePaneDefinition`（per-pane 定義）。
 - `spaces/spaceTreeDataProvider.ts`：`TreeDataProvider<SpaceNode>`；以 `vscode.workspace.fs` 讀取目錄，`resourceUri` 驅動原生圖示／Git／問題裝飾；`findNodeByPath()` 供 `TreeView.reveal` 使用。F-42 的嵌套列舉與 `reveal` 父鏈解析也在此。
 - `spaces/fileNesting.ts`：F-42 檔案嵌套的**純邏輯**（無 `vscode` 相依）——解析 `explorer.fileNesting.patterns`、展開 `$(capture)`／`${capture}`／`basename`／`extname`／`dirname`、指派同層子檔（單一父項、循環截斷）。設計見 `dev/specs/file-nesting-design.md`。
 - `util/log.ts`：`LogOutputChannel` 封裝。
@@ -34,7 +35,7 @@
 5. **無遠端程式碼**：所有相依在打包期 bundle 進 `.vsix`；`eval`／遠端載入一律禁止。
 6. **`engines.vscode` 與 `@types/vscode` 對齊**，調整最低版本需同步 `CHANGELOG.md`。
 7. **不使用 webview**：Files pane 的清單效果由檢視預設集（Files／Contents／List 扁平清單）達成，以維持單一 pane cascading chaining 的產品特色。設計見 `dev/specs/pane-cascade-and-presets-design.md`。
-8. **Linked spaces = 多個原生 TreeView pane 上下堆疊**：預設上下兩個相同 pane（上父下子）互相連動；採固定 view 插槽 `codeFolderSpaces.pane1..8` + `when` context key（VS Code 無法執行期新增 view）。
+8. **Pane = 獨立的 Folder Space（S4R6-D60；原「Linked spaces = 上下堆疊」已修訂）**：最多 8 個原生 TreeView 窗格堆疊於同一容器；**每個窗格擁有自己的 root（可為任意資料夾）、檢視狀態與顯示設定**，`codeFolderSpaces.spaces` 僅為「可選根清單＋新窗格預設值來源」。父子鏈以 `parentPaneId`＋`follow` 連動（子窗格跟隨父窗格選取的資料夾；手動換根為暫時覆寫，父下次選不同資料夾即恢復跟隨）。採固定 view 插槽 `codeFolderSpaces.pane1..8` + `when` context key（VS Code 無法執行期新增 view）；窗格狀態存 `codeFolderSpaces.panes.v2`。設計見 `dev/specs/pane-cascade-and-presets-design.md` §2.4（S4R6-D60–D74）。
 
 ## 指令與驗證
 
@@ -81,3 +82,8 @@ node tools/vscode-debug.mjs close
 - **垃圾桶能力**：VS Code `FileSystemProvider` 沒有通用 trash capability API。當啟用 `files.enableTrash` 時，本擴充僅對 `file:` URI 呼叫 `workspace.fs.delete({ useTrash: true })`；其他 scheme 一律拒絕刪除以避免 provider 忽略選項後靜默永久刪除。file provider 的實際垃圾桶行為仍由平台／VS Code 決定，刪除確認依 `explorer.confirmDelete` 設定保留。
 - **檔案系統更名 vs 空間設定**：監聽更名事件時自動遷移每空間檢視狀態；空間根更名會標記定義 stale。設定僅在使用者明確點擊更新動作後才寫回，避免靜默修改版控中的工作區設定；空間根內子路徑更名只改寫狀態中對應路徑。`workspace.fs.rename` 的 provider／OS 實作可能限制跨磁碟區搬移；移動失敗會保留 undo 記錄與來源狀態，不提供跨磁碟複製刪除 fallback。
 
+- **窗格（pane）模型與限制（S4R6）**：最多 **8 個窗格**——VS Code 無執行期新增 view 的 API，同 id 僅一個實例；要提高上限只能改 manifest 發新版。容器內窗格**垂直堆疊且順序由 manifest 宣告序決定**（擴充套件無法程式化重排；**重用中間空出的插槽時，新窗格會出現在該編號的位置**）；使用者可用內建 `View: Move View`／拖曳把窗格移到次要側邊欄、面板或浮動視窗（位置跨 session 記憶，`View: Reset View Locations` 還原），擴充套件**不代勞**（未公開的 `vscode.moveViews` 不採用）。`pane1` **不可關閉**（至少保留一個窗格）；關閉窗格 N 時其子窗格重掛到 N 的父，維持 `parentIndex < childIndex` 不變式。
+- **窗格狀態與遷移**：檢視狀態歸宿為**每窗格一份**（`codeFolderSpaces.panes.v2`，key 為 `pane1..8`），不再有 `bySpace`。所有以 paneId 為 key 的 store 呼叫對「不存在的窗格」是**靜默 no-op**（寫測試時必須先 `enablePane` 再操作，勿以路徑當 key）。v1→v2 遷移保留既有已啟用窗格數（不自動補齊）；`codeFolderSpaces.panes.count` 僅決定**新工作區初始值**。
+- **任意根與守門**：窗格 root 可為**任意資料夾**（不限 `spaces`）。檔案操作、`switchRoot` 與 cascade 的允許根守門以**該窗格自身 root** 為界（S4R6-D67）；檔案監看器以**窗格 root** 為單位建立（同 root 跨窗格去重）。`resolvePaneDefinition()` 在 root 命中某 space 時沿用其 `name`／`icon`／`showFiles`／`include`／`exclude`，否則用窗格自身值／root basename／預設（D70）；設定編輯**不回寫**既有窗格。
+- **跟隨（follow）語意**：`follow === true` 時子窗格 root 隨父窗格焦點改變；**手動在子窗格換根是允許的暫時覆寫**（不自動關閉 follow），父窗格下次選取不同資料夾時子窗格再次跟隨（父焦點為最終權威，D61/D74）。`expectedRoot` 抑制只吸收自身寫入的回聲。
+- **已知 i18n 缺口（非 S4R6 引入）**：`paneN.menu` 的 QuickPick 選項標籤（`Refresh`／`Toggle follow`／`Set root`／`Add child pane`／`Close pane` 等）為**未包 `vscode.l10n.t()` 的英文字面值**；`check:project` 只掃描字面 `vscode.l10n.t(...)`，故不會攔截。待 i18n 輪（F-51）統一處理。

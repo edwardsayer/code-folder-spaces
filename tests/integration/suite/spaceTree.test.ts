@@ -3,14 +3,29 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
-import { SpaceTreeDataProvider, SpaceRootNode, resolveActiveRoot } from '../../../src/spaces/spaceTreeDataProvider';
-import { PaneStateStore } from '../../../src/spaces/viewState';
+import { SpaceRootNode, SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
+import { resolvePaneDefinition } from '../../../src/spaces/viewState';
 import type { SpaceConfigEntry } from '../../../src/types';
-import { assertFixtureWorkspace, clearGlobalSettings, fixtureWorkspace, withGlobalSettings } from './helpers';
+import {
+  assertFixtureWorkspace,
+  clearGlobalSettings,
+  createPaneStateHarness,
+  fixtureWorkspace,
+  seedPane,
+  withGlobalSettings,
+  withPaneProviders,
+} from './helpers';
 
 // activation.test.ts 驗證 Extension Host 中 extension/view/commands 的啟用與註冊；
 // 本檔獨立建構 provider，透過真實 VS Code 設定與 workspace.fs 驗證樹節點語意，避免依賴 activation 私有實例。
+//
+// S4R6（pane 解耦，spec §2.4）改寫說明：
+// - 一個 provider 只代表**一個 pane**，節點來自該 pane 自己的 root（PaneProviderScope = { paneId, definition }）。
+//   舊版「未帶 scope 的 provider 一次列出所有 spaces 根」屬 v1 語意，本檔一律改寫為「每 pane 一個根列」。
+// - 檢視狀態（preset／filter／sort／下鑽）以 **paneId** 為 key；下鑽直接改變 pane.root，
+//   因此根變更後必須 sync（等同 extension.ts 的 applyPaneScope）才能觀察到新根列舉。
+// - 根節點 id 為 `codeFolderSpaces.<paneId>:root:<basePath>`（v1 的 `codeFolderSpaces.space:<root>` 已過時）。
 
 type Node = SpaceNode;
 
@@ -18,129 +33,147 @@ suite('空間樹 provider', () => {
   suiteSetup(() => assertFixtureWorkspace());
   suiteTeardown(() => clearGlobalSettings());
 
-  async function withProvider<T>(spaces: SpaceConfigEntry[], run: (provider: SpaceTreeDataProvider) => Promise<T>, showFiles?: boolean): Promise<T> {
-    return withGlobalSettings({ spaces, ...(showFiles === undefined ? {} : { showFiles }) }, async () => {
-      const store = new SpaceStore();
-      const provider = new SpaceTreeDataProvider(store);
-      try {
-        return await run(provider);
-      } finally {
-        provider.dispose();
-        store.dispose();
-      }
-    });
-  }
-
   const alpha = path.join(fixtureWorkspace, 'spaces/alpha');
   const beta = path.join(fixtureWorkspace, 'spaces/beta');
   const logs = path.join(fixtureWorkspace, 'spaces/logs');
-  const spaces = [alpha, beta];
 
-  test('pane scoped provider 只呈現指定空間並使用 pane 根引用', async () => withGlobalSettings({ spaces: [alpha, beta] }, async () => {
-    const store = new SpaceStore();
-    const state = new PaneStateStore({ get: <T>() => undefined as T | undefined, update: async () => undefined });
-    const scoped = new SpaceTreeDataProvider(store, state, { basePath: beta, root: path.join(beta, 'nested') });
-    try {
+  test('pane scoped provider 只呈現該 pane 的根並使用其定義', async () => withPaneProviders(
+    [alpha, beta],
+    [{ paneId: 'pane1', root: path.join(beta, 'nested') }],
+    async ({ provider }) => {
+      const scoped = provider('pane1');
       const roots = await scoped.getChildren();
       assert.equal(roots.length, 1);
       assert.ok(roots[0] instanceof SpaceRootNode);
       const root = roots[0] as SpaceRootNode;
       const scopedRoot = path.join(beta, 'nested');
+      assert.equal(root.paneId, 'pane1');
       assert.equal(root.rootPath, scopedRoot);
       assert.equal(root.uri.fsPath, scopedRoot);
       assert.equal(root.resourceUri?.fsPath, scopedRoot);
       assert.equal(root.tooltip, scopedRoot);
-      assert.equal(root.id, `codeFolderSpaces.space:${scopedRoot}`);
+      assert.equal(root.id, `codeFolderSpaces.pane1:root:${scopedRoot}`);
+      // 根不是已配置的 space → 名稱為 root basename（S4R6-D70 fallback）。
       assert.equal(root.label, 'nested');
       assert.deepEqual((await scoped.getChildren(root)).map(node => node.label), ['c.txt']);
-    } finally { scoped.dispose(); store.dispose(); }
+    }
+  ));
+
+  test('未帶 scope 的 provider 不列舉任何節點（v2：pane 是唯一列舉單位）', async () => withGlobalSettings({ spaces: [alpha, beta] }, async () => {
+    const store = new SpaceStore();
+    const { state } = createPaneStateHarness();
+    const provider = new SpaceTreeDataProvider(store, state);
+    try {
+      assert.deepEqual(await provider.getChildren(), []);
+      assert.equal(await provider.findNodeByPath(path.join(alpha, 'a.txt')), undefined);
+    } finally {
+      provider.dispose();
+      store.dispose();
+    }
   }));
 
-  test('已下鑽的 pane 顯示下鑽根，返回後回復 pane 鏈結根（spec §3.3）', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
-    const store = new SpaceStore();
-    let document: unknown;
-    const state = new PaneStateStore({ get: <T>() => document as T | undefined, update: async (_key, value) => { document = value; } });
-    const chainRoot = alpha;
-    const drillRoot = path.join(alpha, 'nested');
-    const scoped = new SpaceTreeDataProvider(store, state, { basePath: alpha, root: chainRoot });
-    try {
-      // drillStack 空 → 顯示 pane 鏈結根（非 null），可解析其可見路徑。
+  test('已下鑽的 pane 顯示下鑽根，返回後回復下鑽前根（spec §2.4.2）', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state, sync }) => {
+      const scoped = provider('pane1');
+      const chainRoot = alpha;
+      const drillRoot = path.join(alpha, 'nested');
+
+      // 未下鑽 → 列舉 pane 自己的 root，可解析其可見路徑。
       const initial = await scoped.getChildren();
       assert.equal((initial[0] as SpaceRootNode).rootPath, chainRoot);
       assert.equal((await scoped.findNodeByPath(path.join(alpha, 'a.txt')))?.label, 'a.txt');
 
-      // 就地下鑽後 → 下鑽根優先於 pane 鏈結根（原缺陷：鏈結根遮蔽下鑽根）。
-      await state.drillDown(alpha, drillRoot);
+      // 就地下鑽：v2 直接改寫 pane.root（不再有鏈結根與下鑽根的雙軌），provider 需同步 scope。
+      await state.drillDown('pane1', drillRoot);
+      sync('pane1');
       const drilled = await scoped.getChildren();
       assert.equal((drilled[0] as SpaceRootNode).rootPath, drillRoot);
-      assert.equal((drilled[0] as SpaceRootNode).rootPath, state.get(alpha).root);
+      assert.equal((drilled[0] as SpaceRootNode).rootPath, state.get('pane1').root);
       assert.equal((await scoped.findNodeByPath(path.join(alpha, 'nested/deep.md')))?.label, 'deep.md');
       // 下鑽根之外的路徑不得被視為可見。
       assert.equal(await scoped.findNodeByPath(path.join(alpha, 'a.txt')), undefined);
 
-      // drillUp 後 stack 清空 → 回復鏈結根。
-      assert.equal(await state.drillUp(alpha), true);
+      // drillUp 後 stack 清空 → 回復下鑽前的根。
+      assert.equal(await state.drillUp('pane1'), true);
+      sync('pane1');
       const restored = await scoped.getChildren();
       assert.equal((restored[0] as SpaceRootNode).rootPath, chainRoot);
       assert.equal((await scoped.findNodeByPath(path.join(alpha, 'a.txt')))?.label, 'a.txt');
-    } finally { scoped.dispose(); store.dispose(); }
+    }
+  ));
+
+  test('pane 的 root 是列舉的唯一權威：resolvePaneDefinition 依 paneId 解析（v2 取代 v1 resolveActiveRoot）', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+    const store = new SpaceStore();
+    const { state } = createPaneStateHarness();
+    try {
+      const space = store.getDefinitions()[0];
+      await seedPane(state, 'pane1', { root: alpha });
+      // 未下鑽：definition.basePath = pane root，命中 space 時沿用其 name／icon。
+      assert.equal(resolvePaneDefinition(state.get('pane1'), store.getDefinitions())?.basePath, alpha);
+      assert.equal(resolvePaneDefinition(state.get('pane1'), store.getDefinitions())?.name, space.name);
+
+      // 下鑽後 pane.root 即為新權威（v1 需要 chainRoot 與 drillStack 妥協，v2 不需要）。
+      const drillRoot = path.join(alpha, 'nested');
+      await state.drillDown('pane1', drillRoot);
+      const drilled = resolvePaneDefinition(state.get('pane1'), store.getDefinitions());
+      assert.equal(drilled?.basePath, drillRoot);
+      // 下鑽根不再是任何 space 根 → 名稱退回 basename。
+      assert.equal(drilled?.name, 'nested');
+
+      // 無 root 的 pane（viewsWelcome 情境）解析為 null。
+      await seedPane(state, 'pane2', { root: null });
+      assert.equal(resolvePaneDefinition(state.get('pane2'), store.getDefinitions()), null);
+    } finally {
+      store.dispose();
+    }
   }));
 
-  test('resolveActiveRoot 依 spec §3.3 解析鏈結根與下鑽根', () => {
-    const basePath = 'C:\\ws\\space';
-    const chainRoot = 'C:\\ws\\space\\one';
-    const drillRoot = 'C:\\ws\\space\\one\\two';
-    // 未下鑽 → 鏈結根優先
-    assert.equal(resolveActiveRoot({ root: basePath, drillStack: [] }, basePath, chainRoot), chainRoot);
-    // 未下鑽且無鏈結根 → 下鑽根（或 basePath）
-    assert.equal(resolveActiveRoot({ root: drillRoot, drillStack: [] }, basePath, null), drillRoot);
-    assert.equal(resolveActiveRoot({ drillStack: [] }, basePath, null), basePath);
-    // 已下鑽 → 下鑽根優先，即使鏈結根非 null
-    assert.equal(resolveActiveRoot({ root: drillRoot, drillStack: [{}] }, basePath, chainRoot), drillRoot);
-    // 無狀態 → basePath
-    assert.equal(resolveActiveRoot(undefined, basePath, null), basePath);
-  });
-
-  test('下鑽後 provider 從新根列舉，返回還原原檢視狀態', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
-    const store = new SpaceStore();
-    let document: unknown;
-    const state = new PaneStateStore({ get: <T>() => document as T | undefined, update: async (_key, value) => { document = value; } });
-    const provider = new SpaceTreeDataProvider(store, state);
-    try {
-      await state.setPreset(alpha, 'Files');
-      await state.setFilter(alpha, 'deep');
-      const root = (await provider.getChildren())[0] as SpaceRootNode;
-      await state.drillDown(alpha, path.join(alpha, 'nested'));
-      const drilledRoot = (await provider.getChildren())[0] as SpaceRootNode;
+  test('下鑽後 provider 從新根列舉，返回還原原檢視狀態', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state, sync }) => {
+      const paneProvider = provider('pane1');
+      await state.setPreset('pane1', 'Files');
+      await state.setFilter('pane1', 'deep');
+      const root = (await paneProvider.getChildren())[0];
+      await state.drillDown('pane1', path.join(alpha, 'nested'));
+      sync('pane1');
+      const drilledRoot = (await paneProvider.getChildren())[0] as SpaceRootNode;
       assert.equal(drilledRoot.uri.fsPath, path.join(alpha, 'nested'));
-      const drilled = await provider.getChildren(drilledRoot) as Node[];
+      const drilled = await paneProvider.getChildren(drilledRoot) as Node[];
       assert.deepEqual(drilled.map(node => node.label), ['deeper', 'deep.md']);
-      assert.equal(state.get(alpha).preset, 'Explorer');
-      assert.equal(await state.drillUp(alpha), true);
-      const returned = (await provider.getChildren())[0] as SpaceRootNode;
-      assert.equal(returned.uri.fsPath, root.uri.fsPath);
-      assert.deepEqual(state.get(alpha), { preset: 'Files', filter: 'deep', sort: { key: 'name', direction: 'asc' }, root: alpha, drillStack: [] });
-    } finally { provider.dispose(); store.dispose(); }
-  }));
+      assert.equal(state.get('pane1').preset, 'Explorer');
+      assert.equal(await state.drillUp('pane1'), true);
+      sync('pane1');
+      const returned = (await paneProvider.getChildren())[0] as SpaceRootNode;
+      assert.equal(returned.uri.fsPath, (root as SpaceRootNode).uri.fsPath);
+      // 下鑽返回只還原 root，同時還原進入堆疊時的 preset／filter（v2 snapshot 語意）。
+      assert.deepEqual(
+        { preset: state.get('pane1').preset, filter: state.get('pane1').filter, sort: state.get('pane1').sort, root: state.get('pane1').root, drillStack: state.get('pane1').drillStack },
+        { preset: 'Files', filter: 'deep', sort: { key: 'name', direction: 'asc' }, root: alpha, drillStack: [] }
+      );
+    }
+  ));
 
-  test('切換根更新 provider 樹但不改空間設定，並清空下鑽堆疊', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
-    const store = new SpaceStore();
-    const values = new Map<string, unknown>();
-    const state = new PaneStateStore({ get: key => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
-    const provider = new SpaceTreeDataProvider(store, state);
-    try {
-      await state.drillDown(alpha, path.join(alpha, 'nested'));
+  test('切換根更新 provider 樹但不改空間設定，並清空下鑽堆疊', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: path.join(alpha, 'nested') }],
+    async ({ provider, state, sync }) => {
+      const paneProvider = provider('pane1');
       const beforeSetting = vscode.workspace.getConfiguration('codeFolderSpaces').inspect('spaces')?.globalValue;
-      const beforeRoot = (await provider.getChildren())[0] as SpaceRootNode;
-      assert.deepEqual((await provider.getChildren(beforeRoot) as Node[]).map(node => node.label), ['deeper', 'deep.md']);
-      await state.switchRoot(alpha, alpha);
-      const afterRoot = (await provider.getChildren())[0] as SpaceRootNode;
+      const drilledRoot = (await paneProvider.getChildren())[0] as SpaceRootNode;
+      assert.deepEqual((await paneProvider.getChildren(drilledRoot) as Node[]).map(node => node.label), ['deeper', 'deep.md']);
+      await state.switchRoot('pane1', alpha);
+      sync('pane1');
+      const afterRoot = (await paneProvider.getChildren())[0] as SpaceRootNode;
       assert.equal(afterRoot.uri.fsPath, alpha);
-      assert.deepEqual((await provider.getChildren(afterRoot) as Node[]).map(node => node.label), ['nested', 'a.txt', 'B.txt']);
-      assert.deepEqual(state.get(alpha).drillStack, []);
+      assert.deepEqual((await paneProvider.getChildren(afterRoot) as Node[]).map(node => node.label), ['nested', 'a.txt', 'B.txt']);
+      assert.deepEqual(state.get('pane1').drillStack, []);
       assert.deepEqual(vscode.workspace.getConfiguration('codeFolderSpaces').inspect('spaces')?.globalValue, beforeSetting);
-    } finally { provider.dispose(); store.dispose(); }
-  }));
+    }
+  ));
 
   test('SpaceStore 重新命名會寫回設定名稱且保留原始路徑', async () => {
     const config = vscode.workspace.getConfiguration('codeFolderSpaces');
@@ -158,195 +191,250 @@ suite('空間樹 provider', () => {
     }
   });
 
-  test('空間根保留設定順序與資源路徑', async () => withProvider(spaces, async (provider) => {
-    const roots = await provider.getChildren() as Node[];
-    assert.deepEqual(roots.map((node) => node.label), ['alpha', 'beta']);
-    assert.ok(roots.every((node) => node.contextValue === 'codeFolderSpaces.spaceRoot'));
-    assert.deepEqual(roots.map((node) => node.resourceUri?.fsPath), spaces);
-    assert.deepEqual(roots.map((node) => (node as SpaceRootNode).rootPath), spaces);
-    assert.deepEqual(roots.map((node) => node.tooltip), spaces);
-    assert.deepEqual(roots.map((node) => node.id), spaces.map(root => `codeFolderSpaces.space:${root}`));
-    assert.ok(roots.every((node) => node.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed));
-  }));
+  test('兩個 pane 各自呈現自己空間的根（v1 多根列舉的 v2 等價）', async () => withPaneProviders(
+    [alpha, { path: beta, name: '自訂空間' }],
+    [{ paneId: 'pane1', root: alpha }, { paneId: 'pane2', root: beta }],
+    async ({ provider, state }) => {
+      const alphaRoot = (await provider('pane1').getChildren())[0] as SpaceRootNode;
+      const betaRoot = (await provider('pane2').getChildren())[0] as SpaceRootNode;
+      assert.equal(alphaRoot.label, 'alpha');
+      // pane 未自訂 name → 命中 space 時沿用設定名稱（S4R6-D70）。
+      assert.equal(betaRoot.label, '自訂空間');
+      for (const [root, paneId, rootPath] of [[alphaRoot, 'pane1', alpha], [betaRoot, 'pane2', beta]] as const) {
+        assert.equal(root.contextValue, 'codeFolderSpaces.spaceRoot');
+        assert.equal(root.paneId, paneId);
+        assert.equal(root.resourceUri?.fsPath, rootPath);
+        assert.equal(root.rootPath, rootPath);
+        assert.equal(root.tooltip, rootPath);
+        assert.equal(root.id, `codeFolderSpaces.${paneId}:root:${rootPath}`);
+        assert.equal(root.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
+      }
+      // 根列彼此獨立：兩個 pane 的根節點即使同路徑也不會共用 id（PD-I2 的基礎）。
+      assert.notEqual(alphaRoot.id, betaRoot.id);
+      assert.equal(state.getEnabledPaneIds().join(','), 'pane1,pane2');
+    }
+  ));
 
-  test('展開目錄優先且不分大小寫排序', async () => withProvider([alpha], async (provider) => {
-    const root = (await provider.getChildren())[0];
-    const children = await provider.getChildren(root) as Node[];
-    // B.txt 存在時，ASCII 大小寫敏感排序會讓 B 排在 a 前，因此可偵測 sensitivity:'base' 回歸。
-    assert.deepEqual(children.map((node) => node.label), ['nested', 'a.txt', 'B.txt']);
-    assert.equal(children[0].collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
-    assert.equal(children[1].collapsibleState, vscode.TreeItemCollapsibleState.None);
-    assert.equal(children[1].contextValue, 'codeFolderSpaces.file');
-    assert.equal(children[1].command?.command, 'codeFolderSpaces.openEntry');
-  }));
+  test('展開目錄優先且不分大小寫排序', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider }) => {
+      const root = (await provider('pane1').getChildren())[0];
+      const children = await provider('pane1').getChildren(root) as Node[];
+      // B.txt 存在時，ASCII 大小寫敏感排序會讓 B 排在 a 前，因此可偵測 sensitivity:'base' 回歸。
+      assert.deepEqual(children.map((node) => node.label), ['nested', 'a.txt', 'B.txt']);
+      assert.equal(children[0].collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
+      assert.equal(children[1].collapsibleState, vscode.TreeItemCollapsibleState.None);
+      assert.equal(children[1].contextValue, 'codeFolderSpaces.file');
+      assert.equal(children[1].command?.command, 'codeFolderSpaces.openEntry');
+    }
+  ));
 
-  test('exclude 過濾檔案且空目錄不可展開', async () => withProvider([{ path: path.dirname(logs), exclude: ['**/*.log'] }], async (provider) => {
-    const root = (await provider.getChildren())[0];
-    const children = await provider.getChildren(root) as Node[];
-    const logsNode = children.find((node) => node.label === 'logs');
-    assert.ok(logsNode);
-    assert.equal(logsNode.collapsibleState, vscode.TreeItemCollapsibleState.None);
-    assert.ok(!children.some((node) => node.label === 'trace.log'));
-    assert.deepEqual(await provider.getChildren(logsNode), []);
-  }));
+  test('exclude 過濾檔案且空目錄不可展開', async () => withPaneProviders(
+    [{ path: path.dirname(logs), exclude: ['**/*.log'] }],
+    [{ paneId: 'pane1', root: path.dirname(logs) }],
+    async ({ provider }) => {
+      const root = (await provider('pane1').getChildren())[0];
+      const children = await provider('pane1').getChildren(root) as Node[];
+      const logsNode = children.find((node) => node.label === 'logs');
+      assert.ok(logsNode);
+      assert.equal(logsNode.collapsibleState, vscode.TreeItemCollapsibleState.None);
+      assert.ok(!children.some((node) => node.label === 'trace.log'));
+      assert.deepEqual(await provider('pane1').getChildren(logsNode), []);
+    }
+  ));
 
-  test('include 僅顯示各層符合的 Markdown 檔案', async () => withProvider([
-    { path: alpha, include: ['**/*.md'] },
-    { path: beta, include: ['**/*.md'] },
-  ], async (provider) => {
-    const roots = await provider.getChildren();
-    const alphaChildren = await provider.getChildren(roots[0]) as Node[];
-    assert.deepEqual(alphaChildren.map((node) => node.label), ['nested']);
-    const nestedChildren = await provider.getChildren(alphaChildren[0]) as Node[];
-    assert.deepEqual(nestedChildren.map((node) => node.label), ['deeper', 'deep.md']);
-    const deeperChildren = await provider.getChildren(nestedChildren[0]) as Node[];
-    assert.deepEqual(deeperChildren.map((node) => node.label), ['two-level.md']);
-    const betaChildren = await provider.getChildren(roots[1]) as Node[];
-    assert.deepEqual(betaChildren.map((node) => node.label), ['nested', 'b.md']);
-    assert.equal(betaChildren[0].collapsibleState, vscode.TreeItemCollapsibleState.None);
-  }));
+  test('include 僅顯示各層符合的 Markdown 檔案', async () => withPaneProviders(
+    [
+      { path: alpha, include: ['**/*.md'] },
+      { path: beta, include: ['**/*.md'] },
+    ],
+    [{ paneId: 'pane1', root: alpha }, { paneId: 'pane2', root: beta }],
+    async ({ provider }) => {
+      const alphaChildren = await provider('pane1').getChildren((await provider('pane1').getChildren())[0]) as Node[];
+      assert.deepEqual(alphaChildren.map((node) => node.label), ['nested']);
+      const nestedChildren = await provider('pane1').getChildren(alphaChildren[0]) as Node[];
+      assert.deepEqual(nestedChildren.map((node) => node.label), ['deeper', 'deep.md']);
+      const deeperChildren = await provider('pane1').getChildren(nestedChildren[0]) as Node[];
+      assert.deepEqual(deeperChildren.map((node) => node.label), ['two-level.md']);
+      const betaChildren = await provider('pane2').getChildren((await provider('pane2').getChildren())[0]) as Node[];
+      assert.deepEqual(betaChildren.map((node) => node.label), ['nested', 'b.md']);
+      assert.equal(betaChildren[0].collapsibleState, vscode.TreeItemCollapsibleState.None);
+    }
+  ));
 
-  test('per-space 與全域 showFiles=false 均隱藏檔案', async () => {
-    await withProvider([{ path: alpha, showFiles: false }], async (provider) => {
-      const root = (await provider.getChildren())[0];
-      const children = await provider.getChildren(root) as Node[];
-      assert.ok(children.length > 0);
-      assert.ok(children.every((node) => node.contextValue !== 'codeFolderSpaces.file'));
-    });
-    await withProvider([alpha], async (provider) => {
-      const root = (await provider.getChildren())[0];
-      const children = await provider.getChildren(root) as Node[];
-      assert.ok(children.length > 0);
-      assert.ok(children.every((node) => node.contextValue !== 'codeFolderSpaces.file'));
-    }, false);
+  test('per-pane 與全域 showFiles=false 均隱藏檔案', async () => {
+    await withPaneProviders(
+      [{ path: alpha, showFiles: false }],
+      [{ paneId: 'pane1', root: alpha }],
+      async ({ provider, state }) => {
+        // pane 建立時自 space 複製 showFiles=false，之後 pane 值為權威（S4R6-D70）。
+        assert.equal(state.get('pane1').showFiles, false);
+        const root = (await provider('pane1').getChildren())[0];
+        const children = await provider('pane1').getChildren(root) as Node[];
+        assert.ok(children.length > 0);
+        assert.ok(children.every((node) => node.contextValue !== 'codeFolderSpaces.file'));
+      }
+    );
+    await withPaneProviders(
+      [alpha],
+      [{ paneId: 'pane1', root: alpha }],
+      async ({ provider, state }) => {
+        assert.equal(state.get('pane1').showFiles, false);
+        const root = (await provider('pane1').getChildren())[0];
+        const children = await provider('pane1').getChildren(root) as Node[];
+        assert.ok(children.length > 0);
+        assert.ok(children.every((node) => node.contextValue !== 'codeFolderSpaces.file'));
+      },
+      { showFiles: false }
+    );
   });
 
-  test('下鑽後 findNodeByPath 以有效根解析並拒絕空間外或過濾路徑', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
-    const store = new SpaceStore();
-    const values = new Map<string, unknown>();
-    const state = new PaneStateStore({ get: key => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
-    const provider = new SpaceTreeDataProvider(store, state);
-    try {
-      await state.drillDown(alpha, path.join(alpha, 'nested'));
+  test('pane 可自行覆寫顯示設定而不改 space 設定（S4R6-D70）', async () => withPaneProviders(
+    [{ path: alpha, showFiles: false }],
+    [{ paneId: 'pane1', root: alpha, overrides: { showFiles: true } }],
+    async ({ provider, state }) => {
+      assert.equal(state.get('pane1').showFiles, true);
+      const root = (await provider('pane1').getChildren())[0];
+      const children = await provider('pane1').getChildren(root) as Node[];
+      assert.ok(children.some((node) => node.contextValue === 'codeFolderSpaces.file'));
+    }
+  ));
+
+  test('下鑽後 findNodeByPath 以有效根解析並拒絕該根外或過濾路徑', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state, sync }) => {
+      const paneProvider = provider('pane1');
+      await state.drillDown('pane1', path.join(alpha, 'nested'));
+      sync('pane1');
       const filePath = path.join(alpha, 'nested/deep.md');
-      const file = await provider.findNodeByPath(filePath) as Node | undefined;
+      const file = await paneProvider.findNodeByPath(filePath) as Node | undefined;
       assert.ok(file);
       assert.equal(file.contextValue, 'codeFolderSpaces.file');
       assert.equal(file.resourceUri?.fsPath, filePath);
-      assert.equal(await provider.findNodeByPath(path.join(alpha, 'a.txt')), undefined);
-      await state.setFilter(alpha, 'not-a-match');
-      assert.equal(await provider.findNodeByPath(filePath), undefined);
-    } finally { provider.dispose(); store.dispose(); }
-  }));
+      assert.equal(await paneProvider.findNodeByPath(path.join(alpha, 'a.txt')), undefined);
+      await state.setFilter('pane1', 'not-a-match');
+      assert.equal(await paneProvider.findNodeByPath(filePath), undefined);
+    }
+  ));
 
-  test('findNodeByPath 解析可見路徑並拒絕過濾或外部路徑', async () => withProvider([
-    alpha,
-    { path: path.dirname(logs), exclude: ['**/*.log'] },
-  ], async (provider) => {
-    const filePath = path.join(alpha, 'a.txt');
-    const file = await provider.findNodeByPath(filePath) as Node | undefined;
-    assert.ok(file);
-    assert.equal(file.contextValue, 'codeFolderSpaces.file');
-    assert.equal(file.resourceUri?.fsPath, filePath);
-    assert.equal(await provider.findNodeByPath(path.join(logs, 'trace.log')), undefined);
-    assert.equal(await provider.findNodeByPath(path.join(os.tmpdir(), 'outside-folder-spaces.txt')), undefined);
-    assert.ok(await provider.findNodeByPath(alpha) instanceof SpaceRootNode);
-  }));
+  test('findNodeByPath 解析可見路徑並拒絕過濾或外部路徑', async () => withPaneProviders(
+    [alpha, { path: path.dirname(logs), exclude: ['**/*.log'] }],
+    [{ paneId: 'pane1', root: alpha }, { paneId: 'pane2', root: path.dirname(logs) }],
+    async ({ provider }) => {
+      const filePath = path.join(alpha, 'a.txt');
+      const file = await provider('pane1').findNodeByPath(filePath) as Node | undefined;
+      assert.ok(file);
+      assert.equal(file.contextValue, 'codeFolderSpaces.file');
+      assert.equal(file.resourceUri?.fsPath, filePath);
+      // 工作區外的不存在檔案、以及**不屬於該 pane root** 的路徑都必須被拒絕（S4R6-D67 邊界）。
+      assert.equal(await provider('pane1').findNodeByPath(path.join(logs, 'trace.log')), undefined);
+      assert.equal(await provider('pane1').findNodeByPath(path.join(os.tmpdir(), 'outside-folder-spaces.txt')), undefined);
+      assert.ok(await provider('pane1').findNodeByPath(alpha) instanceof SpaceRootNode);
+      // 被 exclude 的檔案在其所屬 pane 仍不可見。
+      assert.equal(await provider('pane2').findNodeByPath(path.join(logs, 'trace.log')), undefined);
+    }
+  ));
 
-  test('扁平 Files 預設集列出遞迴檔案、保留 URI 與根相對路徑', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
-    const store = new SpaceStore();
-    const state = new PaneStateStore({ get: () => undefined, update: async () => undefined });
-    await state.setPreset(alpha, 'Files');
-    const provider = new SpaceTreeDataProvider(store, state);
-    try {
-      const root = (await provider.getChildren())[0];
-      const files = await provider.getChildren(root) as Node[];
+  test('扁平 Files 預設集列出遞迴檔案、保留 URI 與根相對路徑', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state }) => {
+      await state.setPreset('pane1', 'Files');
+      const root = (await provider('pane1').getChildren())[0];
+      const files = await provider('pane1').getChildren(root) as Node[];
       const deep = files.find((node) => node.label === 'deep.md');
       assert.ok(deep);
       assert.equal(deep.resourceUri?.fsPath, path.join(alpha, 'nested/deep.md'));
       assert.equal(deep.description, 'nested/deep.md');
       assert.equal(deep.collapsibleState, vscode.TreeItemCollapsibleState.None);
       assert.ok(files.every((node) => node.contextValue === 'codeFolderSpaces.file'));
-    } finally { provider.dispose(); store.dispose(); }
-  }));
+      // 扁平列舉的父鏈指向該 pane 的根節點。
+      assert.equal(provider('pane1').getParent(deep)?.id, `codeFolderSpaces.pane1:root:${alpha}`);
+    }
+  ));
 
-  test('List 只列根層檔案，Files 遞迴列檔且 Contents 同時列目錄與檔案', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
-    const store = new SpaceStore();
-    const values = new Map<string, unknown>();
-    const state = new PaneStateStore({ get: (key) => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
-    const provider = new SpaceTreeDataProvider(store, state);
-    try {
-      const root = (await provider.getChildren())[0];
-      await state.setPreset(alpha, 'List');
-      const list = await provider.getChildren(root) as Node[];
+  test('List 只列根層檔案，Files 遞迴列檔且 Contents 同時列目錄與檔案', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state }) => {
+      const root = (await provider('pane1').getChildren())[0];
+
+      await state.setPreset('pane1', 'List');
+      const list = await provider('pane1').getChildren(root) as Node[];
       assert.ok(list.length > 0);
       assert.ok(list.every((node) => node.contextValue === 'codeFolderSpaces.file'));
       assert.ok(!list.some((node) => node.description === 'nested/deep.md'));
 
-      await state.setPreset(alpha, 'Files');
-      const files = await provider.getChildren(root) as Node[];
+      await state.setPreset('pane1', 'Files');
+      const files = await provider('pane1').getChildren(root) as Node[];
       assert.ok(files.some((node) => node.description === 'nested/deep.md'));
       assert.ok(files.every((node) => node.contextValue === 'codeFolderSpaces.file'));
 
-      await state.setPreset(alpha, 'Contents');
-      const contents = await provider.getChildren(root) as Node[];
+      await state.setPreset('pane1', 'Contents');
+      const contents = await provider('pane1').getChildren(root) as Node[];
       assert.ok(contents.some((node) => node.contextValue === 'codeFolderSpaces.folder'));
       assert.ok(contents.some((node) => node.contextValue === 'codeFolderSpaces.file'));
-    } finally { provider.dispose(); store.dispose(); }
-  }));
+    }
+  ));
 
-  test('Columns 限制為一層、Context 為兩層且 Navigate 僅顯示資料夾', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
-    const store = new SpaceStore();
-    const values = new Map<string, unknown>();
-    const state = new PaneStateStore({ get: (key) => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
-    const provider = new SpaceTreeDataProvider(store, state);
-    try {
-      const root = (await provider.getChildren())[0];
-      await state.setPreset(alpha, 'Columns');
-      let nested = (await provider.getChildren(root) as Node[]).find((node) => node.label === 'nested')!;
+  test('Columns 限制為一層、Context 為兩層且 Navigate 僅顯示資料夾', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state }) => {
+      const root = (await provider('pane1').getChildren())[0];
+      await state.setPreset('pane1', 'Columns');
+      let nested = (await provider('pane1').getChildren(root) as Node[]).find((node) => node.label === 'nested')!;
       assert.equal(nested.collapsibleState, vscode.TreeItemCollapsibleState.None);
-      await state.setPreset(alpha, 'Context');
-      nested = (await provider.getChildren(root) as Node[]).find((node) => node.label === 'nested')!;
+      await state.setPreset('pane1', 'Context');
+      nested = (await provider('pane1').getChildren(root) as Node[]).find((node) => node.label === 'nested')!;
       assert.equal(nested.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
-      const second = await provider.getChildren(nested) as Node[];
+      const second = await provider('pane1').getChildren(nested) as Node[];
       assert.deepEqual(second.map((node) => node.label), ['deeper']);
       assert.equal(second[0].collapsibleState, vscode.TreeItemCollapsibleState.None);
-      await state.setPreset(alpha, 'Navigate');
-      assert.ok((await provider.getChildren(root) as Node[]).every((node) => node.contextValue === 'codeFolderSpaces.folder'));
-    } finally { provider.dispose(); store.dispose(); }
-  }));
+      await state.setPreset('pane1', 'Navigate');
+      assert.ok((await provider('pane1').getChildren(root) as Node[]).every((node) => node.contextValue === 'codeFolderSpaces.folder'));
+    }
+  ));
 
-  test('mtime 排序與路徑過濾可套用並清除，且回報符合數／總數', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
-    const store = new SpaceStore();
-    const values = new Map<string, unknown>();
-    const state = new PaneStateStore({ get: (key) => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
-    const provider = new SpaceTreeDataProvider(store, state);
-    try {
-      const root = (await provider.getChildren())[0];
-      await state.setSort(alpha, 'mtime', 'asc');
-      const items = await provider.getChildren(root) as Node[];
+  test('mtime 排序與路徑過濾可套用並清除，且回報符合數／總數', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state }) => {
+      const paneProvider = provider('pane1');
+      const root = (await paneProvider.getChildren())[0];
+      await state.setSort('pane1', 'mtime', 'asc');
+      const items = await paneProvider.getChildren(root) as Node[];
       const actualTimes = await Promise.all(items.map(async node => (await vscode.workspace.fs.stat(node.resourceUri!)).mtime));
       const expectedOrder = items.map((node, index) => ({ label: String(node.label), time: actualTimes[index] }))
         .sort((a, b) => a.time - b.time || a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })).map(item => item.label);
       assert.deepEqual(items.map(node => node.label), expectedOrder);
-      await state.setFilter(alpha, 'NESTED');
-      const filtered = await provider.getChildren(root) as Node[];
+      await state.setFilter('pane1', 'NESTED');
+      const filtered = await paneProvider.getChildren(root) as Node[];
       assert.deepEqual(filtered.map(node => node.label), ['nested']);
-      assert.equal(provider.filterMessage, '1 / 3 matches');
-      await state.setFilter(alpha, 'does-not-exist');
-      assert.deepEqual(await provider.getChildren(root), []);
-      assert.equal(provider.filterMessage, '0 / 3 matches');
-      await state.clearFilter(alpha);
-      assert.equal((await provider.getChildren(root)).length, 3);
-      assert.equal(provider.filterMessage, '');
-    } finally { provider.dispose(); store.dispose(); }
-  }));
+      assert.equal(paneProvider.filterMessage, '1 / 3 matches');
+      await state.setFilter('pane1', 'does-not-exist');
+      assert.deepEqual(await paneProvider.getChildren(root), []);
+      assert.equal(paneProvider.filterMessage, '0 / 3 matches');
+      await state.clearFilter('pane1');
+      assert.equal((await paneProvider.getChildren(root)).length, 3);
+      assert.equal(paneProvider.filterMessage, '');
+    }
+  ));
 
-  test('空間名稱預設為 basename 並可由 name 覆寫', async () => withProvider([
-    alpha,
-    { path: beta, name: '自訂空間' },
-  ], async (provider) => {
-    const roots = await provider.getChildren();
-    assert.deepEqual(roots.map((node) => node.label), ['alpha', '自訂空間']);
-  }));
+  test('pane 名稱預設依 space／basename，並可由 pane 自身 name 覆寫', async () => withPaneProviders(
+    [alpha, { path: beta, name: '設定名稱' }],
+    [
+      { paneId: 'pane1', root: alpha },
+      { paneId: 'pane2', root: beta },
+      { paneId: 'pane3', root: beta, overrides: { name: '自訂空間' } },
+    ],
+    async ({ provider }) => {
+      assert.equal((await provider('pane1').getChildren())[0].label, 'alpha');
+      assert.equal((await provider('pane2').getChildren())[0].label, '設定名稱');
+      // pane 自訂 name 永遠勝過 space 設定（S4R6-D70：pane 值為權威）。
+      assert.equal((await provider('pane3').getChildren())[0].label, '自訂空間');
+    }
+  ));
 });

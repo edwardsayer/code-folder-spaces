@@ -9,6 +9,9 @@ import { createTreeDragAndDropController } from '../../../src/spaces/treeDragAnd
 import { SpaceEntryNode, SpaceRootNode, type SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
 
 suite('TreeView drag and drop controller', () => {
+  // 與下方 makeController 使用的 pane id 一致（internalMime 以其組成）。
+  const paneId = 'pane2';
+
   async function withTempRoot<T>(run: (root: string) => Promise<T>): Promise<T> {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'folder-spaces-drag-'));
     try { return await run(root); }
@@ -47,8 +50,9 @@ suite('TreeView drag and drop controller', () => {
     };
   }
 
+  // S4R6：根節點必須帶 paneId（id 與拖放 MIME 皆以 pane 為單位）。
   function rootNode(folder: string): SpaceRootNode {
-    return new SpaceRootNode(definition(folder), undefined);
+    return new SpaceRootNode(definition(folder), paneId);
   }
 
   function entryNode(uri: vscode.Uri, isDirectory: boolean, parent: SpaceRootNode): SpaceEntryNode {

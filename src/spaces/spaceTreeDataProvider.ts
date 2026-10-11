@@ -7,11 +7,11 @@ import { assignNestedChildren, parseNestingPatterns } from './fileNesting';
 import type { FileNestingRule } from './fileNesting';
 import { buildFlatListing } from './flatListing';
 import { VIEW_PRESETS } from './viewPresets';
-import type { ViewPreset } from './viewPresets';
+import type { ViewPreset, ViewPresetName } from './viewPresets';
 import { matchesPathFilter, sortEntries, StatCache } from './sortEntries';
 import type { SortableEntry } from './sortEntries';
 import type { SpaceStore } from './spaceStore';
-import type { PaneStateStore } from './viewState';
+import type { PaneState, PaneStateStore } from './viewState';
 
 export type SpaceNode = SpaceRootNode | SpaceEntryNode;
 
@@ -47,31 +47,32 @@ function resolveIcon(icon: string | undefined): vscode.ThemeIcon | vscode.Uri | 
   return new vscode.ThemeIcon(themeIconId);
 }
 
-/** Top-level row: one configured folder space. */
+/** Top-level row: the pane's own root (S4R6-D69: a pane is a standalone Folder Space). */
 export class SpaceRootNode extends vscode.TreeItem {
+  readonly parent: undefined = undefined;
+  readonly rootPath: string;
+
   constructor(
     readonly definition: SpaceDefinition,
-    readonly parent: undefined,
-    readonly rootPath = definition.basePath
+    readonly paneId: string
   ) {
-    super(
-      samePath(rootPath, definition.basePath) ? definition.name : path.basename(rootPath),
-      vscode.TreeItemCollapsibleState.Collapsed
-    );
-    this.id = `codeFolderSpaces.space:${rootPath}`;
-    this.resourceUri = vscode.Uri.file(rootPath);
+    super(definition.name, vscode.TreeItemCollapsibleState.Collapsed);
+    this.rootPath = definition.basePath;
+    // The pane id keeps ids unique when two panes show the same root (PD-I2).
+    this.id = `codeFolderSpaces.${paneId}:root:${definition.basePath}`;
+    this.resourceUri = vscode.Uri.file(definition.basePath);
     this.contextValue = 'codeFolderSpaces.spaceRoot';
-    this.tooltip = rootPath;
+    this.tooltip = definition.basePath;
     this.iconPath = resolveIcon(definition.icon) ?? vscode.ThemeIcon.Folder;
   }
 
-  /** Filesystem URI of this space root. */
+  /** Filesystem URI of this pane root. */
   get uri(): vscode.Uri {
     return vscode.Uri.file(this.rootPath);
   }
 }
 
-/** Directory or file row inside a space. */
+/** Directory or file row inside a pane. */
 export class SpaceEntryNode extends vscode.TreeItem {
   /**
    * F-42 nested child rows (file nesting only; empty when nesting is inactive).
@@ -79,6 +80,12 @@ export class SpaceEntryNode extends vscode.TreeItem {
    * file row would otherwise render with a folder twisty icon.
    */
   readonly nestedChildren: SpaceEntryNode[] = [];
+
+  /** Owning pane, inherited through the parent chain to the root row. */
+  readonly paneId: string;
+
+  /** Owning pane root, inherited through the parent chain to the root row. */
+  readonly rootPath: string;
 
   constructor(
     readonly uri: vscode.Uri,
@@ -95,7 +102,9 @@ export class SpaceEntryNode extends vscode.TreeItem {
           : vscode.TreeItemCollapsibleState.None
         : vscode.TreeItemCollapsibleState.None
     );
-    this.id = `${isDirectory ? 'codeFolderSpaces.dir' : 'codeFolderSpaces.file'}:${uri.fsPath}`;
+    this.paneId = parent.paneId;
+    this.rootPath = parent.rootPath;
+    this.id = `${isDirectory ? 'codeFolderSpaces.dir' : 'codeFolderSpaces.file'}:${this.paneId}:${uri.fsPath}`;
     this.resourceUri = uri;
     this.contextValue = isDirectory ? 'codeFolderSpaces.folder' : 'codeFolderSpaces.file';
     this.tooltip = uri.fsPath;
@@ -110,55 +119,63 @@ export class SpaceEntryNode extends vscode.TreeItem {
 }
 
 /**
- * Tree data provider for `codeFolderSpaces.pane1`.
- *
- * Stage 1 scope: folder-scoped tree over `workspace.fs`, directories first,
- * optional files, per-space include/exclude globs. Native decorations,
- * git status and problems come for free through `resourceUri`.
+ * Per-pane tree scope (spec §2.4.6 D69): `definition` is the pane definition
+ * resolved from the pane's own state (root + name/icon/showFiles/include/exclude),
+ * not from a `spaces` setting index.
  */
 export interface PaneProviderScope {
-  basePath: string;
-  root: string | null;
+  paneId: string;
+  definition: SpaceDefinition;
+}
+
+interface PaneTreeState {
+  preset: ViewPresetName;
+  filter: string;
+  sort: { key: 'name' | 'mtime' | 'ctime'; direction: 'asc' | 'desc' };
+  drillStack: readonly unknown[];
 }
 
 /**
- * 依設計 spec §3.3 解析一個空間在目前 pane 應顯示的根：
- * `drillStack` 非空（已就地下鑽）→ 顯示下鑽根；否則顯示 pane 的鏈結根。
- * 鏈結根不適用（例：非此 pane 的空間）時回退為下鑽根或空間 basePath。
+ * Tree data provider for one pane slot.
+ *
+ * Folder-scoped tree over `workspace.fs`, directories first, optional files,
+ * per-pane include/exclude globs. Native decorations, git status and problems
+ * come for free through `resourceUri`.
  */
-export function resolveActiveRoot(
-  state: { root?: string; drillStack?: readonly unknown[] } | undefined,
-  basePath: string,
-  paneRoot?: string | null,
-): string {
-  if ((state?.drillStack?.length ?? 0) === 0 && paneRoot) return paneRoot;
-  return state?.root ?? basePath;
-}
-
 export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<SpaceNode | undefined | void>();
   readonly onDidChangeTreeData: vscode.Event<SpaceNode | undefined | void> = this._onDidChangeTreeData.event;
 
   private readonly _storeListener: vscode.Disposable;
-  private _definitions: SpaceDefinition[];
+  private _scope?: PaneProviderScope;
   private readonly _statCache = new StatCache();
   private _nestingRulesCache: { key: string; rules: FileNestingRule[] } | undefined;
   filterMessage = '';
   readonly staleRoots = new Set<string>();
 
-  constructor(private readonly _store: SpaceStore, private readonly _viewState?: PaneStateStore, private readonly _paneScope?: PaneProviderScope) {
-    this._definitions = _store.getDefinitions();
-    this._storeListener = _store.onDidChange(() => this.refresh());
+  constructor(store: SpaceStore, private readonly _viewState?: PaneStateStore, scope?: PaneProviderScope) {
+    this._scope = scope;
+    this._storeListener = store.onDidChange(() => this.refresh());
   }
 
-  markStale(basePath: string): void { this.staleRoots.add(basePath); this.refresh(); }
-  clearStale(basePath: string): void { this.staleRoots.delete(basePath); }
+  /** Replace the pane definition after a root/display change, then repaint. */
+  setScope(scope: PaneProviderScope | undefined): void {
+    this._scope = scope;
+    this.refresh();
+  }
+
+  get scope(): PaneProviderScope | undefined {
+    return this._scope;
+  }
+
+  /** Stale tracking is pane-scoped (S4R6): the key is the pane id. */
+  markStale(paneId: string): void { this.staleRoots.add(paneId); this.refresh(); }
+  clearStale(paneId: string): void { this.staleRoots.delete(paneId); }
 
   refresh(): void {
     this._statCache.clear();
     this._nestingRulesCache = undefined;
     this.filterMessage = '';
-    this._definitions = this._store.getDefinitions();
     this._onDidChangeTreeData.fire();
   }
 
@@ -170,46 +187,39 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     return element.parent;
   }
 
-  /** 目前 pane 應顯示的根（依 spec §3.3）；供 extension 組節點時重用同一解析。 */
-  activeRootFor(definition: SpaceDefinition): string {
-    return this._activeRoot(definition);
-  }
-
-  private _activeRoot(definition: SpaceDefinition): string {
-    const state = this._viewState?.get(definition.basePath);
-    const scopeMatchesDefinition = Boolean(this._paneScope && samePath(definition.basePath, this._paneScope.basePath));
-    return resolveActiveRoot(state, definition.basePath, scopeMatchesDefinition ? this._paneScope!.root : null);
+  private _paneState(): PaneTreeState | undefined {
+    if (!this._viewState || !this._scope) return undefined;
+    const state: PaneState = this._viewState.get(this._scope.paneId);
+    return { preset: state.preset, filter: state.filter, sort: state.sort, drillStack: state.drillStack };
   }
 
   async getChildren(element?: SpaceNode): Promise<SpaceNode[]> {
     if (!element) {
-      const definitions = this._paneScope
-        ? this._definitions.filter(definition => samePath(definition.basePath, this._paneScope!.basePath))
-        : this._definitions;
-      return definitions.map((definition) => new SpaceRootNode(definition, undefined, this._activeRoot(definition)));
+      return this._scope ? [new SpaceRootNode(this._scope.definition, this._scope.paneId)] : [];
     }
     return this._listChildren(element);
   }
 
   /**
    * Resolves a filesystem path to a tree node (used by `TreeView.reveal`).
-   * Returns `undefined` when the path is outside every space or hidden by filters.
+   * Returns `undefined` when the path is outside this pane's own root
+   * (S4R6-D67: the boundary is the pane root, not the configured spaces)
+   * or hidden by filters.
    */
   async findNodeByPath(fsPath: string): Promise<SpaceNode | undefined> {
-    const normalized = path.normalize(fsPath);
-    const definition = [...this._definitions]
-      .filter((candidate) => (!this._paneScope || samePath(candidate.basePath, this._paneScope.basePath)) && isInsideOrEqual(candidate.basePath, normalized))
-      .sort((a, b) => b.basePath.length - a.basePath.length)[0];
-    if (!definition) {
+    const scope = this._scope;
+    if (!scope) {
       return undefined;
     }
-    const viewState = this._viewState?.get(definition.basePath);
-    const activeRoot = this._activeRoot(definition);
+    const normalized = path.normalize(fsPath);
+    const definition = scope.definition;
+    const activeRoot = definition.basePath;
     if (!isInsideOrEqual(activeRoot, normalized)) {
       return undefined;
     }
+    const viewState = this._paneState();
     if (samePath(activeRoot, normalized)) {
-      return new SpaceRootNode(definition, undefined, activeRoot);
+      return new SpaceRootNode(definition, scope.paneId);
     }
     const settings = VIEW_PRESETS[viewState?.preset ?? 'Explorer'];
     const segments = path
@@ -219,7 +229,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     if (settings.level !== 'all' && segments.length > settings.level) {
       return undefined;
     }
-    let current: SpaceRootNode | SpaceEntryNode = new SpaceRootNode(definition, undefined, activeRoot);
+    let current: SpaceRootNode | SpaceEntryNode = new SpaceRootNode(definition, scope.paneId);
     let relativePath = '';
     for (const [index, segment] of segments.entries()) {
       const parentRelative = relativePath;
@@ -274,7 +284,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const visibleFiles = await this._visibleFileNames(parent.uri, space, parentRelative);
     const directoryName = path.basename(parent.uri.fsPath);
     const assignment = assignNestedChildren(visibleFiles.names, directoryName, nesting.rules, CASE_INSENSITIVE_PLATFORM);
-    // 由 childrenOf 反向找出父鏈（assignment 為forest，cycle 已在指派時截斷）。
+    // 由 childrenOf 反向找出父鏈（assignment 為 forest，cycle 已在指派時截斷）。
     const chain: string[] = [];
     let cursor: string | undefined = segment;
     const seenNames = new Set<string>();
@@ -366,7 +376,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       return element.nestedChildren;
     }
     const space = element instanceof SpaceRootNode ? element.definition : element.space;
-    const viewState = this._viewState?.get(space.basePath);
+    const viewState = this._paneState();
     const settings = VIEW_PRESETS[viewState?.preset ?? 'Explorer'];
     if (element instanceof SpaceRootNode && settings.mode === 'flat') {
       const flat = await this._listFlat(space, element, settings.content, settings.level);
@@ -374,8 +384,8 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     }
     if (settings.content === 'files' && element instanceof SpaceEntryNode && element.isDirectory) return [];
     if (settings.content === 'folders' && element instanceof SpaceEntryNode && !element.isDirectory) return [];
-    const activeRoot = element instanceof SpaceRootNode ? element.rootPath : this._activeRoot(space);
-    const elementDepth = element instanceof SpaceRootNode ? 0 : path.relative(activeRoot, element.uri.fsPath).split(/[\\/]+/).filter(Boolean).length;
+    const activeRoot = element.rootPath;
+    const elementDepth = path.relative(activeRoot, element.uri.fsPath).split(/[\\/]+/).filter(Boolean).length;
     if (settings.level !== 'all' && elementDepth >= settings.level) return [];
     const entries = await readDirectorySafe(element.uri);
     const parentRelative = path.relative(activeRoot, element.uri.fsPath).replace(/\\/g, '/');
@@ -400,7 +410,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
 
     const directoryNodes = await mapWithConcurrency(directories, DIRECTORY_CHILD_CHECK_CONCURRENCY, async (directory) => {
       const atLevelLimit = settings.level !== 'all' && elementDepth + 1 >= settings.level;
-      const hasChildren = !atLevelLimit && await this._directoryHasVisibleChildren(directory.uri, space, directory.relativePath);
+      const hasChildren = !atLevelLimit && await this._directoryHasVisibleChildren(directory.uri, space, directory.relativePath, settings);
       return new SpaceEntryNode(directory.uri, true, space, element, hasChildren);
     });
     const nesting = this._nestingContext(settings, viewState);
@@ -417,7 +427,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
           const nextAncestors = new Set(ancestors);
           nextAncestors.add(name);
           const children = await Promise.all(childNames.map(child => buildSubtree(child, node, nextAncestors)));
-          node.nestedChildren.push(...await this._sortNodes(children, space.basePath));
+          node.nestedChildren.push(...await this._sortNodes(children));
           node.collapsibleState = nesting.expand ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
           node.iconPath = new vscode.ThemeIcon('file');
         }
@@ -434,7 +444,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       files = fileCandidates.map(candidate => new SpaceEntryNode(candidate.uri, false, space, element));
     }
     const candidates = [...directoryNodes, ...files];
-    const sorted = await this._sortNodes(candidates, space.basePath);
+    const sorted = await this._sortNodes(candidates);
     return this._applyFilter(sorted, activeRoot, viewState?.filter ?? '');
   }
 
@@ -470,7 +480,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         if (isDirectory) node.iconPath = vscode.ThemeIcon.Folder;
         return node;
       });
-    const sorted = await this._sortNodes(nodes, space.basePath);
+    const sorted = await this._sortNodes(nodes);
     return content === 'all' ? sorted.sort((a, b) => path.posix.dirname(String(a.description)).localeCompare(path.posix.dirname(String(b.description)), undefined, { sensitivity: 'base' })) : sorted;
   }
 
@@ -480,8 +490,8 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     return filtered;
   }
 
-  private async _sortNodes(nodes: SpaceEntryNode[], basePath: string): Promise<SpaceEntryNode[]> {
-    const sort = this._viewState?.get(basePath).sort ?? { key: 'name' as const, direction: 'asc' as const };
+  private async _sortNodes(nodes: SpaceEntryNode[]): Promise<SpaceEntryNode[]> {
+    const sort = this._paneState()?.sort ?? { key: 'name' as const, direction: 'asc' as const };
     const entries = nodes.map(node => ({ name: String(node.label ?? ''), uri: node.uri.toString(), node }));
     const statTimes = async (entry: SortableEntry) => this._statCache.get(entry.uri, async () => {
       try { const stat = await vscode.workspace.fs.stat(vscode.Uri.parse(entry.uri)); return { mtime: stat.mtime, ctime: stat.ctime }; }
@@ -500,17 +510,17 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   private async _directoryHasVisibleChildren(
     uri: vscode.Uri,
     space: SpaceDefinition,
-    parentRelative: string
+    parentRelative: string,
+    settings: ViewPreset
   ): Promise<boolean> {
     const entries = await readDirectorySafe(uri);
-    const preset = VIEW_PRESETS[this._viewState?.get(space.basePath).preset ?? 'Explorer'];
     return entries.some(([name, type]) => {
       const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
       if (type & vscode.FileType.Directory) {
         return isVisibleDirectory(name, relativePath, space.exclude);
       }
       if (type & vscode.FileType.File) {
-        return preset.content !== 'folders' && space.showFiles && isVisibleFile(name, relativePath, space.include, space.exclude);
+        return settings.content !== 'folders' && space.showFiles && isVisibleFile(name, relativePath, space.include, space.exclude);
       }
       return false;
     });

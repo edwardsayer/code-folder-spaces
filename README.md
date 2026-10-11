@@ -13,32 +13,33 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 ## Features (current)
 
 - **Folder spaces**: configure any number of folders, each shown as its own root in a dedicated activity-bar view.
+- **Independent panes**: up to eight panes stack in the Folder Spaces view. **Every pane is a full folder space of its own** — its own root (any folder, not only the configured spaces), view preset, path filter, sort, drill-down stack, name/icon and include/exclude rules. `Folder Spaces: Open Child Pane Here` creates a child pane rooted at the selected folder and links it to its parent.
+- **Linked panes (cascading chain)**: a child pane with follow enabled tracks the folder selected in its parent pane. Turning follow off makes the pane fully independent; switching a child pane's root manually is allowed and lasts until the parent selects a different folder again.
+- **View presets**: seven named presets (Explorer, Navigate, Columns, Context, Contents, Files, List) covering tree/flat modes, depth levels and folder/file content filters.
+- **Navigation**: in-place drill-down with a back stack, root switching and pane title actions (show current file, collapse all, expand one level, switch mode).
 - **Variables in paths**: `${workspaceFolder}`, `${workspaceFolders[N]}`, `${userHome}`.
-- **Per-space options**: custom name, icon, show/hide files, include/exclude glob patterns.
+- **Per-space options**: custom name, icon, show/hide files, include/exclude glob patterns (used as the defaults for panes created from them).
 - **Native tree experience**: file icons, git decorations and problem badges come from `resourceUri`.
 - **File nesting**: groups child files under their parent file inside space trees, mirroring the built-in `explorer.fileNesting.enabled` / `patterns` / `expand` settings (the extension re-reads them; nothing extra to configure).
-- **Live updates**: recursive file system watchers per space.
-- **Commands**: add space, remove space, refresh, reveal active file.
-- **File operations**: session-only cut/copy/paste, with cut/move undo; file opening defaults to the current editor group and can be configured to open beside.
+- **Live updates**: recursive file system watchers per pane root.
+- **Commands**: add/remove space, add/remove pane, open child pane, set pane root, refresh, reveal active file, reset pane layout.
+- **File operations**: new file/folder, rename, delete, move-to, context actions delegated to built-in commands, drag & drop between panes, session-only cut/copy/paste, with cut/move undo. File opening defaults to the current editor group and can be configured to open beside.
 
 ## Planned
 
-- Tree / flat view modes with depth limits and content filters (folder-only, file-only).
-- Named view presets (Explorer, Navigate, Columns, Context, Contents, Files, List).
-- In-place drill-down with a back stack; root switcher and inline root rename.
-- Full context actions (new file/folder, rename, delete, reveal in OS, open in terminal, copy path).
-- Drag & drop between spaces, with undo for supported operations.
-- Linked spaces as stacked panes: the default layout shows two identical panes (parent above, child below) that follow each other, forming a cascading chain — the product's signature interaction. The "files pane" effect comes from view presets (Files / Contents / List flat lists) instead of a webview.
-- Full Traditional Chinese / English localization.
+- Folder Spaces in a multi-root / remote setting, and a quick-open entry (`explorer/context` "Add to Folder Spaces").
+- Optional space grouping/tags.
+- CI (including Linux xvfb integration tests) and Marketplace release assets (PNG icon, screenshots, repository field).
 
 ## Known limitations
 
 - **Glob subset**: supports `*`, `**`, `**/` (including zero directory levels), `?` and character escaping. Brace patterns (`{a,b}`) and character classes (`[abc]`) are unsupported; `src/**` does not match the `src` directory itself.
 - **Clipboard and drag undo**: internal drag-and-drop moves (undoable); external items dragged in are copied (not undoable). Cut/move operations share the session undo stack; copied files/folders are not undoable. Ctrl+C/X/V, Ctrl+N, F2, Delete and Ctrl+Z bindings apply only while the Folder Spaces tree has focus.
-- **Single pane**: the current extension has one pane. Multiple panes (up to 8) and linked spaces are planned for Stage 4 (F-47/F-40).
+- **Pane count and placement**: at most **eight** panes, because VS Code requires views to be declared statically (there is no API to create views at runtime). Panes stack vertically inside the Folder Spaces view and the order is fixed by the manifest; you can move any pane to the secondary side bar, the panel or a floating window yourself with the built-in `View: Move View` / drag actions, and `View: Reset View Locations` restores the default.
+- **Pane model**: each pane keeps its own view state; `codeFolderSpaces.spaces` is only a list of folders to pick from (and the source of defaults for new panes), not the definition of what panes show.
 - **Workspace support**: virtual workspaces are unsupported; remote scenarios have not been validated.
-- **Large directories**: visible-child probing is concurrency-limited to 16. Caching has not been added; it will be evaluated in Stage 4 (F-44).
-- **External folders**: folders outside the workspace can be used as space roots; reading and watching them have been tested.
+- **Large directories**: visible-child probing is concurrency-limited to 16. Caching has not been added yet.
+- **External folders**: folders outside the workspace can be used as space or pane roots; reading and watching them have been tested.
 - **File nesting**: follows `explorer.fileNesting.enabled` / `patterns` / `expand`, so it stays off unless file nesting is enabled for the built-in Explorer. Only files in the same directory are matched, each file nests under at most one parent (the first matching pattern wins), exact-name parent patterns such as the built-in `package.json` / `tsconfig.json` rules are supported (`${capture}` child patterns are skipped for those), and nesting is disabled while a path filter is active. Case-insensitive matching follows the platform (Windows / macOS) rather than per-folder case sensitivity. Flat presets (Contents / Files / List) are unaffected.
 
 For implementation-level details, see the Known pitfalls section in `AGENTS.md`.

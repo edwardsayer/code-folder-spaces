@@ -1,10 +1,11 @@
-import * as path from 'node:path';
-import type { PaneLinkState } from './viewState';
-
 const MAX_PANE_COUNT = 8;
 
+/** Minimal chain shape both `PaneLinkState` views and full `PaneState` records satisfy. */
+type PaneChainEntry = { parentPaneId: string | null };
+type PaneFollowEntry = PaneChainEntry & { follow: boolean };
+
 /** True when assigning childPaneId to parentPaneId violates the one-way pane chain. */
-export function wouldCreateCycle(links: Record<string, PaneLinkState>, parentPaneId: string, childPaneId: string): boolean {
+export function wouldCreateCycle(links: Record<string, PaneChainEntry>, parentPaneId: string, childPaneId: string): boolean {
   const parentIndex = paneIndex(parentPaneId);
   const childIndex = paneIndex(childPaneId);
   if (parentIndex < 1 || childIndex < 1 || parentIndex >= childIndex) return true;
@@ -28,7 +29,7 @@ export function wouldCreateCycle(links: Record<string, PaneLinkState>, parentPan
 }
 
 /** Validate every stored parent edge and ensure no chain exceeds the eight static views. */
-export function hasValidPaneLinks(links: Record<string, PaneLinkState>): boolean {
+export function hasValidPaneLinks(links: Record<string, PaneChainEntry>): boolean {
   for (const [childId, link] of Object.entries(links)) {
     if (!link.parentPaneId) continue;
     if (wouldCreateCycle(links, link.parentPaneId, childId)) return false;
@@ -36,7 +37,7 @@ export function hasValidPaneLinks(links: Record<string, PaneLinkState>): boolean
   return true;
 }
 
-export function getFollowingChildPaneIds(links: Record<string, PaneLinkState>, parentPaneId: string): string[] {
+export function getFollowingChildPaneIds(links: Record<string, PaneFollowEntry>, parentPaneId: string): string[] {
   return Object.entries(links)
     .filter(([, link]) => link.parentPaneId === parentPaneId && link.follow)
     .map(([paneId]) => paneId);
@@ -46,16 +47,25 @@ export function shouldCascadeSelection(isDirectory: boolean, followsParent: bool
   return isDirectory && followsParent;
 }
 
-export function rewritePaneRoots(links: Record<string, PaneLinkState>, oldPath: string, newPath: string): Record<string, PaneLinkState> {
-  const normalizedOld = path.normalize(oldPath);
-  const rewritten: Record<string, PaneLinkState> = {};
-  for (const [id, link] of Object.entries(links)) {
-    if (!link.root) { rewritten[id] = link; continue; }
-    const relative = path.relative(normalizedOld, path.normalize(link.root));
-    const inside = relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-    rewritten[id] = inside ? { ...link, root: path.join(newPath, relative) } : link;
+/**
+ * Remove `removedPaneId` and re-attach its children to that pane's parent
+ * (S4R6-D62/D71, PD-U3). Children that become top-level stop following.
+ * The `parentIndex < childIndex` invariant is preserved because the grandparent
+ * index is below the removed index, which is below every child index.
+ */
+export function reattachChildren<T extends PaneFollowEntry>(panes: Record<string, T>, removedPaneId: string): Record<string, T> {
+  const removed = panes[removedPaneId];
+  const nextParent = removed?.parentPaneId ?? null;
+  const result: Record<string, T> = {};
+  for (const [paneId, pane] of Object.entries(panes)) {
+    if (paneId === removedPaneId) continue;
+    if (pane.parentPaneId !== removedPaneId) {
+      result[paneId] = pane;
+      continue;
+    }
+    result[paneId] = { ...pane, parentPaneId: nextParent, ...(nextParent ? {} : { follow: false }) };
   }
-  return rewritten;
+  return result;
 }
 
 export function isPaneRootDirectory(statType: number, directoryType: number): boolean {

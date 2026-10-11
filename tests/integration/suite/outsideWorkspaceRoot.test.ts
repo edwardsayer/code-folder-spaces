@@ -6,9 +6,9 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { UndoStack } from '../../../src/spaces/spaceActions';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
-import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
+import type { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
-import { clearGlobalSettings } from './helpers';
+import { clearGlobalSettings, createPaneProvider, createPaneStateHarness, seedPaneFromRoot, syncPaneScope } from './helpers';
 
 suite('工作區外空間根', () => {
   let tmpRoot: string;
@@ -73,7 +73,11 @@ suite('工作區外空間根', () => {
     let provider: SpaceTreeDataProvider | undefined;
     try {
       await config.update('spaces', [{ path: tmpRoot, exclude: ['**/*.log'] }], vscode.ConfigurationTarget.Global);
-      provider = new SpaceTreeDataProvider(store);
+      // S4R6：工作區外的任意資料夾可直接作為 pane root（D69：不要求命中 spaces）；
+      // 本例以 space 設定提供顯示預設值，pane 建立時複製之（D70）。
+      const { state } = createPaneStateHarness();
+      await seedPaneFromRoot(store, state, 'pane1', tmpRoot);
+      provider = createPaneProvider(store, state, 'pane1');
       const roots = await provider.getChildren();
       assert.equal(roots.length, 1);
       assert.equal(normalizePath(roots[0].resourceUri?.fsPath ?? ''), normalizePath(tmpRoot));
@@ -89,6 +93,12 @@ suite('工作區外空間根', () => {
         normalizePath(path.join(tmpRoot, 'sub', 'deep.md'))
       );
       assert.equal(await provider.findNodeByPath(path.join(os.tmpdir(), 'outside-code-folder-spaces.txt')), undefined);
+      // pane 自行換根（仍是工作區外的任意資料夾）：不依賴 spaces 設定。
+      await state.switchRoot('pane1', path.join(tmpRoot, 'sub'));
+      syncPaneScope(store, state, provider, 'pane1');
+      const relocated = (await provider.getChildren())[0];
+      assert.equal(normalizePath(relocated.resourceUri?.fsPath ?? ''), normalizePath(path.join(tmpRoot, 'sub')));
+      assert.deepEqual((await provider.getChildren(relocated) as SpaceNode[]).map(node => node.label), ['deep.md']);
     } finally {
       provider?.dispose();
       store.dispose();

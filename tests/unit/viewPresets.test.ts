@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildFlatListing } from '../../src/spaces/flatListing';
 import { VIEW_PRESETS } from '../../src/spaces/viewPresets';
-import { normalizePaneState, normalizeSpaceKey, PaneStateStore, PANE_STATE_KEY } from '../../src/spaces/viewState';
+import { normalizePaneState, PaneStateStore, PANE_STATE_KEY } from '../../src/spaces/viewState';
 
 describe('view presets and state', () => {
   it('maps all seven presets to their designed mode, level, and content', () => {
@@ -16,23 +16,27 @@ describe('view presets and state', () => {
     });
   });
 
-  it('normalizes missing, wrong-version, and malformed per-space fields independently', () => {
-    expect(normalizePaneState(undefined)).toEqual({ version: 1, bySpace: {} });
-    expect(normalizePaneState({ version: 2, bySpace: { a: { preset: 'Files' } } })).toEqual({ version: 1, bySpace: {} });
-    expect(normalizePaneState({ version: 1, bySpace: { a: { preset: 'bogus' }, b: { preset: 'Files' } } })).toEqual({
-      version: 1, bySpace: {
-        a: { preset: 'Explorer', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [] },
-        b: { preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [] },
+  it('normalizes missing, wrong-version, and malformed per-pane fields independently', () => {
+    expect(normalizePaneState(undefined)).toEqual({ version: 2, panes: {} });
+    expect(normalizePaneState({ version: 1, bySpace: { a: { preset: 'Files' } } })).toEqual({ version: 2, panes: {} });
+    expect(normalizePaneState({ version: 2, panes: { pane1: { preset: 'bogus' }, pane2: { preset: 'Files' } } })).toEqual({
+      version: 2, panes: {
+        pane1: { root: null, parentPaneId: null, follow: false, preset: 'Explorer', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [], name: null, icon: null, showFiles: true, include: [], exclude: [] },
+        pane2: { root: null, parentPaneId: null, follow: false, preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [], name: null, icon: null, showFiles: true, include: [], exclude: [] },
       },
     });
   });
 
-  it('persists by-space state under the v1 workspace key', async () => {
+  it('persists per-pane state under the v2 workspace key', async () => {
     const values = new Map<string, unknown>();
     const state = new PaneStateStore({ get: (key) => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
-    await state.setPreset('/space', 'Files');
-    expect(values.get(PANE_STATE_KEY)).toEqual({ version: 1, bySpace: { [normalizeSpaceKey('/space')]: { preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' } } } });
-    expect(state.get('/space').preset).toBe('Files');
+    await state.initialize({ spaces: [], showFilesDefault: true, configuredCount: 2 });
+    await state.setPreset('pane1', 'Files');
+    const saved = values.get(PANE_STATE_KEY) as { version: number; panes: Record<string, { preset: string }> };
+    expect(saved.version).toBe(2);
+    expect(saved.panes.pane1.preset).toBe('Files');
+    expect('bySpace' in saved).toBe(false);
+    expect(state.get('pane1').preset).toBe('Files');
   });
 
   it('applies flat levels 1/2/all and keeps the maxDepth protection for all', async () => {

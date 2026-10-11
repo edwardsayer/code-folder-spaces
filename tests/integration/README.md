@@ -19,7 +19,9 @@ npm run test:integration
 ## 測試界線
 
 - `activation.test.ts` 驗證擴充套件 API、命令與 view 的 Extension API 註冊證據，不代表視覺 UI 驗收。
-- `spaceTree.test.ts` 自行建構 `SpaceStore` 與 `SpaceTreeDataProvider`，驗證樹根、展開排序、include／exclude、檔案顯示、名稱與路徑 reveal 語意。這個 provider 與 activation 建立的實例互不干擾。
+- `spaceTree.test.ts` 自行建構 `SpaceStore`、`PaneStateStore` 與每 pane 的 `SpaceTreeDataProvider`，驗證根節點、展開排序、include／exclude、檔案顯示、名稱與路徑 reveal 語意。這些 provider 與 activation 建立的實例互不干擾。
+- `paneDecoupling.test.ts` 是 S4R6「pane 解耦」（`panes.v2`）的驗收矩陣 PD-I1～PD-I5：兩個 pane 各自不同 root（含**非 spaces 的任意資料夾**）、每 pane 狀態隔離（F-S4R4-8 回歸）、「在此開子 pane」的插槽分配與繼承、關閉中間 pane 的子樹重掛與重載還原、`min(count, 8)` 與無 spaces 啟用數。
+- `paneCascade.test.ts` 驗證 cascade controller 的真實檔案系統行為：以 paneId 為 key 的 root 傳遞、D67 允許根（父 pane 自己的 root）、D61/D74 的手動暫時覆寫、寫入序列化與快照失效守門。
 - `trust.test.ts` 驗證 SpaceStore 在有工作區時寫入 Workspace 範圍，測試以暫存路徑操作，並在 `finally` 還原原有 workspace/global 設定；同時確認重複新增為 no-op。
 - `outsideWorkspaceRoot.test.ts` 以系統暫存目錄驗證工作區外根的 provider 樹節點、排序、exclude 與路徑解析；測試結束會清理暫存根。
 
@@ -33,6 +35,10 @@ npm run test:integration
 `@vscode/test-electron` 的 `node_modules/@vscode/test-electron/out/runTest.js` 固定傳入 `--disable-workspace-trust`，因此整合測試 Extension Host 是 trusted，`trust.test.ts` 以 `vscode.workspace.isTrusted === true` 明確記錄此限制。受限模式無法由本自動化套件涵蓋，須透過 Extension Development Host（EDH）probe 手動取證，結果見 `dev/tests/s1-3-s1-4-runtime-evidence.md`。
 
 工作區外根的自動化涵蓋 `workspace.fs` provider 讀取／樹節點、排序與篩選、`findNodeByPath`。排除使用單一 `**/*.log` pattern 驗證頂層及巢狀檔案。watcher 診斷由外部行程建立工作區外與工作區內檔案，最多等候 20 秒；這些測試不代表 restricted 模式，受限模式的 watcher 與瀏覽／開檔實機證據見 EDH probe 報告。測試設定會還原 workspace/global 值，不在 committed fixture 留下設定變更。watcher 案例會在工作區 fixture 根建立 `watcher-*.txt` 並於 `finally` 刪除；若 Extension Host 崩潰可能殘留未追蹤檔，需人工刪除。
+
+## 剪貼簿命令契約（S4R6）
+
+v2 的 `codeFolderSpaces.cutEntry／copyEntry／pasteEntries` 只接受 `SpaceRootNode`／`SpaceEntryNode` **實例**（`nodeInfo` 走 `instanceof`）；v1 的 duck-typed `{ uri, space, isDirectory }` 參數分支已移除。整合測試的 bundle 與 `dist/extension.js` 是兩份模組實體，跨 bundle 的 `instanceof` 必然失敗，因此 `clipboardAndOpen.test.ts` 改為在真實磁碟驗證產品匯出的同一組剪貼簿／搬移語意模組，並以一個案例固定「非 pane 節點參數＝no-op、不動磁碟」的契約；命令接線本身需由 EDH 實機取證。
 
 ## 已知平台行為／限制
 
