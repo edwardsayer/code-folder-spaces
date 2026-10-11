@@ -42,7 +42,7 @@
     },
     "views": {
       "code-folder-spaces": [
-        { "id": "codeFolderSpaces.pane1", "name": "%view.pane1.name%", "when": "codeFolderSpaces.pane1.enabled", "contextualTitle": "%container.title%" },
+        { "id": "codeFolderSpaces.pane1", "name": "%view.pane1.name%", "contextualTitle": "%container.title%" },
         { "id": "codeFolderSpaces.pane2", "name": "%view.pane2.name%", "when": "codeFolderSpaces.pane2.enabled", "contextualTitle": "%container.title%" },
         { "id": "codeFolderSpaces.pane3", "name": "%view.pane3.name%", "when": "codeFolderSpaces.pane3.enabled", "contextualTitle": "%container.title%" },
         { "id": "codeFolderSpaces.pane4", "name": "%view.pane4.name%", "when": "codeFolderSpaces.pane4.enabled", "contextualTitle": "%container.title%" },

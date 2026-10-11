@@ -12,7 +12,6 @@ export interface PaneCascadeRuntime {
   id: string;
   scope?: PaneCascadeScope;
   provider: {
-    clearStale(paneId: string): void;
     refresh(): void;
   };
   treeView: { message?: string };
@@ -186,7 +185,6 @@ export class PaneCascadeController implements vscode.Disposable {
           childTask.expectedRootTimer = undefined;
         }, this.options.expectedRootMs ?? 500);
         current.staleRoot = undefined;
-        current.provider.clearStale(childId);
         current.provider.refresh();
         current.treeView.message = '';
       });

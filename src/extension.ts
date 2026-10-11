@@ -6,7 +6,7 @@ import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
 import { classifySpaceRename, normalizeSpaceKey, PaneStateStore, resolvePaneDefinition } from './spaces/viewState';
-import { isPaneRootDirectory } from './spaces/paneLinks';
+import { canClosePane, isPaneRootDirectory, nextChildPaneId } from './spaces/paneLinks';
 import { PaneCascadeController } from './spaces/paneCascade';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
 import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack, validateSpaceName } from './spaces/spaceActions';
@@ -21,6 +21,8 @@ const FOLLOW_DEBOUNCE_MS = 250;
 export interface FolderSpacesApi {
   readonly version: string;
   getSpaces(): Array<{ name: string; basePath: string }>;
+  /** 目前啟用的窗格（S4R6 新增，供自動化驗證命令接線）：id／root／父窗格／follow／預設集。 */
+  getPanes(): Array<{ id: string; root: string | null; parentPaneId: string | null; follow: boolean; preset: string }>;
 }
 
 /** Runtime of one enabled pane: provider + TreeView + cascade scope (paneId-keyed, S4R6). */
@@ -91,9 +93,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   context.subscriptions.push(cascadeController);
 
   const nodeInfo = (node: unknown): NodeInfo | undefined => {
-    if (node instanceof SpaceRootNode) return { paneId: node.paneId, uri: node.uri, isDirectory: true, definition: node.definition };
-    if (node instanceof SpaceEntryNode) return { paneId: node.paneId, uri: node.uri, isDirectory: node.isDirectory, definition: node.space };
-    return undefined;
+    // 審查 F-02：改為**結構型**判定（不再用 instanceof），讓命令可被可注入的節點驅動
+    // （整合測試跨 bundle 時 instanceof 會失敗，使命令接線失去自動化覆蓋）。
+    if (!node || typeof node !== 'object') return undefined;
+    const candidate = node as {
+      uri?: vscode.Uri;
+      isDirectory?: unknown;
+      paneId?: unknown;
+      definition?: SpaceDefinition;
+      space?: SpaceDefinition;
+    };
+    if (!candidate.uri || typeof candidate.uri.fsPath !== 'string') return undefined;
+    if (typeof candidate.paneId !== 'string' || candidate.paneId.length === 0) return undefined;
+    const isRoot = Boolean(candidate.definition);
+    const definition = candidate.definition ?? candidate.space;
+    if (!definition) return undefined;
+    return {
+      paneId: candidate.paneId,
+      uri: candidate.uri,
+      isDirectory: isRoot ? true : candidate.isDirectory === true,
+      definition,
+    };
   };
 
   const requireTrust = (): boolean => {
@@ -649,7 +669,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const info = nodeInfo(node);
     if (!info?.isDirectory) return;
     const sourcePane = viewState.get(info.paneId);
-    const childId = viewState.allocatePaneId(paneIndexOf(info.paneId) + 1);
+    // 審查 F-11：插槽決策抽為純函式（`nextChildPaneId`）以便單元測試。
+    const childId = nextChildPaneId(info.paneId, viewState.getEnabledPaneIds());
     if (!childId) {
       void vscode.window.showInformationMessage(vscode.l10n.t('Folder Spaces supports at most 8 panes.'));
       return;
@@ -676,7 +697,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const closePane = async (paneId?: string): Promise<void> => {
     const enabled = viewState.getEnabledPaneIds();
     const target = paneId ?? enabled[enabled.length - 1];
-    if (!target || target === 'pane1' || enabled.length <= 1 || !enabled.includes(target)) return;
+    // 審查 F-11：關閉守門抽為純函式（`canClosePane`）以便單元測試。
+    if (!target || !canClosePane(target, enabled)) return;
     await viewState.disablePane(target);
     syncPaneViews();
     await syncPaneContexts();
@@ -853,6 +875,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       return [
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.toggleFollow`, () => toggleFollowForPane(id)),
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.menu`, () => paneMenu(id)),
+        // 審查 F-08：命令 id 描述的是**狀態**（follow 開／關），handler 則為切換，兩者故意相反。
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOn`, () => setFollowForPane(id, false)),
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOff`, () => setFollowForPane(id, true)),
       ];
@@ -961,6 +984,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   return {
     version,
     getSpaces: () => store.getDefinitions().map((definition) => ({ name: definition.name, basePath: definition.basePath })),
+    getPanes: () => viewState.getEnabledPaneIds().map((id) => {
+      const pane = viewState.get(id);
+      return { id, root: pane.root, parentPaneId: pane.parentPaneId, follow: pane.follow, preset: pane.preset };
+    }),
   };
 }
 

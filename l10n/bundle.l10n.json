@@ -19,7 +19,6 @@
   "Could not update space path: {0}": "Could not update space path: {0}",
   "Choose a new space root": "Choose a new space root",
   "Could not read folders: {0}": "Could not read folders: {0}",
-  "The selected folder is outside the space root.": "The selected folder is outside the space root.",
   "The selected path is not a folder.": "The selected path is not a folder.",
   "The selected folder does not exist.": "The selected folder does not exist.",
   "Enter a new space name": "Enter a new space name",

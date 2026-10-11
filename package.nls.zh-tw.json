@@ -2,7 +2,6 @@
   "extension.displayName": "Folder Spaces",
   "extension.description": "資料夾範圍的檔案總管空間：一次專注一個資料夾，不必離開目前工作區。",
   "container.title": "Folder Spaces",
-  "view.explorer.name": "空間",
   "view.pane1.name": "Folder Spaces 1",
   "view.pane2.name": "Folder Spaces 2",
   "view.pane3.name": "Folder Spaces 3",
@@ -87,7 +86,5 @@
   "configuration.openFilesIn.description": "選擇從 Folder Spaces 開啟檔案的位置。",
   "configuration.openFilesIn.current": "在目前編輯器群組開啟。",
   "configuration.openFilesIn.beside": "在相鄰編輯器群組開啟；若已存在則重用。",
-  "pane.invalidLink": "窗格連結無效：{0}",
-  "pane.staleRoot": "窗格根目錄已失效：{0}。請在父窗格選取資料夾或重設版面。",
   "command.pane.menu.title": "窗格操作"
 }

@@ -151,7 +151,6 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   private readonly _statCache = new StatCache();
   private _nestingRulesCache: { key: string; rules: FileNestingRule[] } | undefined;
   filterMessage = '';
-  readonly staleRoots = new Set<string>();
 
   constructor(store: SpaceStore, private readonly _viewState?: PaneStateStore, scope?: PaneProviderScope) {
     this._scope = scope;
@@ -167,10 +166,6 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   get scope(): PaneProviderScope | undefined {
     return this._scope;
   }
-
-  /** Stale tracking is pane-scoped (S4R6): the key is the pane id. */
-  markStale(paneId: string): void { this.staleRoots.add(paneId); this.refresh(); }
-  clearStale(paneId: string): void { this.staleRoots.delete(paneId); }
 
   refresh(): void {
     this._statCache.clear();

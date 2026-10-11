@@ -21,7 +21,7 @@ import {
   type PaneStateDocument,
 } from '../../src/spaces/viewState';
 import type { SpaceDefinition } from '../../src/types';
-import { isAllowedSpaceRoot, isValidSpaceRoot, validateSpaceName } from '../../src/spaces/spaceActions';
+import { isAllowedSpaceRoot, validateSpaceName } from '../../src/spaces/spaceActions';
 
 /** Absolute, platform-appropriate fixture path (Windows tests must not rely on POSIX roots). */
 const P = (...segments: string[]): string =>
@@ -308,6 +308,34 @@ describe('PaneStateStore lifecycle', () => {
     expect(Object.keys(doc(memento.read()).panes)).toEqual(['pane1', 'pane2']);
   });
 
+  it('rebuilds when the stored layout has invalid pane links or no pane1 (F-10)', async () => {
+    // 反向鏈（pane1 掛在 pane2 之下）→ 佈局不合法
+    const reversed = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: {
+      pane1: { root: P('alpha'), parentPaneId: 'pane2', follow: true },
+      pane2: { root: P('beta') },
+    } } });
+    const reversedStore = new PaneStateStore(reversed);
+    const reversedOutcome = await reversedStore.initialize({ spaces: [space(P('alpha')), space(P('beta'))], showFilesDefault: true, configuredCount: 2 });
+    expect(reversedOutcome.kind).toBe('rebuilt');
+    expect(reversedStore.get('pane1').parentPaneId).toBeNull();
+
+    // 循環（pane2 ↔ pane3）
+    const cyclic = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: {
+      pane1: { root: P('alpha') },
+      pane2: { root: P('beta'), parentPaneId: 'pane3', follow: true },
+      pane3: { root: P('gamma'), parentPaneId: 'pane2', follow: true },
+    } } });
+    const cyclicStore = new PaneStateStore(cyclic);
+    await expect(cyclicStore.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2 })).resolves.toMatchObject({ kind: 'rebuilt' });
+
+    // 缺 pane1（D71 要求 pane1 恆存在）
+    const noPane1 = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: { pane3: { root: P('gamma') } } } });
+    const noPane1Store = new PaneStateStore(noPane1);
+    const noPane1Outcome = await noPane1Store.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2 });
+    expect(noPane1Outcome.kind).toBe('rebuilt');
+    expect(noPane1Store.getEnabledPaneIds()).toEqual(['pane1', 'pane2']);
+  });
+
   it('resets to the default layout for pane.resetLayout', async () => {
     const memento = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: { pane1: { root: P('alpha') }, pane4: { root: P('delta'), parentPaneId: 'pane1', follow: true } } } });
     const store = new PaneStateStore(memento);
@@ -344,23 +372,33 @@ describe('slot allocation (PD-U2, S4R6-D62)', () => {
     expect(full.allocatePaneId(8)).toBeUndefined();
   });
 
-  it('opens a child pane in the allocated slot, inheriting the source pane state (S4R6-D64)', async () => {
+  it('opens a child pane in the allocated slot, inheriting the source pane display settings (S4R6-D64/D75)', async () => {
     const store = loaded(['pane1', 'pane2']);
+    // 先給來源窗格可辨識的非預設值，否則斷言無區辨力（審查 F-07）。
+    await store.setPreset('pane1', 'Files');
+    await store.setFilter('pane1', 'keep-me');
+    await store.setPaneDisplay('pane1', { showFiles: false, include: ['**/*.ts'], exclude: ['**/skip/**'] });
     const slot = store.allocatePaneId();
     expect(slot).toBe('pane3');
     const source = store.get('pane1');
+    // 與 extension.ts 的 addChildPane 同形：**只**帶顯示設定（D75），preset／filter／sort 不繼承。
     await store.enablePane(slot as string, {
       root: P('alpha', 'nested'),
       parentPaneId: 'pane1',
       follow: true,
-      preset: source.preset,
-      filter: source.filter,
-      sort: source.sort,
       showFiles: source.showFiles,
       include: source.include,
       exclude: source.exclude,
     });
-    expect(store.get('pane3')).toMatchObject({ root: path.join(P('alpha'), 'nested'), parentPaneId: 'pane1', follow: true, preset: 'Explorer', drillStack: [] });
+    const child = store.get('pane3');
+    expect(child).toMatchObject({ root: path.join(P('alpha'), 'nested'), parentPaneId: 'pane1', follow: true, drillStack: [] });
+    // D75：只繼承顯示設定（來源值）。
+    expect(child.showFiles).toBe(false);
+    expect(child.include).toEqual(['**/*.ts']);
+    expect(child.exclude).toEqual(['**/skip/**']);
+    // D75：來源窗格的當下檢視狀態不隨新窗格帶入。
+    expect(child.preset).toBe('Explorer');
+    expect(child.filter).toBe('');
     expect(store.getEnabledPaneIds()).toEqual(['pane1', 'pane2', 'pane3']);
   });
 
@@ -623,15 +661,6 @@ describe('space root candidates (unchanged pure helpers)', () => {
   it('allows descendants when the space root is the filesystem root', () => {
     const filesystemRoot = path.parse(path.resolve(path.sep)).root;
     expect(isAllowedSpaceRoot(filesystemRoot, path.join(filesystemRoot, 'folder'))).toBe(true);
-  });
-
-  it('rejects non-directories and missing paths when validating root candidates', async () => {
-    const base = P('alpha');
-    const inside = path.join(base, 'nested');
-    expect(await isValidSpaceRoot(base, inside, async () => true)).toBe(true);
-    expect(await isValidSpaceRoot(P('other'), inside, async () => true)).toBe(false);
-    expect(await isValidSpaceRoot(base, inside, async () => false)).toBe(false);
-    expect(await isValidSpaceRoot(base, inside, async () => { throw new Error('missing'); })).toBe(false);
   });
 
   it('accepts only changed nonblank space names', () => {

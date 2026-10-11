@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canClosePane,
   getFollowingChildPaneIds,
   hasValidPaneLinks,
   isPaneRootDirectory,
+  nextChildPaneId,
   reattachChildren,
   shouldCascadeSelection,
   wouldCreateCycle,
@@ -148,5 +150,22 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     const next = reattachChildren(panes, 'pane2');
     expect(next.pane3).toEqual({ root: '/c', parentPaneId: 'pane1', follow: true, preset: 'List', filter: 'own' });
     expect(next.pane1).toBe(panes.pane1);
+  });
+
+  it('allocates the lowest free slot above the source pane so parentIndex < childIndex holds (F-11)', () => {
+    expect(nextChildPaneId('pane1', ['pane1', 'pane2'])).toBe('pane3');
+    expect(nextChildPaneId('pane1', ['pane1', 'pane3'])).toBe('pane2');
+    expect(nextChildPaneId('pane2', ['pane1', 'pane2'])).toBe('pane3');
+    // 池已滿 → undefined
+    expect(nextChildPaneId('pane1', ['pane1', 'pane2', 'pane3', 'pane4', 'pane5', 'pane6', 'pane7', 'pane8'])).toBeUndefined();
+    // 來源已是最後一個插槽 → 沒有合法子插槽
+    expect(nextChildPaneId('pane8', ['pane1', 'pane8'])).toBeUndefined();
+  });
+
+  it('only closes non-pane1 panes while at least one pane stays (F-11/D71)', () => {
+    expect(canClosePane('pane2', ['pane1', 'pane2'])).toBe(true);
+    expect(canClosePane('pane1', ['pane1', 'pane2'])).toBe(false);
+    expect(canClosePane('pane2', ['pane2'])).toBe(false);
+    expect(canClosePane('pane3', ['pane1', 'pane2'])).toBe(false);
   });
 });

@@ -72,6 +72,24 @@ export function isPaneRootDirectory(statType: number, directoryType: number): bo
   return (statType & directoryType) !== 0;
 }
 
+/**
+ * Lowest free slot strictly above `sourcePaneId`, so the chain keeps
+ * `parentIndex < childIndex` (S4R6-D62). Returns `undefined` when the pool is full.
+ */
+export function nextChildPaneId(sourcePaneId: string, enabledPaneIds: readonly string[]): string | undefined {
+  const used = new Set(enabledPaneIds);
+  for (let index = Math.max(paneIndex(sourcePaneId) + 1, 1); index <= MAX_PANE_COUNT; index += 1) {
+    const candidate = `pane${index}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/** `pane1` is never closable and at least one pane must stay (S4R6-D71). */
+export function canClosePane(paneId: string, enabledPaneIds: readonly string[]): boolean {
+  return paneId !== 'pane1' && enabledPaneIds.length > 1 && enabledPaneIds.includes(paneId);
+}
+
 function paneIndex(id: string): number {
   const match = /^pane([1-8])$/.exec(id);
   return match ? Number(match[1]) : -1;

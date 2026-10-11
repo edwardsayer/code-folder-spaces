@@ -2,7 +2,7 @@
 
 **Folder-scoped file explorer spaces for Visual Studio Code.** Pin any folder as its own focused explorer space and browse it without the noise of the whole workspace.
 
-> **Status: early scaffold (v0.0.1).** The extension currently provides the configuration model, a dedicated activity-bar view, a folder-scoped tree with optional files, include/exclude filtering, refresh and reveal-active-file commands. View modes, drill-down, drag & drop and file operations are planned next.
+> **Status: early development (v0.0.1).** Folder Spaces provides a dedicated activity-bar view with up to eight **independent panes** (each pane is a folder space of its own, with its own root, preset, filter, sort and drill-down stack) that can be chained parent → child, plus view presets, drill-down, file nesting, drag & drop and file operations. See Known limitations below.
 
 ## Why
 

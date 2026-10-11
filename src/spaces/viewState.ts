@@ -375,6 +375,9 @@ export class PaneStateStore {
     if (isV2Document(storedV2)) {
       this.state = normalizePaneState(storedV2);
       if (Object.keys(this.state.panes).length === 0) return this.persistDefault(context, 'created');
+      // 審查 F-10：載入時也要驗證鏈結（反向／循環／超深）與 pane1 存在，
+      // 否則損壞或手改的狀態會讓 cascade 指向編號更小的窗格。
+      if (!isUsableLayout(this.state.panes)) return this.persistDefault(context, 'rebuilt', 'invalid pane layout');
       if (storedV1 !== undefined) await this.memento.update(LEGACY_PANE_STATE_KEY, undefined);
       return { kind: 'restored', enabled: Object.keys(this.state.panes).length };
     }
@@ -382,6 +385,7 @@ export class PaneStateStore {
     if (legacySource === undefined) return this.persistDefault(context, 'created');
     try {
       this.state = migrateV1ToV2(legacySource, context.spaces, context.showFilesDefault);
+      if (!isUsableLayout(this.state.panes)) throw new Error('migrated layout has invalid pane links');
       await this.persist();
       await this.memento.update(LEGACY_PANE_STATE_KEY, undefined);
       return { kind: 'migrated', enabled: Object.keys(this.state.panes).length };
@@ -565,4 +569,9 @@ function isV1Document(value: unknown): boolean {
 function paneIndexOf(paneId: string): number {
   const match = /^pane([1-8])$/.exec(paneId);
   return match ? Number(match[1]) : MAX_PANE_COUNT + 1;
+}
+
+/** 審查 F-10：載入／遷移後的佈局必須鏈結合法且 pane1 存在（D71）。 */
+function isUsableLayout(panes: Record<string, PaneState>): boolean {
+  return Boolean(panes.pane1) && hasValidPaneLinks(panes);
 }

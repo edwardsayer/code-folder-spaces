@@ -2,7 +2,6 @@
   "extension.displayName": "Folder Spaces",
   "extension.description": "Folder-scoped file explorer spaces: focus on one folder at a time without leaving your workspace.",
   "container.title": "Folder Spaces",
-  "view.explorer.name": "Spaces",
   "view.pane1.name": "Folder Spaces 1",
   "view.pane2.name": "Folder Spaces 2",
   "view.pane3.name": "Folder Spaces 3",
@@ -16,8 +15,7 @@
   "command.pane.resetLayout.title": "Folder Spaces: Reset Pane Layout",
   "command.pane.addChild.title": "Folder Spaces: Open Child Pane Here",
   "command.pane.setRoot.title": "Folder Spaces: Set Pane Root",
-  "command.pane.toggleFollow.title": "Folder Spaces: Toggle Parent Follow",
-  "configuration.panes.count.description": "Number of panes to enable initially (1–8). Each pane is an independent folder space and can change its own root later.",
+  "command.pane.toggleFollow.title": "Folder Spaces: Toggle Parent Follow",  "configuration.panes.count.description": "Number of panes to enable initially (1–8). Each pane is an independent folder space and can change its own root later.",
   "viewsWelcome.empty": "No folder spaces yet.\n[Add a folder space](command:codeFolderSpaces.addSpace)\nOpen a folder or workspace first, or configure `codeFolderSpaces.spaces` in settings.",
   "command.refresh.title": "Folder Spaces: Refresh",
   "command.addSpace.title": "Folder Spaces: Add Folder Space...",
@@ -87,7 +85,5 @@
   "configuration.openFilesIn.description": "Choose where files opened from Folder Spaces appear.",
   "configuration.openFilesIn.current": "Open in the current editor group.",
   "configuration.openFilesIn.beside": "Open in the adjacent editor group, reusing it when available.",
-  "pane.invalidLink": "Invalid pane link: {0}",
-  "pane.staleRoot": "Pane root is stale: {0}. Select a folder in its parent pane or reset the layout.",
   "command.pane.menu.title": "Pane actions"
 }

@@ -19,7 +19,6 @@
   "Could not update space path: {0}": "無法更新空間路徑：{0}",
   "Choose a new space root": "選擇新的空間根目錄",
   "Could not read folders: {0}": "無法讀取資料夾：{0}",
-  "The selected folder is outside the space root.": "所選資料夾超出空間原始根目錄範圍。",
   "The selected path is not a folder.": "所選路徑不是資料夾。",
   "The selected folder does not exist.": "所選資料夾不存在。",
   "Enter a new space name": "輸入新的空間名稱",

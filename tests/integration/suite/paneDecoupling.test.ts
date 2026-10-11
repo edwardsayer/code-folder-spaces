@@ -1,4 +1,6 @@
 import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceRootNode, type SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
@@ -319,5 +321,48 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
     assert.equal(harness.state.allocatePaneId(), undefined, '八個插槽用滿時不得再分配');
     await harness.state.disablePane('pane5');
     assert.equal(harness.state.allocatePaneId(), 'pane5', '關閉中間 pane 後釋放其插槽');
+  });
+});
+
+suite('S4R6 命令接線（結構型節點驅動；審查 F-02／F-11）', () => {
+  const api = async (): Promise<{ getPanes(): Array<{ id: string; root: string | null; parentPaneId: string | null; follow: boolean }> }> => {
+    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    assert.ok(extension);
+    return await extension.activate() as never;
+  };
+
+  test('pane.addChild 以結構型資料夾節點建立子窗格；非資料夾節點 no-op', async () => {
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'folder-spaces-addchild-'));
+    const before = (await api()).getPanes();
+    // 結構型節點：與 SpaceEntryNode 同形（不再依賴 instanceof，見 F-02）。
+    const folderNode = {
+      uri: vscode.Uri.file(root),
+      isDirectory: true,
+      paneId: 'pane1',
+      space: { basePath: before[0].root ?? root, name: 'x', showFiles: true, include: [], exclude: [], sourceIndex: 0 },
+    };
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.addChild', folderNode);
+    const after = (await api()).getPanes();
+    assert.equal(after.length, before.length + 1);
+    const child = after[after.length - 1];
+    assert.equal(child.parentPaneId, 'pane1');
+    assert.equal(child.follow, true);
+    // Windows 的 Uri.file 會把磁碟機字母轉小寫，比對前先正規化大小寫（同 S4R4 的處置）。
+    assert.equal(path.normalize(String(child.root)).toLowerCase(), path.normalize(root).toLowerCase());
+
+    // 非資料夾節點 → 不新增窗格
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.addChild', { ...folderNode, isDirectory: false });
+    assert.equal((await api()).getPanes().length, after.length);
+
+    // 清理：關閉剛建立的子窗格
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.remove', child.id);
+    assert.equal((await api()).getPanes().length, before.length);
+  });
+
+  test('pane.remove 拒絕 pane1 與最後一個窗格（守門）', async () => {
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.remove', 'pane1');
+    assert.ok((await api()).getPanes().some((pane) => pane.id === 'pane1'), 'pane1 不可被關閉');
   });
 });
