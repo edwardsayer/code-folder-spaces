@@ -16,7 +16,7 @@
 
 ## Architecture (`src/`)
 
-- `extension.ts`：`activate()` 進入點。建立 `SpaceStore`、`SpaceTreeDataProvider`、`TreeView`，註冊指令與檔案監看器，回傳公開 API（`version`、`getSpaces()`）。
+- `extension.ts`：`activate()` 進入點。建立 `SpaceStore`、`SpaceTreeDataProvider`、`TreeView`，註冊指令與檔案監看器，回傳公開 API（`version`、`getSpaces()`、**`getPanes()`**〔S4R6 新增，供自動化驗證命令接線：id／root／父窗格／follow／預設集〕）。
 - `spaces/spaceConfig.ts`：**純邏輯**（無 `vscode` 相依）——設定正規化、變數插值、glob 比對。所有可單元測試的邏輯放這裡。
 - `spaces/spaceStore.ts`：`codeFolderSpaces.spaces` 設定的讀寫封裝與變更事件；寫入目標為 Workspace（有工作區時）或 Global。
 - `spaces/viewState.ts`：**每窗格檢視狀態**（`codeFolderSpaces.panes.v2`：`root`／`preset`／`filter`／`sort`／`drillStack`／`parentPaneId`／`follow`／`name`／`icon`／`showFiles`／`include`／`exclude`）與 v1→v2 遷移；插槽分配（`allocatePaneId`）、啟用／關閉（`enablePane`／`disablePane`）與 `resolvePaneDefinition`（per-pane 定義）。
@@ -35,7 +35,7 @@
 5. **無遠端程式碼**：所有相依在打包期 bundle 進 `.vsix`；`eval`／遠端載入一律禁止。
 6. **`engines.vscode` 與 `@types/vscode` 對齊**，調整最低版本需同步 `CHANGELOG.md`。
 7. **不使用 webview**：Files pane 的清單效果由檢視預設集（Files／Contents／List 扁平清單）達成，以維持單一 pane cascading chaining 的產品特色。設計見 `dev/specs/pane-cascade-and-presets-design.md`。
-8. **Pane = 獨立的 Folder Space（S4R6-D60；原「Linked spaces = 上下堆疊」已修訂）**：最多 8 個原生 TreeView 窗格堆疊於同一容器；**每個窗格擁有自己的 root（可為任意資料夾）、檢視狀態與顯示設定**，`codeFolderSpaces.spaces` 僅為「可選根清單＋新窗格預設值來源」。父子鏈以 `parentPaneId`＋`follow` 連動（子窗格跟隨父窗格選取的資料夾；手動換根為暫時覆寫，父下次選不同資料夾即恢復跟隨）。採固定 view 插槽 `codeFolderSpaces.pane1..8` + `when` context key（VS Code 無法執行期新增 view）；窗格狀態存 `codeFolderSpaces.panes.v2`。設計見 `dev/specs/pane-cascade-and-presets-design.md` §2.4（S4R6-D60–D74）。
+8. **Pane = 獨立的 Folder Space（S4R6-D60；原「Linked spaces = 上下堆疊」已修訂）**：最多 8 個原生 TreeView 窗格堆疊於同一容器；**每個窗格擁有自己的 root（可為任意資料夾）、檢視狀態與顯示設定**，`codeFolderSpaces.spaces` 僅為「可選根清單＋新窗格預設值來源」。父子鏈以 `parentPaneId`＋`follow` 連動（子窗格跟隨父窗格選取的資料夾；手動換根為暫時覆寫，父下次選不同資料夾即恢復跟隨）。採固定 view 插槽 `codeFolderSpaces.pane1..8`（VS Code 無法執行期新增 view）；**`pane1` 不帶 `when`（恆可見），`pane2..8` 才用 `codeFolderSpaces.paneN.enabled`**——因為 context key 需啟動後才設定，若 pane1 也被 `when` 隱藏，新 profile／reload 時容器不會出現、`onView` 無從觸發（冷啟動死結，S4R6 修正）。窗格狀態存 `codeFolderSpaces.panes.v2`。設計見 `dev/specs/pane-cascade-and-presets-design.md` §2.4（S4R6-D60–D75）。
 
 ## 指令與驗證
 
