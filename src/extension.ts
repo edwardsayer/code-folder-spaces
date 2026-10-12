@@ -691,10 +691,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const value = await vscode.window.showInputBox({ prompt: vscode.l10n.t('Filter by path substring'), value: viewState.get(paneId).filter });
     if (value === undefined) return;
     await viewState.setFilter(paneId, value.trim());
+    // 審查 P2-1（D86 訂正）：在 repaint（generation++）**之前**同步清橫幅與 provider 計數——
+    // 新列舉必以新 filter 計算，計數即使與上一 filter 相同也會因 ≠ '' 觸發事件；
+    // 若樹收合尚未列舉，保持空白（未知）而非顯示舊 filter 的計數。
+    const filterRuntime = paneRuntime.get(paneId);
+    if (filterRuntime) {
+      filterRuntime.provider.filterMessage = '';
+      filterRuntime.treeView.message = '';
+    }
     repaintPane(paneId);
     await syncContext();
-    const runtime = paneRuntime.get(paneId);
-    if (runtime) runtime.treeView.message = '';
   };
 
   const toggleModeForPane = async (paneId: string): Promise<void> => {

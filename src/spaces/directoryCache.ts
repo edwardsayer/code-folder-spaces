@@ -275,7 +275,7 @@ export class DirectoryCache {
    * schema 不合法時静默丢弃而不 throw；單一目錄非法即整體略過。
    */
   loadSnapshot(value: unknown): void {
-    const next = new Map<string, CachedDirectory>();
+    const valid: SnapshotDirectoryRecord[] = [];
     const now = this.clock();
     if (isPlainObject(value) && value.version === SNAPSHOT_VERSION && Array.isArray(value.entries)) {
       for (const item of value.entries) {
@@ -292,9 +292,15 @@ export class DirectoryCache {
         if (!isValidDirectoryChildren(children, this.limits.maxEntriesPerDirectory)) {
           continue;
         }
-        // 完整 URI 當作 key，不小寫化，避免破壞大小寫敏感 provider（S4R7-D80）。
-        next.set(uri, { time, entries: copyEntries(children) });
+        valid.push({ uri, time, children: copyEntries(children as DirectoryEntry[]) });
       }
+    }
+    // 完整 URI 當作 key，不小寫化，避免破壞大小寫敏感 provider（S4R7-D80）；
+    // 載入同受 maxDirectories 上限約束（審查 P2-2）：取最新者，與 export 新到舊序一致。
+    valid.sort((a, b) => b.time - a.time || (a.uri < b.uri ? -1 : a.uri > b.uri ? 1 : 0));
+    const next = new Map<string, CachedDirectory>();
+    for (const record of valid.slice(0, this.limits.maxDirectories)) {
+      next.set(record.uri, { time: record.time, entries: record.children });
     }
     this.snapshots = next;
   }

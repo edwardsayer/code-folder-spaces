@@ -572,3 +572,24 @@ describe('DirectoryCache 失效粒度與快照上限（審查 F1/F3）', () => {
     expect(exported.entries.length).toBe(2);
   });
 });
+
+describe('DirectoryCache loadSnapshot 上限（審查 P2-2）', () => {
+  it('載入超過 maxDirectories 的快照時保留最新者', async () => {
+    const h = createHarness({ limits: { maxDirectories: 2 } });
+    const now = 1_000_000; // 與 harness 時鐘對齊（時間必須 ≤ clock 且在 24h 內）
+    h.cache.loadSnapshot({
+      version: 1,
+      entries: [
+        { uri: 'file:///ws/old', time: now - 3000, children: [['a', 1]] },
+        { uri: 'file:///ws/new', time: now - 1000, children: [['b', 1]] },
+        { uri: 'file:///ws/mid', time: now - 2000, children: [['c', 1]] },
+      ],
+    });
+    const exported = h.cache.exportSnapshot() as { entries: Array<{ uri: string }> };
+    const uris = exported.entries.map(entry => entry.uri);
+    expect(uris.length).toBe(2);
+    expect(uris).toContain('file:///ws/new');
+    expect(uris).toContain('file:///ws/mid');
+    expect(uris).not.toContain('file:///ws/old');
+  });
+});
