@@ -4,6 +4,8 @@ import type { SpaceDefinition } from './types';
 import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProvider';
 import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
+import { DirectoryCache } from './spaces/directoryCache';
+import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
 import { classifySpaceRename, normalizeSpaceKey, PaneStateStore, resolvePaneDefinition } from './spaces/viewState';
 import { canClosePane, isPaneRootDirectory, nextChildPaneId } from './spaces/paneLinks';
@@ -16,6 +18,14 @@ import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActi
 const MAX_PANE_INDEX = 8;
 const REFRESH_DEBOUNCE_MS = 200;
 const FOLLOW_DEBOUNCE_MS = 250;
+// S4R7-D85 啟動事件合併與 S4R7-D81 快照持久化的時間常數。
+// STARTUP_WINDOW_MS／STARTUP_MAX_WAIT_MS 為參考值（Explorer Enhanced 2800ms），待 EDH 取證後定值；
+// 若實測顯示不合適須調整並記錄於 handoff。
+const STARTUP_WINDOW_MS = 2800;
+const STARTUP_MAX_WAIT_MS = 1000;
+const SNAPSHOT_WRITE_DEBOUNCE_MS = 800;
+/** 目錄快照的獨立 workspaceState key（S4R7-D81：僅 chevron 提示，不放進 panes.v2、不寫 globalState／設定檔）。 */
+const DIRECTORY_SNAPSHOT_KEY = 'codeFolderSpaces.directorySnapshot.v1';
 
 /** Public surface returned from `activate()` for other extensions. */
 export interface FolderSpacesApi {
@@ -69,6 +79,57 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   // 所有 pane 與命令共用 session-only undo；回呼延後取用後方建立的服務。
   const undoStack = new UndoStack();
   const clipboard = new SpaceClipboard();
+
+  // --- 共享目錄快取與快照持久化（S4R7 W3，D79–D83） -------------------------
+
+  const directoryCache = new DirectoryCache({
+    // URI 以 toString／parse 往返：cache key 為完整序列化 URI（D80），provider 端同樣用 uri.toString()。
+    readDirectory: async uri => await vscode.workspace.fs.readDirectory(vscode.Uri.parse(uri)),
+    onError: (uri, error) => log.error(`Directory listing failed for ${uri}: ${String(error)}`),
+    // cache 為跨 pane 共享，revalidate 一律重繪所有 pane（provider 注入時不自接預設回呼）。
+    onDidRevalidate: () => {
+      repaintAllPanes();
+      void reconcilePaneRoots();
+      scheduleSnapshotWrite();
+    },
+    // D81：成功驗證並記憶化後排定持久化（800ms debounce，避免展開期間頻繁寫入）。
+    onDidStore: () => scheduleSnapshotWrite(),
+  });
+  // 啟動先載入快照（僅提示用途）再建立 pane（D79：不引入舊的可操作檔案列）。
+  directoryCache.loadSnapshot(context.workspaceState.get(DIRECTORY_SNAPSHOT_KEY));
+
+  let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastSnapshotJson = '';
+  const writeSnapshot = (): void => {
+    // exportSnapshot 內建 1MiB 上限（D81）；內容未變不重複寫入；失敗只記錄、不拋出。
+    const snapshot = directoryCache.exportSnapshot();
+    const json = JSON.stringify(snapshot);
+    if (json === lastSnapshotJson) {
+      return;
+    }
+    lastSnapshotJson = json;
+    void context.workspaceState.update(DIRECTORY_SNAPSHOT_KEY, snapshot)
+      .then(undefined, error => log.error(`Failed to persist directory snapshot: ${String(error)}`));
+  };
+  const scheduleSnapshotWrite = (): void => {
+    if (snapshotTimer) {
+      clearTimeout(snapshotTimer);
+    }
+    snapshotTimer = setTimeout(() => {
+      snapshotTimer = undefined;
+      writeSnapshot();
+    }, SNAPSHOT_WRITE_DEBOUNCE_MS);
+  };
+  context.subscriptions.push(new vscode.Disposable(() => {
+    // deactivate 無法 await：debounce 尚未觸發時同步排定最後一次寫入（接受丟失 800ms 內變動的取捨，快照僅提示）。
+    // 與 cache.dispose 合併為單一註冊：無論 subscriptions 處置順序，寫入必在 dispose 前（dispose 會清空 stores，造成匯出空快照覆寫好資料）。
+    if (snapshotTimer) {
+      clearTimeout(snapshotTimer);
+      snapshotTimer = undefined;
+      writeSnapshot();
+    }
+    directoryCache.dispose();
+  }));
 
   const paneRuntime = new Map<string, PaneRuntime>();
   const cascadeDisposables = new Map<string, vscode.Disposable>();
@@ -153,7 +214,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   });
 
   const createPane = (paneId: string): PaneRuntime => {
-    const provider = new SpaceTreeDataProvider(store, viewState);
+    // 第 4 參注入共享 cache（W2 凍結的簽名：store, viewState, scope?, directoryCache?）；注入時 provider 不 dispose 它。
+    const provider = new SpaceTreeDataProvider(store, viewState, undefined, directoryCache);
     const treeView = vscode.window.createTreeView(`codeFolderSpaces.${paneId}`, {
       treeDataProvider: provider,
       showCollapseAll: true,
@@ -165,6 +227,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       treeView,
       provider.onDidChangeTreeData(() => {
         if (!runtime.staleRoot) treeView.message = provider.filterMessage;
+        // D81：樹活動後排定快照寫入——展開／重繪觸發的列舉完成後，持久化最新快照（800ms debounce）。
+        scheduleSnapshotWrite();
       }),
     );
     // active-file follow 沿用既有行為：只跟 pane1（可見性條件需要 pane1 的 TreeView）。
@@ -268,6 +332,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   // --- watchers (D68: per pane root, deduplicated) ------------------------
 
   let watchers = new Map<string, vscode.FileSystemWatcher>();
+  // D83：FS 事件立即失效快取（跨 pane 共享，全量 invalidate），UI 重繪仍走 debounce。
+  const invalidateCacheAndRefresh = (): void => {
+    directoryCache.invalidate();
+    scheduleRefresh();
+  };
   const rebuildWatchers = (): void => {
     const desired = new Map<string, string>();
     for (const runtime of paneRuntime.values()) {
@@ -283,9 +352,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     for (const [key, root] of desired) {
       if (watchers.has(key)) continue;
       const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(root), '**/*'));
-      watcher.onDidCreate(scheduleRefresh);
-      watcher.onDidDelete(scheduleRefresh);
-      watcher.onDidChange(scheduleRefresh);
+      watcher.onDidCreate(invalidateCacheAndRefresh);
+      watcher.onDidDelete(invalidateCacheAndRefresh);
+      watcher.onDidChange(invalidateCacheAndRefresh);
       watchers.set(key, watcher);
     }
   };
@@ -300,6 +369,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   let followGeneration = 0;
   const pane1 = (): PaneRuntime | undefined => paneRuntime.get('pane1');
 
+  /**
+   * D84：reveal 前等待已開始的列舉收斂。whenSettled 內部已吸收 rejection，理論不 reject；
+   * 防御性 try/catch 確保 settle 失敗不會讓 follow／命令抛出。
+   */
+  const settleProvider = async (provider: SpaceTreeDataProvider): Promise<void> => {
+    try {
+      await provider.whenSettled();
+    } catch {
+      // 忽略：不因 settle 失敗阻斷後續 reveal。
+    }
+  };
+
   const followActiveFile = async (generation: number, uri: vscode.Uri | undefined): Promise<void> => {
     const runtime = pane1();
     const canFollow = (): boolean => shouldFollowActiveFile({
@@ -311,7 +392,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (!uri || !runtime || !canFollow()) return;
     const node = await runtime.provider.findNodeByPath(uri.fsPath);
     if (!canFollow() || !sameUri(uri, getActiveTabUri())) return;
-    if (node) await runtime.treeView.reveal(node, { select: true, focus: false, expand: true });
+    if (!node) return;
+    // D84：reveal 前 settle；await 後重查 pane 仍啟用、root（scope 物件身份）未變、filter 未變。
+    const scopeBefore = runtime.provider.scope;
+    const filterBefore = viewState.get(runtime.id).filter;
+    await settleProvider(runtime.provider);
+    if (!canFollow() || !sameUri(uri, getActiveTabUri())) return;
+    if (paneRuntime.get(runtime.id) !== runtime || runtime.provider.scope !== scopeBefore) return;
+    if (viewState.get(runtime.id).filter !== filterBefore) return;
+    await runtime.treeView.reveal(node, { select: true, focus: false, expand: true });
   };
   const scheduleFollow = (): void => {
     followGeneration++;
@@ -338,29 +427,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   );
   void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', settings().get<boolean>('followActiveFile', false));
 
-  // --- refresh debounce ----------------------------------------------------
+  // --- refresh debounce（S4R7-D85：啟動窗口內有上限合併，純邏輯在 refreshScheduler.ts） ---
 
-  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-  const scheduleRefresh = (): void => {
-    if (refreshTimer) {
-      clearTimeout(refreshTimer);
+  const fireRefresh = (): void => {
+    for (const runtime of paneRuntime.values()) {
+      runtime.provider.refresh();
+      if (!runtime.staleRoot) runtime.treeView.message = runtime.provider.filterMessage;
     }
-    refreshTimer = setTimeout(() => {
-      refreshTimer = undefined;
-      for (const runtime of paneRuntime.values()) {
-        runtime.provider.refresh();
-        if (!runtime.staleRoot) runtime.treeView.message = runtime.provider.filterMessage;
-      }
-      void reconcilePaneRoots();
-      scheduleFollow();
-    }, REFRESH_DEBOUNCE_MS);
+    void reconcilePaneRoots();
+    scheduleFollow();
   };
-  context.subscriptions.push(new vscode.Disposable(() => {
-    if (refreshTimer) {
-      clearTimeout(refreshTimer);
-      refreshTimer = undefined;
-    }
-  }));
+
+  const refreshScheduler = createRefreshScheduler({
+    fire: fireRefresh,
+    debounceMs: REFRESH_DEBOUNCE_MS,
+    startupWindowMs: STARTUP_WINDOW_MS,
+    startupMaxWaitMs: STARTUP_MAX_WAIT_MS,
+  });
+  const scheduleRefresh = (): void => refreshScheduler.schedule();
+  context.subscriptions.push(new vscode.Disposable(() => refreshScheduler.dispose()));
 
   // --- context keys（pane1 的 view/title 按鈕狀態） -------------------------
 
@@ -644,6 +729,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const expandLevelForPane = async (paneId: string): Promise<void> => {
     const runtime = paneRuntime.get(paneId);
     if (!runtime) return;
+    // D84：先收斂進行中的列舉；settle 後確認 pane 仍啟用且 scope（root）未變，
+    // 避免換根後把舊節點 reveal 到新樹。
+    const scopeBefore = runtime.provider.scope;
+    await settleProvider(runtime.provider);
+    if (paneRuntime.get(paneId) !== runtime || runtime.provider.scope !== scopeBefore) return;
     const selection = runtime.treeView.selection[0];
     const info = nodeInfo(selection);
     const parents = selection && info?.isDirectory ? [selection as SpaceRootNode | SpaceEntryNode] : await runtime.provider.getChildren();
@@ -660,6 +750,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const runtime = paneRuntime.get(paneId);
     const uri = getActiveTabUri();
     if (!runtime || !uri) return;
+    // D84：reveal 前 settle，settle 後重查 pane／root 未變（與命令面板路徑保持一致行為）。
+    const scopeBefore = runtime.provider.scope;
+    await settleProvider(runtime.provider);
+    if (paneRuntime.get(paneId) !== runtime || runtime.provider.scope !== scopeBefore) return;
     const node = await runtime.provider.findNodeByPath(uri.fsPath);
     if (node) await runtime.treeView.reveal(node, { select: true, focus: false, expand: true });
   };
@@ -792,6 +886,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (event.affectsConfiguration('explorer.fileNesting')) scheduleRefresh();
     }),
     vscode.workspace.onDidRenameFiles(async event => {
+      // D83：更名事件不得保留舊列舉結果；立即失效，UI 重繪仍走既有刷新路徑。
+      directoryCache.invalidate();
       for (const file of event.files) {
         // pane 為單位改寫 root 與 drillStack（S4R6：更名處理改以 pane 為界）。
         await viewState.rewriteRoots(file.oldUri.fsPath, file.newUri.fsPath);
@@ -966,6 +1062,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         void vscode.window.showInformationMessage(vscode.l10n.t('No active file to reveal.'));
         return;
       }
+      // D84：reveal 前 settle；settle 後重查 pane 仍啟用且 root 未變，避免 reveal 到新樹。
+      const scopeBefore = runtime.provider.scope;
+      await settleProvider(runtime.provider);
+      if (paneRuntime.get('pane1') !== runtime || runtime.provider.scope !== scopeBefore) return;
       const node = await runtime.provider.findNodeByPath(uri.fsPath);
       if (!node) {
         void vscode.window.showInformationMessage(
@@ -978,6 +1078,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   );
 
   scheduleFollow();
+  // D81：初始啟動後排定一次快照寫入（涵蓋啟動期间的新鲜列舉結果）。
+  scheduleSnapshotWrite();
   log.info('Folder Spaces activated');
 
   const version = String(context.extension.packageJSON.version ?? '0.0.0');

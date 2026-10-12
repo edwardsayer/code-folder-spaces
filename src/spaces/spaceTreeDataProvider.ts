@@ -2,6 +2,9 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { SpaceDefinition } from '../types';
 import { mapWithConcurrency } from '../util/concurrency';
+import { getLogChannel } from '../util/log';
+import { DirectoryCache } from './directoryCache';
+import type { DirectoryEntry } from './directoryCache';
 import { isVisibleDirectory, isVisibleFile } from './spaceConfig';
 import { assignNestedChildren, parseNestingPatterns } from './fileNesting';
 import type { FileNestingRule } from './fileNesting';
@@ -20,12 +23,22 @@ const DIRECTORY_CHILD_CHECK_CONCURRENCY = 16;
 /** F-42: file-nesting matching is case-insensitive on these platforms (spec §2). */
 const CASE_INSENSITIVE_PLATFORM = process.platform === 'win32' || process.platform === 'darwin';
 
-async function readDirectorySafe(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
-  try {
-    return await vscode.workspace.fs.readDirectory(uri);
-  } catch {
-    return [];
-  }
+async function readDirectoryFromWorkspaceFs(uri: string): Promise<DirectoryEntry[]> {
+  return await vscode.workspace.fs.readDirectory(vscode.Uri.parse(uri));
+}
+
+/**
+ * Provider-owned cache (S4R7 W2): reads through `workspace.fs`, reports failures on the
+ * shared log channel (S4R7-D82) and delegates snapshot revalidate notifications to the
+ * owning provider. When the extension layer injects one shared cache (W3), it owns both
+ * the error sink and the cross-pane repaint wiring instead.
+ */
+function createDefaultDirectoryCache(onDidRevalidate: () => void): DirectoryCache {
+  return new DirectoryCache({
+    readDirectory: readDirectoryFromWorkspaceFs,
+    onError: (uri, error) => getLogChannel().error(`Directory listing failed for ${uri}: ${String(error)}`),
+    onDidRevalidate,
+  });
 }
 
 async function statSafe(uri: vscode.Uri): Promise<vscode.FileStat | undefined> {
@@ -150,16 +163,39 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   private _scope?: PaneProviderScope;
   private readonly _statCache = new StatCache();
   private _nestingRulesCache: { key: string; rules: FileNestingRule[] } | undefined;
+  private readonly _directoryCache: DirectoryCache;
+  private readonly _ownsDirectoryCache: boolean;
+  /** Listing generation: bumped on refresh／root switch／dispose so stale awaits cause no side effects (S4R7-D83). */
+  private _generation = 0;
+  private _disposed = false;
   filterMessage = '';
 
-  constructor(store: SpaceStore, private readonly _viewState?: PaneStateStore, scope?: PaneProviderScope) {
+  /**
+   * @param directoryCache Optional shared cache injected by the extension layer (S4R7 W3).
+   * An injected cache is never disposed by this provider; without one the provider owns and
+   * disposes its own default cache.
+   */
+  constructor(
+    store: SpaceStore,
+    private readonly _viewState?: PaneStateStore,
+    scope?: PaneProviderScope,
+    directoryCache?: DirectoryCache
+  ) {
     this._scope = scope;
+    this._ownsDirectoryCache = directoryCache === undefined;
+    this._directoryCache = directoryCache ?? createDefaultDirectoryCache(() => {
+      // Only a snapshot hint that actually changed triggers this, so one repaint converges (S4R7-D82).
+      if (!this._disposed) {
+        this.refresh();
+      }
+    });
     this._storeListener = store.onDidChange(() => this.refresh());
   }
 
   /** Replace the pane definition after a root/display change, then repaint. */
   setScope(scope: PaneProviderScope | undefined): void {
     this._scope = scope;
+    // refresh() 遞增代次並失效快取：換根後舊根的列舉結果一律作廢（S4R7-D83）。
     this.refresh();
   }
 
@@ -168,10 +204,25 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   }
 
   refresh(): void {
+    this._generation += 1;
+    if (this._disposed) {
+      return;
+    }
+    // 手動 Refresh／寫入後 refresh／換根都不得保留舊列舉結果（S4R7-D83）。
+    this._directoryCache.invalidate();
     this._statCache.clear();
     this._nestingRulesCache = undefined;
     this.filterMessage = '';
     this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Waits until the directory reads that have already started converge (S4R7-D84).
+   * Does not promise that the VS Code renderer has painted, and does not wait for
+   * listings requested after this call.
+   */
+  async whenSettled(): Promise<void> {
+    await this._directoryCache.whenSettled();
   }
 
   getTreeItem(element: SpaceNode): vscode.TreeItem {
@@ -186,6 +237,25 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     if (!this._viewState || !this._scope) return undefined;
     const state: PaneState = this._viewState.get(this._scope.paneId);
     return { preset: state.preset, filter: state.filter, sort: state.sort, drillStack: state.drillStack };
+  }
+
+  /**
+   * Single directory-read seam (S4R7-D79/D82): display listings never serve an
+   * unvalidated snapshot, only the chevron probe may (`allowSnapshot`).
+   * A failed read resolves to an empty listing so existing display behaviour is unchanged;
+   * the cache keeps nothing on failure and reports the error through its own sink.
+   */
+  private async _readEntries(uri: vscode.Uri, allowSnapshot: boolean): Promise<DirectoryEntry[]> {
+    try {
+      return await this._directoryCache.read(uri.toString(), allowSnapshot);
+    } catch {
+      return [];
+    }
+  }
+
+  /** True when a refresh／root switch／dispose happened while an enumeration was awaited. */
+  private _isStale(generation: number): boolean {
+    return generation !== this._generation;
   }
 
   async getChildren(element?: SpaceNode): Promise<SpaceNode[]> {
@@ -326,7 +396,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   private async _visibleFileNames(dirUri: vscode.Uri, space: SpaceDefinition, parentRelative: string): Promise<{ names: string[]; uriByName: Map<string, vscode.Uri> }> {
     const names: string[] = [];
     const uriByName = new Map<string, vscode.Uri>();
-    for (const [name, type] of await readDirectorySafe(dirUri)) {
+    for (const [name, type] of await this._readEntries(dirUri, false)) {
       if (!(type & vscode.FileType.File)) {
         continue;
       }
@@ -365,6 +435,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   }
 
   private async _listChildren(element: SpaceRootNode | SpaceEntryNode): Promise<SpaceNode[]> {
+    const generation = this._generation;
     // F-42: file rows render their nested children; without nesting this stays empty
     // and the row keeps its existing CollapsibleState.None behaviour.
     if (element instanceof SpaceEntryNode && !element.isDirectory) {
@@ -375,14 +446,20 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const settings = VIEW_PRESETS[viewState?.preset ?? 'Explorer'];
     if (element instanceof SpaceRootNode && settings.mode === 'flat') {
       const flat = await this._listFlat(space, element, settings.content, settings.level);
-      return this._applyFilter(flat, element.rootPath, viewState?.filter ?? '');
+      if (this._isStale(generation)) {
+        return [];
+      }
+      return this._applyFilter(flat, element.rootPath, viewState?.filter ?? '', generation);
     }
     if (settings.content === 'files' && element instanceof SpaceEntryNode && element.isDirectory) return [];
     if (settings.content === 'folders' && element instanceof SpaceEntryNode && !element.isDirectory) return [];
     const activeRoot = element.rootPath;
     const elementDepth = path.relative(activeRoot, element.uri.fsPath).split(/[\\/]+/).filter(Boolean).length;
     if (settings.level !== 'all' && elementDepth >= settings.level) return [];
-    const entries = await readDirectorySafe(element.uri);
+    const entries = await this._readEntries(element.uri, false);
+    if (this._isStale(generation)) {
+      return [];
+    }
     const parentRelative = path.relative(activeRoot, element.uri.fsPath).replace(/\\/g, '/');
     const directories: { name: string; uri: vscode.Uri; relativePath: string }[] = [];
     const fileCandidates: { name: string; uri: vscode.Uri }[] = [];
@@ -408,6 +485,9 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       const hasChildren = !atLevelLimit && await this._directoryHasVisibleChildren(directory.uri, space, directory.relativePath, settings);
       return new SpaceEntryNode(directory.uri, true, space, element, hasChildren);
     });
+    if (this._isStale(generation)) {
+      return [];
+    }
     const nesting = this._nestingContext(settings, viewState);
     let files: SpaceEntryNode[];
     if (nesting) {
@@ -422,7 +502,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
           const nextAncestors = new Set(ancestors);
           nextAncestors.add(name);
           const children = await Promise.all(childNames.map(child => buildSubtree(child, node, nextAncestors)));
-          node.nestedChildren.push(...await this._sortNodes(children));
+          node.nestedChildren.push(...await this._sortNodes(children, generation));
           node.collapsibleState = nesting.expand ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
           node.iconPath = new vscode.ThemeIcon('file');
         }
@@ -439,8 +519,11 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       files = fileCandidates.map(candidate => new SpaceEntryNode(candidate.uri, false, space, element));
     }
     const candidates = [...directoryNodes, ...files];
-    const sorted = await this._sortNodes(candidates);
-    return this._applyFilter(sorted, activeRoot, viewState?.filter ?? '');
+    const sorted = await this._sortNodes(candidates, generation);
+    if (this._isStale(generation)) {
+      return [];
+    }
+    return this._applyFilter(sorted, activeRoot, viewState?.filter ?? '', generation);
   }
 
   private async _listFlat(
@@ -449,11 +532,16 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     content: 'all' | 'folders' | 'files',
     level: 1 | 2 | 'all'
   ): Promise<SpaceEntryNode[]> {
+    const generation = this._generation;
     const listing = await buildFlatListing(async (parent: vscode.Uri | undefined) => {
+      // 舊代次的遞迴不再打來源，也不再產生可被回填的讀取（S4R7-D83）。
+      if (this._isStale(generation)) {
+        return [];
+      }
       const parentUri = parent ?? root.uri;
       const parentRelative = path.relative(root.rootPath, parentUri.fsPath).replace(/\\/g, '/');
       const result: { value: vscode.Uri; isDirectory: boolean }[] = [];
-      for (const [name, type] of await readDirectorySafe(parentUri)) {
+      for (const [name, type] of await this._readEntries(parentUri, false)) {
         const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
         const uri = vscode.Uri.joinPath(parentUri, name);
         if (type & vscode.FileType.Directory) {
@@ -466,6 +554,9 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       }
       return result;
     }, undefined, level);
+    if (this._isStale(generation)) {
+      return [];
+    }
     const nodes = listing
       .filter(({ isDirectory }) => content === 'all' ? true : content === 'folders' ? isDirectory : !isDirectory)
       .map(({ value: uri, isDirectory }) => {
@@ -475,23 +566,32 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         if (isDirectory) node.iconPath = vscode.ThemeIcon.Folder;
         return node;
       });
-    const sorted = await this._sortNodes(nodes);
+    const sorted = await this._sortNodes(nodes, generation);
     return content === 'all' ? sorted.sort((a, b) => path.posix.dirname(String(a.description)).localeCompare(path.posix.dirname(String(b.description)), undefined, { sensitivity: 'base' })) : sorted;
   }
 
-  private _applyFilter(nodes: SpaceEntryNode[], rootPath: string, filter: string): SpaceEntryNode[] {
+  private _applyFilter(nodes: SpaceEntryNode[], rootPath: string, filter: string, generation: number): SpaceEntryNode[] {
     const filtered = filter ? nodes.filter(node => matchesPathFilter(path.relative(rootPath, node.uri.fsPath).replace(/\\/g, '/'), filter)) : nodes;
-    this.filterMessage = filter ? vscode.l10n.t('{0} / {1} matches', filtered.length, nodes.length) : '';
+    // `filterMessage` 是跨列舉共享的可變欄位：只有代次仍相符的列舉能寫入（S4R7-D83）。
+    if (!this._isStale(generation)) {
+      this.filterMessage = filter ? vscode.l10n.t('{0} / {1} matches', filtered.length, nodes.length) : '';
+    }
     return filtered;
   }
 
-  private async _sortNodes(nodes: SpaceEntryNode[]): Promise<SpaceEntryNode[]> {
+  private async _sortNodes(nodes: SpaceEntryNode[], generation: number): Promise<SpaceEntryNode[]> {
     const sort = this._paneState()?.sort ?? { key: 'name' as const, direction: 'asc' as const };
     const entries = nodes.map(node => ({ name: String(node.label ?? ''), uri: node.uri.toString(), node }));
-    const statTimes = async (entry: SortableEntry) => this._statCache.get(entry.uri, async () => {
-      try { const stat = await vscode.workspace.fs.stat(vscode.Uri.parse(entry.uri)); return { mtime: stat.mtime, ctime: stat.ctime }; }
-      catch { return undefined; }
-    });
+    const statTimes = async (entry: SortableEntry) => {
+      // 代次已變：不讀 stat、不回填備忘錄，呼叫端會丢棄整個結果（S4R7-D83）。
+      if (this._isStale(generation)) {
+        return undefined;
+      }
+      return this._statCache.get(entry.uri, async () => {
+        try { const stat = await vscode.workspace.fs.stat(vscode.Uri.parse(entry.uri)); return { mtime: stat.mtime, ctime: stat.ctime }; }
+        catch { return undefined; }
+      });
+    };
     if (sort.key === 'name') {
       const folders = entries.filter(entry => entry.node.isDirectory);
       const files = entries.filter(entry => !entry.node.isDirectory);
@@ -508,7 +608,8 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     parentRelative: string,
     settings: ViewPreset
   ): Promise<boolean> {
-    const entries = await readDirectorySafe(uri);
+    // D79：快照只允許用在此處（chevron「有無子項」提示）；實際顯示列一律走 allowSnapshot=false。
+    const entries = await this._readEntries(uri, true);
     return entries.some(([name, type]) => {
       const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
       if (type & vscode.FileType.Directory) {
@@ -522,8 +623,14 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   }
 
   dispose(): void {
+    this._disposed = true;
+    // 作廢所有在途列舉的副作用，並停止本 provider 的後續事件（S4R7-D83）。
+    this._generation += 1;
     this._storeListener.dispose();
     this._onDidChangeTreeData.dispose();
+    if (this._ownsDirectoryCache) {
+      this._directoryCache.dispose();
+    }
   }
 }
 
