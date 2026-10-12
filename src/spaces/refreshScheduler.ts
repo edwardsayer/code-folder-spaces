@@ -46,6 +46,8 @@ export function createRefreshScheduler(options: RefreshSchedulerOptions): Refres
   const startupAt = options.startupAt ?? clock();
 
   let timer: unknown;
+  /** 終態旗標：dispose 後 schedule 為無效操作（審查 F7）。 */
+  let disposed = false;
   /** 窗口內本批次硬截止（首個事件 + startupMaxWaitMs）；持續事件不 reset，fire 後清除。 */
   let deadlineAt: number | undefined;
 
@@ -57,6 +59,9 @@ export function createRefreshScheduler(options: RefreshSchedulerOptions): Refres
 
   return {
     schedule(): void {
+      if (disposed) {
+        return;
+      }
       const now = clock();
       let dueAt: number;
       if (startupWindowMs !== undefined && now - startupAt < startupWindowMs) {
@@ -76,6 +81,7 @@ export function createRefreshScheduler(options: RefreshSchedulerOptions): Refres
       timer = setTimer(fire, Math.max(0, dueAt - now));
     },
     dispose(): void {
+      disposed = true;
       if (timer !== undefined) {
         clearTimer(timer);
         timer = undefined;

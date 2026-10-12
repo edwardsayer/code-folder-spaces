@@ -278,12 +278,40 @@ suite('F-44 目錄快取與 refresh 一致性', () => {
     }
   });
 
+  test('setScope（refresh）不清除快照提示（審查 F1 回歸）', async () => {
+    const root = tree({ 'a.md': 'a', 'dir-x': null });
+    const rootUri = vscode.Uri.file(root);
+    const dirXUri = vscode.Uri.joinPath(rootUri, 'dir-x');
+    const harness = createCacheHarness();
+    const fixture = await createPaneFixture(root, harness.cache);
+    try {
+      await rootOf(fixture.provider);
+      harness.cache.loadSnapshot({
+        version: 1,
+        entries: [{ uri: dirXUri.toString(), time: Date.now(), children: [['hinted.txt', 1]] }],
+      });
+      // 模擬 activate 序列：setScope 觸發 refresh；refresh 只失效 memory、保留提示層（D83 修訂）。
+      await fixture.setRoot(root);
+      // 擋住所有來源讀取：只有提示存活才可能同步回傳；若有缺陷（提示被清）會讀來源而阻塞逾時。
+      harness.armGate();
+      harness.reads.length = 0;
+      const hinted = await harness.cache.read(dirXUri.toString(), true);
+      assert.deepEqual(hinted, [['hinted.txt', 1]], 'setScope 後提示層必須仍在');
+    } finally {
+      harness.releaseGate();
+      fixture.dispose();
+      harness.dispose();
+    }
+  });
+
   test('filterMessage 只由當代列舉寫入；併發交錯與 refresh 後計數仍正確', async () => {
     const root = tree({ 'alpha.md': 'a', 'beta.md': 'b', 'note.txt': 'c' });
     const harness = createCacheHarness();
     const fixture = await createPaneFixture(root, harness.cache);
     try {
       const rootNode = await rootOf(fixture.provider);
+      const messages: string[] = [];
+      const messageListener = fixture.provider.onDidChangeFilterMessage(message => messages.push(message));
       await fixture.state.setFilter('pane1', 'alpha');
       harness.armGate();
 
@@ -303,7 +331,8 @@ suite('F-44 目錄快取與 refresh 一致性', () => {
 
       await fixture.state.setFilter('pane1', 'nothing-matches');
       fixture.provider.refresh();
-      assert.equal(fixture.provider.filterMessage, '', 'refresh 應立即清空上一代的計數');
+      // 審查 F2：refresh 不清橫幅，保留上一代計數直到新列舉完成（並以事件即時更新）。
+      assert.equal(fixture.provider.filterMessage, '1 / 3 matches', 'refresh 後保留上一代計數');
       assert.deepEqual(await fixture.provider.getChildren(rootNode) as SpaceNode[], []);
       assert.equal(fixture.provider.filterMessage, '0 / 3 matches');
 
@@ -311,6 +340,8 @@ suite('F-44 目錄快取與 refresh 一致性', () => {
       fixture.provider.refresh();
       assert.equal((await fixture.provider.getChildren(rootNode) as SpaceNode[]).length, 3);
       assert.equal(fixture.provider.filterMessage, '');
+      messageListener.dispose();
+      assert.deepEqual(messages, ['1 / 3 matches', '0 / 3 matches', ''], 'onDidChangeFilterMessage 需依序反映每次列舉結果');
     } finally {
       harness.releaseGate();
       fixture.dispose();

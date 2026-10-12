@@ -96,18 +96,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     onDidStore: () => scheduleSnapshotWrite(),
   });
   // 啟動先載入快照（僅提示用途）再建立 pane（D79：不引入舊的可操作檔案列）。
-  directoryCache.loadSnapshot(context.workspaceState.get(DIRECTORY_SNAPSHOT_KEY));
+  const loadedSnapshot = context.workspaceState.get(DIRECTORY_SNAPSHOT_KEY);
+  const loadedSnapshotEntries = (loadedSnapshot && typeof loadedSnapshot === 'object' && Array.isArray((loadedSnapshot as { entries?: unknown[] }).entries))
+    ? (loadedSnapshot as { entries: unknown[] }).entries.length
+    : 0;
+  directoryCache.loadSnapshot(loadedSnapshot);
 
   let snapshotTimer: ReturnType<typeof setTimeout> | undefined;
   let lastSnapshotJson = '';
+  let lastSnapshotHadEntries = loadedSnapshotEntries > 0;
   const writeSnapshot = (): void => {
     // exportSnapshot 內建 1MiB 上限（D81）；內容未變不重複寫入；失敗只記錄、不拋出。
     const snapshot = directoryCache.exportSnapshot();
+    const entries = Array.isArray((snapshot as { entries?: unknown[] }).entries) ? (snapshot as { entries: unknown[] }).entries : [];
+    if (entries.length === 0 && lastSnapshotHadEntries) {
+      // 審查 F4：不以空集合覆寫既有非空提示（提示會在使用時背景 revalidate，D79）。
+      return;
+    }
     const json = JSON.stringify(snapshot);
     if (json === lastSnapshotJson) {
       return;
     }
     lastSnapshotJson = json;
+    lastSnapshotHadEntries = entries.length > 0;
     void context.workspaceState.update(DIRECTORY_SNAPSHOT_KEY, snapshot)
       .then(undefined, error => log.error(`Failed to persist directory snapshot: ${String(error)}`));
   };
@@ -229,6 +240,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         if (!runtime.staleRoot) treeView.message = provider.filterMessage;
         // D81：樹活動後排定快照寫入——展開／重繪觸發的列舉完成後，持久化最新快照（800ms debounce）。
         scheduleSnapshotWrite();
+      }),
+      // 審查 F2：列舉完成後即時更新過濾橫幅（fire 時機在列舉前，僅靠 onDidChangeTreeData 會讀到舊值）。
+      provider.onDidChangeFilterMessage(() => {
+        if (!runtime.staleRoot) treeView.message = provider.filterMessage;
       }),
     );
     // active-file follow 沿用既有行為：只跟 pane1（可見性條件需要 pane1 的 TreeView）。

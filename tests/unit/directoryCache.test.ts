@@ -537,3 +537,38 @@ describe('DirectoryCache onDidStore（S4R7-D81 持久化觸發）', () => {
     expect(h.stored).toEqual([dir]);
   });
 });
+
+describe('DirectoryCache 失效粒度與快照上限（審查 F1/F3）', () => {
+  it('invalidateMemory 保留快照提示；invalidate 才清（F1）', async () => {
+    const h = createHarness();
+    const first = h.cache.read(dir);
+    h.gates[0].resolve([['a', 1]]);
+    await first;
+    h.cache.invalidateMemory(); // provider refresh 路徑：memory/pending 清、提示保留
+    const hinted = await h.cache.read(dir, true);
+    expect(hinted).toEqual([['a', 1]]);
+    h.gates[1].resolve([['a', 1]]); // 背景 revalidate
+    await h.cache.whenSettled();
+
+    h.cache.invalidate(); // 全量失效（FS 事件路徑）：提示也不在
+    const before = h.gates.length;
+    const fresh = h.cache.read(dir, true);
+    expect(h.gates.length).toBe(before + 1); // 無 hint → 直接走來源
+    h.gates[before].resolve([['b', 2]]);
+    await fresh;
+    expect(await h.cache.read(dir, true)).toEqual([['b', 2]]); // 記憶體命中，不再新增 gate
+    expect(h.gates.length).toBe(before + 1);
+  });
+
+  it('快照層受 maxDirectories 上限約束（F3）', async () => {
+    const h = createHarness({ limits: { maxDirectories: 2 } });
+    const uris = ['file:///ws/1', 'file:///ws/2', 'file:///ws/3'];
+    for (let index = 0; index < uris.length; index += 1) {
+      const pending = h.cache.read(uris[index]);
+      h.gates[index].resolve([['x', 1]]);
+      await pending;
+    }
+    const exported = h.cache.exportSnapshot() as { entries: unknown[] };
+    expect(exported.entries.length).toBe(2);
+  });
+});

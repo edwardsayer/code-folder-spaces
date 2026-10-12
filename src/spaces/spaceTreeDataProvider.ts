@@ -158,6 +158,9 @@ interface PaneTreeState {
 export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<SpaceNode | undefined | void>();
   readonly onDidChangeTreeData: vscode.Event<SpaceNode | undefined | void> = this._onDidChangeTreeData.event;
+  /** 過濾橫幅文字變更（審查 F2：列舉完成後即時更新 treeView.message）。 */
+  private readonly _onDidChangeFilterMessage = new vscode.EventEmitter<string>();
+  readonly onDidChangeFilterMessage: vscode.Event<string> = this._onDidChangeFilterMessage.event;
 
   private readonly _storeListener: vscode.Disposable;
   private _scope?: PaneProviderScope;
@@ -208,11 +211,12 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     if (this._disposed) {
       return;
     }
-    // 手動 Refresh／寫入後 refresh／換根都不得保留舊列舉結果（S4R7-D83）。
-    this._directoryCache.invalidate();
+    // 手動 Refresh／寫入後 refresh／換根都不得保留已驗證的記憶體結果；
+    // 只失效 memory/pending、保留快照提示（提示僅影響 chevron 且會背景 revalidate，審查 F1）。
+    this._directoryCache.invalidateMemory();
     this._statCache.clear();
     this._nestingRulesCache = undefined;
-    this.filterMessage = '';
+    // filterMessage 不在此清空：橫幅保留上一代計數，直到新列舉完成以事件更新（審查 F2）。
     this._onDidChangeTreeData.fire();
   }
 
@@ -572,9 +576,12 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
 
   private _applyFilter(nodes: SpaceEntryNode[], rootPath: string, filter: string, generation: number): SpaceEntryNode[] {
     const filtered = filter ? nodes.filter(node => matchesPathFilter(path.relative(rootPath, node.uri.fsPath).replace(/\\/g, '/'), filter)) : nodes;
-    // `filterMessage` 是跨列舉共享的可變欄位：只有代次仍相符的列舉能寫入（S4R7-D83）。
-    if (!this._isStale(generation)) {
-      this.filterMessage = filter ? vscode.l10n.t('{0} / {1} matches', filtered.length, nodes.length) : '';
+    const message = filter ? vscode.l10n.t('{0} / {1} matches', filtered.length, nodes.length) : '';
+    // `filterMessage` 是跨列舉共享的可變欄位：只有代次仍相符的列舉能寫入（S4R7-D83），
+    // 並在內容變更時通知外層即時更新 treeView.message（審查 F2）。
+    if (!this._isStale(generation) && message !== this.filterMessage) {
+      this.filterMessage = message;
+      this._onDidChangeFilterMessage.fire(message);
     }
     return filtered;
   }
@@ -628,6 +635,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     this._generation += 1;
     this._storeListener.dispose();
     this._onDidChangeTreeData.dispose();
+    this._onDidChangeFilterMessage.dispose();
     if (this._ownsDirectoryCache) {
       this._directoryCache.dispose();
     }

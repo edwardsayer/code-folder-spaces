@@ -135,17 +135,16 @@ describe('createRefreshScheduler（S4R7-D85 啟動事件合併）', () => {
     expect(fires).toEqual([3300]);
   });
 
-  it('未觸發的排程可 dispose 清除，之後 schedule 仍可正常運作', () => {
+  it('dispose 為終態：清除未觸發排程，之後 schedule 為無效操作（審查 F7）', () => {
     const { timers, fires, scheduler } = createHarness({ startupWindowMs: 0 });
     scheduler.schedule();
     expect(scheduler.pending).toBe(true);
     scheduler.dispose();
     expect(scheduler.pending).toBe(false);
+    scheduler.schedule();
+    expect(scheduler.pending).toBe(false);
     timers.advance(1000);
     expect(fires).toEqual([]);
-    scheduler.schedule();
-    timers.advance(200);
-    expect(fires).toEqual([1200]);
   });
 
   it('startupMaxWaitMs 未設定時以 debounceMs 作為批次上限', () => {

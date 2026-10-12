@@ -193,10 +193,22 @@ export class DirectoryCache {
     return copyEntries(await this.fetch(uri));
   }
 
-  /** 全量失效：增代次並清空記憶體、pending 與快照（S4R7-D83）。 */
-  invalidate(): void {
+  /**
+   * 失效記憶體與 pending（保留快照提示層）。
+   * 供 provider refresh 使用：重繪／換根／設定變更只須放棄已驗證的記憶體結果；
+   * 快照提示僅影響 chevron 且每次使用都會背景 revalidate（D79），FS 事件才須清（D83 修訂，審查 F1/F6）。
+   */
+  invalidateMemory(): void {
     this.generation += 1;
-    this.clearStores();
+    this.memory = new Map();
+    this.memoryTotalEntries = 0;
+    this.pending = new Map();
+  }
+
+  /** 全量失效：記憶體、pending 與快照提示（FS 事件／更名等 D83 路徑）。 */
+  invalidate(): void {
+    this.invalidateMemory();
+    this.snapshots = new Map();
   }
 
   /**
@@ -333,7 +345,7 @@ export class DirectoryCache {
     return record.promise;
   }
 
-  /** 成功讀取的唯一記憶化入口：超限目錄不存；file: URI 才進快照層。 */
+  /** 成功讀取的唯一記憶化入口：超限目錄不存；file: URI 才進快照層（審查 F3：快照層同受目錄數上限約束）。 */
   private remember(uri: string, entries: DirectoryEntry[]): void {
     if (entries.length > this.limits.maxEntriesPerDirectory) {
       return;
@@ -341,6 +353,12 @@ export class DirectoryCache {
     this.setMemory(uri, entries);
     if (isFileSchemeUri(uri)) {
       this.snapshots.set(uri, { time: this.clock(), entries });
+      // 快照層採插入序 FIFO 上限（同 maxDirectories）：超出時丟最舊提示。
+      while (this.snapshots.size > this.limits.maxDirectories) {
+        const oldest = this.snapshots.keys().next();
+        if (oldest.done) break;
+        this.snapshots.delete(oldest.value);
+      }
     }
     // 僅在成功驗證後通知持久化層（失敗路徑不會到達這裡，S4R7-D81）。
     this.onDidStore?.(uri);
