@@ -13,6 +13,7 @@ import {
   createTempTree,
   fixtureWorkspace,
   removeTempTree,
+  seedPane,
   withPaneCascade,
   withPaneProviders,
 } from './helpers';
@@ -364,5 +365,29 @@ suite('S4R6 命令接線（結構型節點驅動；審查 F-02／F-11）', () =>
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
     await vscode.commands.executeCommand('codeFolderSpaces.pane.remove', 'pane1');
     assert.ok((await api()).getPanes().some((pane) => pane.id === 'pane1'), 'pane1 不可被關閉');
+  });
+
+  test('PD-I6 成環操作被拒絕：反向／自我鏈結拋出且狀態不變（S4 DoD 補驗）', async () => {
+    // 獨立於 unit 測試的 store 層取證：真實 PaneStateStore（整合層）拒絕建立環，
+    // 且被拒後既有鏈結不受污染；forward 重新指派仍可設定。
+    const { state } = createPaneStateHarness();
+    const rootA = path.join(fixtureWorkspace, 'spaces/alpha');
+    const rootB = path.join(fixtureWorkspace, 'spaces/beta');
+    const rootC = path.join(fixtureWorkspace, 'spaces/alpha/nested/deeper');
+    await seedPane(state, 'pane1', { root: rootA });
+    await seedPane(state, 'pane2', { root: rootB, parentPaneId: 'pane1', follow: true });
+    await seedPane(state, 'pane3', { root: rootC, parentPaneId: 'pane2', follow: true });
+
+    // 反向鏈結：pane1 指向 pane3 會形成 pane1→pane2→pane3→pane1 環 → 拒絕。
+    await assert.rejects(() => state.setPaneParent('pane1', 'pane3', true), /acyclic/);
+    assert.equal(state.get('pane1').parentPaneId, null, '被拒後 pane1 不得有父');
+
+    // 自我鏈結 → 拒絕且 pane2 原鏈結不變。
+    await assert.rejects(() => state.setPaneParent('pane2', 'pane2', true), /acyclic/);
+    assert.equal(state.get('pane2').parentPaneId, 'pane1', '被拒後 pane2 鏈結不變');
+
+    // forward（pane3 改指 pane1，跳過 pane2）不構成環 → 接受。
+    await state.setPaneParent('pane3', 'pane1', true);
+    assert.equal(state.get('pane3').parentPaneId, 'pane1');
   });
 });
