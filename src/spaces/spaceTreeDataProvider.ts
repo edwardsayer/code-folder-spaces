@@ -9,12 +9,13 @@ import { isVisibleDirectory, isVisibleFile } from './spaceConfig';
 import { assignNestedChildren, parseNestingPatterns } from './fileNesting';
 import type { FileNestingRule } from './fileNesting';
 import { buildFlatListing } from './flatListing';
-import { VIEW_PRESETS } from './viewPresets';
-import type { ViewPreset, ViewPresetName } from './viewPresets';
+import { VIEW_PRESETS, type ViewPreset, type ViewSettings } from './viewPresets';
+
+const DEFAULT_VIEW: ViewSettings = VIEW_PRESETS.Explorer;
 import { matchesPathFilter, sortEntries, StatCache } from './sortEntries';
 import type { SortableEntry } from './sortEntries';
 import type { SpaceStore } from './spaceStore';
-import type { PaneState, PaneStateStore } from './viewState';
+import { effectiveView, rootForUri, type PaneState, type PaneStateStore } from './viewState';
 
 export type SpaceNode = SpaceRootNode | SpaceEntryNode;
 
@@ -67,9 +68,10 @@ export class SpaceRootNode extends vscode.TreeItem {
 
   constructor(
     readonly definition: SpaceDefinition,
-    readonly paneId: string
+    readonly paneId: string,
+    expanded = false
   ) {
-    super(definition.name, vscode.TreeItemCollapsibleState.Collapsed);
+    super(definition.name, expanded ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
     this.rootPath = definition.basePath;
     // The pane id keeps ids unique when two panes show the same root (PD-I2).
     this.id = `codeFolderSpaces.${paneId}:root:${definition.basePath}`;
@@ -86,7 +88,20 @@ export class SpaceRootNode extends vscode.TreeItem {
 }
 
 /** Directory or file row inside a pane. */
+/** flat Contents「.」群組（pane root 直屬檔案）的 contextValue：不匹配任何資料夾選單／快捷鍵。 */
+export const FLAT_ROOT_GROUP_CONTEXT = 'codeFolderSpaces.flatRootGroup';
+
+let leafFolderIcon: { light: vscode.Uri; dark: vscode.Uri } | undefined;
+/** 由 activate() 注入端點資料夾圖示（light／dark SVG）。 */
+export function setLeafFolderIcon(extensionUri: vscode.Uri): void {
+  leafFolderIcon = {
+    light: vscode.Uri.joinPath(extensionUri, 'resources', 'folder-leaf-light.svg'),
+    dark: vscode.Uri.joinPath(extensionUri, 'resources', 'folder-leaf-dark.svg'),
+  };
+}
+
 export class SpaceEntryNode extends vscode.TreeItem {
+  readonly parent: SpaceRootNode | SpaceEntryNode | undefined;
   /**
    * F-42 nested child rows (file nesting only; empty when nesting is inactive).
    * Collapsible parents get `ThemeIcon('file')` per D56 because a collapsible
@@ -100,12 +115,16 @@ export class SpaceEntryNode extends vscode.TreeItem {
   /** Owning pane root, inherited through the parent chain to the root row. */
   readonly rootPath: string;
 
+  /** S4.1R6 OP-10：flat「全部」模式的資料夾群組列，記錄其直屬檔案的相對路徑（供過濾比對）。 */
+  flatFileRelPaths?: string[];
+
   constructor(
     readonly uri: vscode.Uri,
     readonly isDirectory: boolean,
     readonly space: SpaceDefinition,
-    readonly parent: SpaceRootNode | SpaceEntryNode,
-    hasChildren = false
+    parent: SpaceRootNode | SpaceEntryNode,
+    hasChildren = false,
+    hideRootParent = false
   ) {
     super(
       path.basename(uri.fsPath),
@@ -115,10 +134,13 @@ export class SpaceEntryNode extends vscode.TreeItem {
           : vscode.TreeItemCollapsibleState.None
         : vscode.TreeItemCollapsibleState.None
     );
+    this.parent = hideRootParent && parent instanceof SpaceRootNode ? undefined : parent;
     this.paneId = parent.paneId;
     this.rootPath = parent.rootPath;
     this.id = `${isDirectory ? 'codeFolderSpaces.dir' : 'codeFolderSpaces.file'}:${this.paneId}:${uri.fsPath}`;
     this.resourceUri = uri;
+    // OP-11：無子項的資料夾（端點）以小圓角矩形圖示標示（對照 Obsidian is-terminal-folder）；有子項者沿用原生 twisty＋主題圖示。
+    if (isDirectory && !hasChildren && leafFolderIcon) this.iconPath = leafFolderIcon;
     this.contextValue = isDirectory ? 'codeFolderSpaces.folder' : 'codeFolderSpaces.file';
     this.tooltip = uri.fsPath;
     if (!isDirectory) {
@@ -138,14 +160,15 @@ export class SpaceEntryNode extends vscode.TreeItem {
  */
 export interface PaneProviderScope {
   paneId: string;
-  definition: SpaceDefinition;
+  definitions: SpaceDefinition[];
 }
 
 interface PaneTreeState {
-  preset: ViewPresetName;
+  view: ViewSettings;
   filter: string;
   sort: { key: 'name' | 'mtime' | 'ctime'; direction: 'asc' | 'desc' };
   drillStack: readonly unknown[];
+  drillRoot: string | null;
 }
 
 /**
@@ -206,6 +229,22 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     return this._scope;
   }
 
+  private _definitions(): SpaceDefinition[] {
+    const definitions = this._scope?.definitions ?? [];
+    const drillRoot = this._paneState()?.drillRoot;
+    if (!drillRoot) return definitions;
+    const root = rootForUri(definitions.map(definition => definition.basePath), drillRoot);
+    const definition = definitions.find(item => root !== null && samePath(item.basePath, root));
+    return definition ? [{ ...definition, basePath: drillRoot }] : [];
+  }
+
+  private rootForPath(fsPath: string): SpaceDefinition | undefined {
+    const definitions = this._definitions();
+    if (definitions.length === 1) return definitions[0];
+    const root = rootForUri(definitions.map(definition => definition.basePath), fsPath);
+    return definitions.find(definition => root !== null && samePath(definition.basePath, root));
+  }
+
   refresh(): void {
     this._generation += 1;
     if (this._disposed) {
@@ -240,7 +279,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   private _paneState(): PaneTreeState | undefined {
     if (!this._viewState || !this._scope) return undefined;
     const state: PaneState = this._viewState.get(this._scope.paneId);
-    return { preset: state.preset, filter: state.filter, sort: state.sort, drillStack: state.drillStack };
+    return { view: effectiveView(state), filter: state.filter, sort: state.sort, drillStack: state.drillStack, drillRoot: state.drillRoot };
   }
 
   /**
@@ -257,6 +296,9 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     }
   }
 
+  /** S4.1R2：為 true 時 root 列預設展開（follow 的子 pane 換根後即可看到第一層內容）。 */
+  expandRoot = false;
+
   /** True when a refresh／root switch／dispose happened while an enumeration was awaited. */
   private _isStale(generation: number): boolean {
     return generation !== this._generation;
@@ -264,7 +306,10 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
 
   async getChildren(element?: SpaceNode): Promise<SpaceNode[]> {
     if (!element) {
-      return this._scope ? [new SpaceRootNode(this._scope.definition, this._scope.paneId)] : [];
+      const definitions = this._definitions();
+      if (definitions.length === 0) return [];
+      if (definitions.length === 1) return this._listChildren(new SpaceRootNode(definitions[0], this._scope!.paneId, this.expandRoot));
+      return definitions.map(definition => new SpaceRootNode(definition, this._scope!.paneId, this.expandRoot));
     }
     return this._listChildren(element);
   }
@@ -281,16 +326,17 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       return undefined;
     }
     const normalized = path.normalize(fsPath);
-    const definition = scope.definition;
+    const definition = this.rootForPath(normalized);
+    if (!definition) return undefined;
     const activeRoot = definition.basePath;
     if (!isInsideOrEqual(activeRoot, normalized)) {
       return undefined;
     }
     const viewState = this._paneState();
     if (samePath(activeRoot, normalized)) {
-      return new SpaceRootNode(definition, scope.paneId);
+      return this._definitions().length === 1 ? undefined : new SpaceRootNode(definition, scope.paneId, this.expandRoot);
     }
-    const settings = VIEW_PRESETS[viewState?.preset ?? 'Explorer'];
+    const settings = (viewState?.view ?? DEFAULT_VIEW);
     const segments = path
       .relative(activeRoot, normalized)
       .split(/[\\/]+/)
@@ -298,7 +344,10 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     if (settings.level !== 'all' && segments.length > settings.level) {
       return undefined;
     }
-    let current: SpaceRootNode | SpaceEntryNode = new SpaceRootNode(definition, scope.paneId);
+    if (settings.mode === 'flat') {
+      return this._findFlatNode(definition, scope.paneId, normalized, segments, settings.content, viewState?.filter ?? '');
+    }
+    let current: SpaceRootNode | SpaceEntryNode = new SpaceRootNode(definition, scope.paneId, this.expandRoot);
     let relativePath = '';
     for (const [index, segment] of segments.entries()) {
       const parentRelative = relativePath;
@@ -327,9 +376,54 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
           return nestingNode;
         }
       }
-      current = new SpaceEntryNode(uri, isDirectory, definition, current, isDirectory);
+      current = new SpaceEntryNode(uri, isDirectory, definition, current, isDirectory, this._definitions().length === 1 && current instanceof SpaceRootNode);
     }
     return current;
+  }
+
+  /** S4.1R6：flat 模式的 reveal 節點——Files／Folders 為單層清單（父＝root）；All 為「資料夾群組＞檔案」兩層。 */
+  private async _findFlatNode(
+    definition: SpaceDefinition,
+    paneId: string,
+    target: string,
+    segments: string[],
+    content: 'all' | 'folders' | 'files',
+    filter: string
+  ): Promise<SpaceNode | undefined> {
+    const stat = await statSafe(vscode.Uri.file(target));
+    if (!stat) return undefined;
+    const isDirectory = (stat.type & vscode.FileType.Directory) !== 0;
+    // 沿途資料夾須可見；最終段落依型別檢查。
+    let relativePath = '';
+    for (const [index, segment] of segments.entries()) {
+      relativePath = relativePath ? `${relativePath}/${segment}` : segment;
+      const last = index === segments.length - 1;
+      if (last && !isDirectory) {
+        if (!definition.showFiles || !isVisibleFile(segment, relativePath, definition.include, definition.exclude)) return undefined;
+      } else if (!isVisibleDirectory(segment, relativePath, definition.exclude)) {
+        return undefined;
+      }
+    }
+    if (content === 'files' && isDirectory) return undefined;
+    if (content === 'folders' && !isDirectory) return undefined;
+    const root = new SpaceRootNode(definition, paneId, this.expandRoot);
+    if (content !== 'all') {
+      if (filter && !matchesPathFilter(relativePath, filter)) return undefined;
+      return new SpaceEntryNode(vscode.Uri.file(target), isDirectory, definition, root, false, this._definitions().length === 1);
+    }
+    const groupUri = isDirectory ? vscode.Uri.file(target) : vscode.Uri.file(path.dirname(target));
+    const group = new SpaceEntryNode(groupUri, true, definition, root, true, this._definitions().length === 1);
+    const groupRelative = path.relative(definition.basePath, groupUri.fsPath).split(path.sep).join('/') || '.';
+    if (isDirectory) {
+      // 目錄目標也須符合群組保留條件（資料夾路徑符合；直屬檔案是否符合需讀取，故只檢查路徑或無過濾）。
+      if (filter && !matchesPathFilter(groupRelative, filter)) {
+        const hasMatchingFile = (await vscode.workspace.fs.readDirectory(groupUri)).some(([name, type]) => (type & vscode.FileType.File) !== 0 && matchesPathFilter(groupRelative === '.' ? name : `${groupRelative}/${name}`, filter));
+        if (!hasMatchingFile) return undefined;
+      }
+      return group;
+    }
+    if (filter && !matchesPathFilter(relativePath, filter) && !matchesPathFilter(path.relative(definition.basePath, groupUri.fsPath).split(path.sep).join('/') || '.', filter)) return undefined;
+    return new SpaceEntryNode(vscode.Uri.file(target), false, definition, group, false);
   }
 
   /**
@@ -378,7 +472,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       if (!parentUri) {
         return undefined;
       }
-      const parentNode = new SpaceEntryNode(parentUri, false, space, cursorNode);
+      const parentNode = new SpaceEntryNode(parentUri, false, space, cursorNode, false, this._definitions().length === 1);
       if (fabricated.length > 0) {
         fabricated[fabricated.length - 1].nestedChildren.push(parentNode);
       }
@@ -447,13 +541,23 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     }
     const space = element instanceof SpaceRootNode ? element.definition : element.space;
     const viewState = this._paneState();
-    const settings = VIEW_PRESETS[viewState?.preset ?? 'Explorer'];
+    const settings = (viewState?.view ?? DEFAULT_VIEW);
     if (element instanceof SpaceRootNode && settings.mode === 'flat') {
       const flat = await this._listFlat(space, element, settings.content, settings.level);
       if (this._isStale(generation)) {
         return [];
       }
+      if (settings.content === 'all') {
+        // 群組保留條件：資料夾路徑或其任一直屬檔案符合過濾。
+        const filter = viewState?.filter ?? '';
+        return this._applyFilter(flat, element.rootPath, filter, generation, node =>
+          matchesPathFilter(path.relative(element.rootPath, node.uri.fsPath).replace(/\\/g, '/') || '.', filter)
+          || (node.flatFileRelPaths ?? []).some(file => matchesPathFilter(file, filter)));
+      }
       return this._applyFilter(flat, element.rootPath, viewState?.filter ?? '', generation);
+    }
+    if (settings.mode === 'flat' && element instanceof SpaceEntryNode && element.isDirectory) {
+      return this._listFlatGroupFiles(space, element, viewState?.filter ?? '', generation);
     }
     if (settings.content === 'files' && element instanceof SpaceEntryNode && element.isDirectory) return [];
     if (settings.content === 'folders' && element instanceof SpaceEntryNode && !element.isDirectory) return [];
@@ -487,7 +591,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const directoryNodes = await mapWithConcurrency(directories, DIRECTORY_CHILD_CHECK_CONCURRENCY, async (directory) => {
       const atLevelLimit = settings.level !== 'all' && elementDepth + 1 >= settings.level;
       const hasChildren = !atLevelLimit && await this._directoryHasVisibleChildren(directory.uri, space, directory.relativePath, settings);
-      return new SpaceEntryNode(directory.uri, true, space, element, hasChildren);
+      return new SpaceEntryNode(directory.uri, true, space, element, hasChildren, this._definitions().length === 1 && element instanceof SpaceRootNode);
     });
     if (this._isStale(generation)) {
       return [];
@@ -500,7 +604,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       const byName = new Map(fileCandidates.map(file => [file.name, file]));
       const buildSubtree = async (name: string, parentNode: SpaceRootNode | SpaceEntryNode, ancestors: ReadonlySet<string>): Promise<SpaceEntryNode> => {
         const candidate = byName.get(name)!;
-        const node = new SpaceEntryNode(candidate.uri, false, space, parentNode);
+        const node = new SpaceEntryNode(candidate.uri, false, space, parentNode, false, this._definitions().length === 1 && parentNode instanceof SpaceRootNode);
         const childNames = (assignment.childrenOf.get(name) ?? []).filter(child => child !== name && !ancestors.has(child) && byName.has(child));
         if (childNames.length > 0) {
           const nextAncestors = new Set(ancestors);
@@ -520,7 +624,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         files.push(await buildSubtree(candidate.name, element, new Set()));
       }
     } else {
-      files = fileCandidates.map(candidate => new SpaceEntryNode(candidate.uri, false, space, element));
+      files = fileCandidates.map(candidate => new SpaceEntryNode(candidate.uri, false, space, element, false, this._definitions().length === 1 && element instanceof SpaceRootNode));
     }
     const candidates = [...directoryNodes, ...files];
     const sorted = await this._sortNodes(candidates, generation);
@@ -561,21 +665,81 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     if (this._isStale(generation)) {
       return [];
     }
+    const relativeOf = (uri: vscode.Uri): string => path.relative(root.rootPath, uri.fsPath).replace(/\\/g, '/');
+
+    if (content === 'all') {
+      // OP-10：第一層＝資料夾群組（標籤為自 pane root 起的相對路徑；root 直屬檔案歸入「.」群組），
+      // 第二層＝該資料夾的直屬檔案（僅檔名）。群組是否可展開取決於是否有直屬檔案。
+      const filesByDir = new Map<string, string[]>();
+      for (const { value: uri, isDirectory } of listing) {
+        if (isDirectory) continue;
+        const dir = path.dirname(uri.fsPath);
+        const list = filesByDir.get(dir) ?? [];
+        list.push(relativeOf(uri));
+        filesByDir.set(dir, list);
+      }
+      const groups: SpaceEntryNode[] = [];
+      const makeGroup = (uri: vscode.Uri, label: string): SpaceEntryNode => {
+        const files = filesByDir.get(uri.fsPath) ?? [];
+        const node = new SpaceEntryNode(uri, true, space, root, files.length > 0, this._definitions().length === 1);
+        node.label = label;
+        node.flatFileRelPaths = files;
+        return node;
+      };
+      if (filesByDir.has(root.uri.fsPath)) {
+        // 「.」群組代表 pane root 本身：不得具資料夾 CRUD／拖放語意（見 FLAT_ROOT_GROUP_CONTEXT）。
+        const rootGroup = makeGroup(root.uri, '.');
+        rootGroup.contextValue = FLAT_ROOT_GROUP_CONTEXT;
+        groups.push(rootGroup);
+      }
+      for (const { value: uri, isDirectory } of listing) {
+        if (isDirectory) groups.push(makeGroup(uri, relativeOf(uri)));
+      }
+      return this._sortNodes(groups, generation);
+    }
+
+    // Files／Folders：第一級清單，項目名稱為自 pane root 起的完整相對路徑。
+    // 在 Flat 模式下資料夾皆不可展開（點擊無子項可開合），一律顯示端點符號。
     const nodes = listing
-      .filter(({ isDirectory }) => content === 'all' ? true : content === 'folders' ? isDirectory : !isDirectory)
+      .filter(({ isDirectory }) => content === 'folders' ? isDirectory : !isDirectory)
       .map(({ value: uri, isDirectory }) => {
-        const relative = path.relative(root.rootPath, uri.fsPath).replace(/\\/g, '/');
-        const node = new SpaceEntryNode(uri, isDirectory, space, root, false);
-        node.description = relative;
-        if (isDirectory) node.iconPath = vscode.ThemeIcon.Folder;
+        const node = new SpaceEntryNode(uri, isDirectory, space, root, false, this._definitions().length === 1);
+        node.label = relativeOf(uri);
         return node;
       });
-    const sorted = await this._sortNodes(nodes, generation);
-    return content === 'all' ? sorted.sort((a, b) => path.posix.dirname(String(a.description)).localeCompare(path.posix.dirname(String(b.description)), undefined, { sensitivity: 'base' })) : sorted;
+    return this._sortNodes(nodes, generation);
   }
 
-  private _applyFilter(nodes: SpaceEntryNode[], rootPath: string, filter: string, generation: number): SpaceEntryNode[] {
-    const filtered = filter ? nodes.filter(node => matchesPathFilter(path.relative(rootPath, node.uri.fsPath).replace(/\\/g, '/'), filter)) : nodes;
+  /** flat「全部」模式：群組列展開時列出該資料夾的直屬檔案（僅檔名）。 */
+  private async _listFlatGroupFiles(
+    space: SpaceDefinition,
+    group: SpaceEntryNode,
+    filter: string,
+    generation: number
+  ): Promise<SpaceNode[]> {
+    if (!space.showFiles) return [];
+    const parentRelative = path.relative(group.rootPath, group.uri.fsPath).replace(/\\/g, '/');
+    const groupMatches = !filter || matchesPathFilter(parentRelative || '.', filter);
+    const nodes: SpaceEntryNode[] = [];
+    for (const [name, type] of await this._readEntries(group.uri, false)) {
+      if (!(type & vscode.FileType.File)) continue;
+      const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
+      if (!isVisibleFile(name, relativePath, space.include, space.exclude)) continue;
+      if (!groupMatches && !matchesPathFilter(relativePath, filter)) continue;
+      nodes.push(new SpaceEntryNode(vscode.Uri.joinPath(group.uri, name), false, space, group, false));
+    }
+    if (this._isStale(generation)) return [];
+    return this._sortNodes(nodes, generation);
+  }
+
+  private _applyFilter(
+    nodes: SpaceEntryNode[],
+    rootPath: string,
+    filter: string,
+    generation: number,
+    matcher?: (node: SpaceEntryNode) => boolean
+  ): SpaceEntryNode[] {
+    const filtered = filter ? nodes.filter(node => matcher ? matcher(node) : matchesPathFilter(path.relative(rootPath, node.uri.fsPath).replace(/\\/g, '/'), filter)) : nodes;
     const message = filter ? vscode.l10n.t('{0} / {1} matches', filtered.length, nodes.length) : '';
     // `filterMessage` 是跨列舉共享的可變欄位：只有代次仍相符的列舉能寫入（S4R7-D83），
     // 並在內容變更時通知外層即時更新 treeView.message（審查 F2）。

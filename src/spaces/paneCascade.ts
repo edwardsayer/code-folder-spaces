@@ -30,14 +30,19 @@ export interface PaneCascadeStateAdapter {
    * (S4R6-D74). Must not change `follow`; manual child root switches are
    * temporary overrides that the next parent selection replaces.
    */
-  setPaneRoot(paneId: string, root: string): Promise<void>;
+  switchRoot(paneId: string, root: string): Promise<void>;
+  /**
+   * 父 pane 目前的所有 root（S4.1R11-D6）。多 root pane 選取任一 root 內的資料夾
+   * 都必須能驅動子 pane，因此守門不可只看 `activeRoot`（審查 P1-2）。
+   */
+  getPaneRoots(paneId: string): string[];
 }
 
 export interface PaneCascadeOptions {
   state: PaneCascadeStateAdapter;
   getRuntime(id: string): PaneCascadeRuntime | undefined;
   /** S4R6-D67: the boundary is the pane's own root, not a configured space. */
-  isAllowedRoot(paneRoot: string, candidate: string): boolean;
+  isAllowedRoot(paneRoots: readonly string[], candidate: string): boolean;
   stat(uri: vscode.Uri): Promise<vscode.FileStat>;
   directoryType: vscode.FileType;
   onError?(error: unknown): void;
@@ -49,6 +54,8 @@ interface ParentSnapshot {
   runtime: PaneCascadeRuntime;
   paneId: string;
   root: string | null;
+  /** S4.1R11-D6：父 pane 的全部 root，供守門判定（審查 P1-2）。 */
+  roots: readonly string[];
 }
 
 interface PaneTask {
@@ -103,6 +110,7 @@ export class PaneCascadeController implements vscode.Disposable {
       runtime: parent,
       paneId,
       root: parent.scope.root,
+      roots: this.options.state.getPaneRoots(paneId),
     };
     const links = this.options.state.getPaneLinks();
     if (!getFollowingChildPaneIds(links, paneId).length) return;
@@ -155,9 +163,10 @@ export class PaneCascadeController implements vscode.Disposable {
   ): Promise<void> {
     const selectedUri = selection?.uri;
     if (!selectedUri || !selection?.isDirectory || !this.isCurrent(paneId, task, generation, parentSnapshot)) return;
-    // D61/D67：防禦性守門——選取項必須位於父 pane 自己的 root 內；
+    // D61/D67：防禦性守門——選取項必須位於父 pane **任一** root 內（S4.1R11-D6）；
     // 不再要求位於子 pane 的舊 root 內，讓子 pane 可被帶到父 root 內任何資料夾。
-    if (!parentSnapshot.root || !this.options.isAllowedRoot(parentSnapshot.root, selectedUri.fsPath)) return;
+    const parentRoots = parentSnapshot.roots.length ? parentSnapshot.roots : (parentSnapshot.root ? [parentSnapshot.root] : []);
+    if (!parentRoots.length || !this.options.isAllowedRoot(parentRoots, selectedUri.fsPath)) return;
     let stat: vscode.FileStat;
     try { stat = await this.options.stat(selectedUri); } catch { return; }
     if (!this.isCurrent(paneId, task, generation, parentSnapshot) || !isPaneRootDirectory(stat.type, this.options.directoryType)) return;
@@ -172,7 +181,7 @@ export class PaneCascadeController implements vscode.Disposable {
         const links = this.options.state.getPaneLinks();
         const childLink = links[childId];
         if (!childLink || childLink.parentPaneId !== paneId || !childLink.follow) return;
-        await this.options.state.setPaneRoot(childId, selectedUri.fsPath);
+        await this.options.state.switchRoot(childId, selectedUri.fsPath);
         if (!this.isCurrent(paneId, task, generation, parentSnapshot)) return;
         const current = this.options.getRuntime(childId);
         if (!current?.scope) return;

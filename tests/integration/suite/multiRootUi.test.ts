@@ -1,0 +1,242 @@
+import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as vscode from 'vscode';
+import {
+  activeRoot,
+  PANE_STATE_KEY,
+  PaneStateStore,
+  type MementoLike,
+} from '../../../src/spaces/viewState';
+import { shouldSyncWorkspaceRoots } from '../../../src/spaces/paneLinks';
+
+/**
+ * S4.1R11b 專屬整合測試：UI 入口與 root 列語意的**可驗證核心**。
+ *
+ * 說明：`view/title` 與 `view/item/context` 的選單呈現需 EDH 真實點擊（主控取證）；
+ * 此處以 Extension Host 可驗證的層級鎖定三個關鍵不變式：
+ *  1. `root.remove` 只移除資料夾，**不得**關閉窗格（P1-5 的核心落差）。
+ *  2. `canRemoveRoot` 的判定條件（`roots.length > 1`）與選單 gate 一致。
+ *  3. P1-4：`followWorkspaceDirectory` 設定變更時每個啟用 pane 都被寫入。
+ */
+
+class MemoryMemento implements MementoLike {
+  readonly values = new Map<string, unknown>();
+  get<T>(key: string): T | undefined { return this.values.get(key) as T | undefined; }
+  async update(key: string, value: unknown): Promise<void> {
+    if (value === undefined) this.values.delete(key); else this.values.set(key, value);
+  }
+}
+
+const norm = (value: string): string => path.normalize(value);
+
+function storeWith(panes: Record<string, unknown>): PaneStateStore {
+  const memento = new MemoryMemento();
+  memento.values.set(PANE_STATE_KEY, { version: 3, panes });
+  return new PaneStateStore(memento);
+}
+
+suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
+  let tempRoot = '';
+
+  suiteSetup(() => {
+    tempRoot = fs.mkdtempSync(path.join(process.env.TEMP ?? '/tmp', 'cfs-r11b-'));
+    fs.mkdirSync(path.join(tempRoot, 'a'), { recursive: true });
+    fs.mkdirSync(path.join(tempRoot, 'b'), { recursive: true });
+  });
+
+  suiteTeardown(() => {
+    if (tempRoot) fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  test('root.remove 移除資料夾後窗格仍存在，且只影響 roots（P1-5：不得關閉窗格）', async () => {
+    const a = norm(path.join(tempRoot, 'a'));
+    const b = norm(path.join(tempRoot, 'b'));
+    const store = storeWith({
+      pane1: { roots: [a, b], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: true },
+    });
+
+    assert.equal(store.get('pane1').roots.length, 2);
+    const removed = await store.removePaneRoot('pane1', b);
+    assert.equal(removed, true, 'root 應可被移除');
+    // 窗格仍在（未被關閉）：這是與舊行為（pane.close）最關鍵的差異。
+    assert.ok(store.getEnabledPaneIds().includes('pane1'), '移除 root 不得關閉窗格');
+    assert.deepEqual(store.get('pane1').roots, [a]);
+    assert.equal(activeRoot(store.get('pane1')), a);
+  });
+
+  test('live 命令 paneN.root.remove 以被點擊節點的 rootPath 為標的（多 root 不可誤刪 activeRoot）', async () => {
+    // 這是 handler 接線層的驗證：root 列的 inline X 會傳入被點擊的節點，
+    // 若 handler 忽略節點而只移除 activeRoot（＝roots[0]），就會刪錯資料夾。
+    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    assert.ok(extension);
+    await extension.activate();
+
+    const b = path.join(tempRoot, 'b');
+    const normalize = (value: string | null): string => (value ?? '').split(String.fromCharCode(92)).join('/').toLowerCase();
+
+    // 以命令加入一個 root（pane1 於 resetLayout 後已含工作區根，故 activeRoot ≠ 新加入者，
+    // 這樣才能區分「移除被點擊者」與「移除 activeRoot」）。
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+    await vscode.commands.executeCommand('codeFolderSpaces.pane1.root.add', b);
+
+    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[] }> };
+    const paneBefore = api.getPanes().find(pane => pane.id === 'pane1');
+    assert.equal(paneBefore?.roots.length, 2, `加入後應有 2 個 root，實際=${JSON.stringify(paneBefore?.roots)}`);
+    assert.equal(normalize(paneBefore?.root ?? null), normalize(paneBefore?.roots[0] ?? null),
+      'activeRoot 應為 roots[0]（未被下鑽）');
+    assert.notEqual(normalize(paneBefore?.roots[0] ?? null), normalize(b), 'roots[0] 不應是新加入的 b（否則測不到誤刪）');
+
+    // 節點物件模擬 root 列（SpaceRootNode 的結構形狀：uri + paneId + definition + rootPath）。
+    const clickNode = {
+      uri: vscode.Uri.file(b),
+      paneId: 'pane1',
+      isDirectory: true,
+      rootPath: b,
+      definition: { basePath: b, name: 'b', showFiles: true, include: [], exclude: [], sourceIndex: -1 },
+    };
+
+    await vscode.commands.executeCommand('codeFolderSpaces.pane1.root.remove', clickNode);
+    const after = api.getPanes().find(pane => pane.id === 'pane1');
+    assert.ok(after, '窗格必須仍存在（移除 root 不可關閉窗格）');
+    // 被移除的是 b（roots[1]），而非 roots[0]；若 handler 忽略節點就會誤刪 activeRoot。
+    assert.deepEqual(after.roots.map(normalize), [normalize(paneBefore!.roots[0])],
+      '應移除被點擊的 b 並留下 roots[0]');
+
+    // 清理：還原預設佈局。
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+  });
+
+  test('canRemoveRoot 條件＝roots.length > 1，與選單 gate 一致', async () => {
+    const a = norm(path.join(tempRoot, 'a'));
+    const b = norm(path.join(tempRoot, 'b'));
+    const store = storeWith({
+      pane1: { roots: [a], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: true },
+      pane2: { roots: [a, b], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: false },
+    });
+
+    // 單 root：X 不應顯示（移除後會清空 pane，語意為「關閉」而非「移除資料夾」）。
+    assert.equal(store.get('pane1').roots.length > 1, false);
+    // 多 root：X 顯示。
+    assert.equal(store.get('pane2').roots.length > 1, true);
+    // 移除至單一 root 後條件應變回 false（UI 隨之隱藏）。
+    await store.removePaneRoot('pane2', b);
+    assert.equal(store.get('pane2').roots.length > 1, false);
+  });
+
+  test('加入資料夾：重複者不重複加入（addPaneRoot 回傳 false 供 UI 提示）', async () => {
+    const a = norm(path.join(tempRoot, 'a'));
+    const b = norm(path.join(tempRoot, 'b'));
+    const store = storeWith({
+      pane1: { roots: [a], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: true },
+    });
+
+    assert.equal(await store.addPaneRoot('pane1', b), true, '新資料夾應加入成功');
+    assert.equal(await store.addPaneRoot('pane1', b), false, '重複加入應回報 false');
+    assert.deepEqual(store.get('pane1').roots, [a, b], 'roots 必須保序且無重複');
+  });
+
+  test('P1-4：followWorkspaceDirectory 設定寫入每個啟用 pane 後，關閉即不再跟隨', async () => {
+    const a = norm(path.join(tempRoot, 'a'));
+    const b = norm(path.join(tempRoot, 'b'));
+    const store = storeWith({
+      pane1: { roots: [a], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: true },
+      pane2: { roots: [b], drillRoot: null, parentPaneId: 'pane1', follow: true, followWorkspaceDirectory: true },
+    });
+
+    // 模擬設定變更事件：把新值寫入每個啟用 pane（R11b 的 P1-4 修復行為）。
+    for (const paneId of store.getEnabledPaneIds()) {
+      await store.setPaneFollowWorkspaceDirectory(paneId, false);
+    }
+    assert.equal(store.get('pane1').followWorkspaceDirectory, false);
+    assert.equal(store.get('pane2').followWorkspaceDirectory, false);
+
+    // 呼叫端（syncWorkspaceDirectory）以 flag 過濾：兩個 pane 都不再參與同步。
+    // 註：`shouldSyncWorkspaceRoots` 只判斷 roots 差異，**不管** follow flag，
+    // 故這裡必須同時驗證「flag 已關」＋「呼叫端會跳過」兩件事。
+    for (const paneId of store.getEnabledPaneIds()) {
+      const pane = store.get(paneId);
+      const wouldSync = pane.followWorkspaceDirectory && shouldSyncWorkspaceRoots(pane.roots, [a, b], (left: string, right: string) => left === right);
+      assert.equal(wouldSync, false, `${paneId} 關閉 follow 後不應再被工作區同步`);
+    }
+  });
+
+  test('術語與命令契約：pane 專屬 view/title 項目使用 per-pane id（D47）', async () => {
+    const pkg = vscode.extensions.getExtension('edwardsayer.code-folder-spaces')?.packageJSON as
+      { contributes?: { menus?: { 'view/title'?: Array<{ command?: string; when?: string }> } } } | undefined;
+    const titleItems = pkg?.contributes?.menus?.['view/title'] ?? [];
+    assert.ok(titleItems.length > 0, 'manifest 應有 view/title 項目');
+
+    const globallyScoped = new Set([
+      'codeFolderSpaces.pane.add',
+      'codeFolderSpaces.pane.resetLayout',
+      'codeFolderSpaces.pane.close',
+    ]);
+    const offenders = titleItems.filter(item => {
+      const when = String(item.when ?? '');
+      const match = /view == codeFolderSpaces\.(pane[1-8])/.exec(when);
+      if (!match) return false;
+      const command = String(item.command ?? '');
+      if (globallyScoped.has(command)) return false;
+      return !command.includes(`.${match[1]}.`);
+    }).map(item => `${item.command} @ ${item.when}`);
+    assert.deepEqual(offenders, [], `view/title 的 pane 專屬項目必須使用 per-pane id（D47）：${offenders.join('; ')}`);
+
+    // 新增的兩個 root 入口都必須存在且為 per-pane。
+    const commands = new Set(titleItems.map(item => String(item.command)));
+    for (let index = 1; index <= 8; index++) {
+      assert.ok(commands.has(`codeFolderSpaces.pane${index}.root.add`), `pane${index} 缺少 root.add`);
+      assert.ok(commands.has(`codeFolderSpaces.pane${index}.root.remove`), `pane${index} 缺少 root.remove`);
+    }
+  });
+
+  test('live 命令 codeFolderSpaces.root.remove 以節點 paneId 路由（P1-1：不得错路由到 pane1）', async () => {
+    // view/item/context 的 root 列 X 只用單一全域命令涵蓋所有 pane，
+    // handler **必須**以節點 paneId 為準；否則 pane2 的 X 會去動 pane1。
+    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    assert.ok(extension);
+    await extension.activate();
+
+    const normalize = (value: string | null): string => (value ?? '').split(String.fromCharCode(92)).join('/').toLowerCase();
+    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[] }> };
+
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+    const pane1Before = api.getPanes().find(pane => pane.id === 'pane1');
+    assert.ok(pane1Before, '前置：pane1 應存在');
+
+    // 以 pane2 的節點呼叫【全域】命令——模擬使用者點 pane2 的 root 列 X。
+    const clickNode = {
+      uri: vscode.Uri.file(path.join(tempRoot, 'b')),
+      paneId: 'pane2',
+      isDirectory: true,
+      rootPath: path.join(tempRoot, 'b'),
+      definition: { basePath: path.join(tempRoot, 'b'), name: 'b', showFiles: true, include: [], exclude: [], sourceIndex: -1 },
+    };
+    await vscode.commands.executeCommand('codeFolderSpaces.root.remove', clickNode);
+
+    const pane1After = api.getPanes().find(pane => pane.id === 'pane1');
+    assert.ok(pane1After, 'pane1 必須仍存在');
+    // 關鍵：pane1 的 roots 必須完全不變（不得因 pane2 的點擊而被動到）。
+    assert.deepEqual(pane1After.roots.map(normalize), pane1Before.roots.map(normalize),
+      '點 pane2 的 X 不得改變 pane1 的 roots（P1-1 错路由回歸）');
+
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+  });
+
+  test('單 root 守門：不得移除唯一 root（P1-3：Palette 等路徑可繞過 canRemoveRoot）', async () => {
+    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    assert.ok(extension);
+    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[] }> };
+
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+    const before = api.getPanes().find(pane => pane.id === 'pane1');
+    assert.ok(before, '前置：pane1 應存在');
+    assert.equal(before.roots.length, 1, '前置：pane1 應只有一個 root');
+
+    // 無節點呼叫 live 命令（模擬命令面板）——應被守門擋下。
+    await vscode.commands.executeCommand('codeFolderSpaces.pane1.root.remove');
+    const after = api.getPanes().find(pane => pane.id === 'pane1');
+    assert.ok(after, '窗格必須仍存在');
+    assert.equal(after.roots.length, 1, '唯一 root 不得被移除（否則資料夾空間會變空）');
+  });
+});

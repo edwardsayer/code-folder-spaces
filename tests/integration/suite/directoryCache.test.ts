@@ -7,7 +7,7 @@ import { DirectoryCache, defaultDirectoryCacheLimits } from '../../../src/spaces
 import type { DirectoryEntry } from '../../../src/spaces/directoryCache';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import type { PaneProviderScope, SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
-import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
+import { SpaceRootNode, SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { PaneStateStore } from '../../../src/spaces/viewState';
 import { clearGlobalSettings, createPaneStateHarness, paneScopeFor, seedPane } from './helpers';
 
@@ -109,7 +109,7 @@ async function createPaneFixture(root: string, cache: DirectoryCache | undefined
     state,
     provider,
     setRoot: async (nextRoot: string) => {
-      await state.setPaneRoot('pane1', nextRoot);
+      await state.switchRoot('pane1', nextRoot);
       provider.setScope(scopeFor());
     },
     dispose: () => {
@@ -119,11 +119,11 @@ async function createPaneFixture(root: string, cache: DirectoryCache | undefined
   };
 }
 
-/** 根節點（每個 pane 只有一個）。 */
+/** 取得未渲染的根 scope，供測試內部呼叫根列舉分支。 */
 async function rootOf(provider: SpaceTreeDataProvider): Promise<SpaceNode> {
-  const roots = await provider.getChildren();
-  assert.equal(roots.length, 1, 'pane 必須只有一個根列');
-  return roots[0];
+  const definition = provider.scope?.definitions[0];
+  assert.ok(definition, 'pane 必須有一個根定義');
+  return new SpaceRootNode(definition, provider.scope!.paneId);
 }
 
 function labels(nodes: readonly SpaceNode[]): string[] {

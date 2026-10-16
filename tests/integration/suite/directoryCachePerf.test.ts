@@ -8,7 +8,7 @@ import type { DirectoryEntry } from '../../../src/spaces/directoryCache';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
-import { clearGlobalSettings, createPaneStateHarness, paneScopeFor, seedPane } from './helpers';
+import { clearGlobalSettings, createPaneStateHarness, paneRootNode, paneScopeFor, seedPane } from './helpers';
 
 // F-44 S4R7 量測（契約 D79–D85）：以注入的計數 cache 量測
 // ① 冷啟動首次根列舉 ② TTL 內重複列舉（記憶體命中）③ invalidate 後新鮮列舉
@@ -71,7 +71,7 @@ suite('F-44 快取量測（S4R7）', () => {
       const scope = paneScopeFor(store, viewState, 'pane1');
       assert.ok(scope, 'pane1 必須有 root');
       provider = new SpaceTreeDataProvider(store, viewState, scope, harness.cache);
-      const root = (await provider.getChildren())[0] as SpaceNode;
+      const root = paneRootNode(provider);
 
       // ① 基準（無快取層）：直接以 workspace.fs 讀 root ＋逐子目錄子項探測（等價無快取展開的 I/O 面）。
       const baselineSamples: number[] = [];

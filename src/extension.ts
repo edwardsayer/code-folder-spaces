@@ -1,19 +1,20 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import type { SpaceDefinition } from './types';
-import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider } from './spaces/spaceTreeDataProvider';
+import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider, setLeafFolderIcon } from './spaces/spaceTreeDataProvider';
 import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
-import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, isViewPresetName } from './spaces/viewPresets';
-import { classifySpaceRename, normalizeSpaceKey, PaneStateStore, resolvePaneDefinition } from './spaces/viewState';
-import { canClosePane, isPaneRootDirectory, nextChildPaneId } from './spaces/paneLinks';
+import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, resolveConfiguredDefaultChildPreset, resolveConfiguredCascadeParentPreset, type ViewAxisChange, type ViewContent, type ViewLevel, type ViewMode } from './spaces/viewPresets';
+import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
+import { canClosePane, isPaneRootDirectory, nextChildPaneId, shouldSyncWorkspaceRoots } from './spaces/paneLinks';
 import { PaneCascadeController } from './spaces/paneCascade';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
-import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack, validateSpaceName } from './spaces/spaceActions';
+import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
+import { selectedQuickPickId, stableQuickPickItems } from './ui/stableQuickPick';
 
 const MAX_PANE_INDEX = 8;
 const REFRESH_DEBOUNCE_MS = 200;
@@ -32,7 +33,7 @@ export interface FolderSpacesApi {
   readonly version: string;
   getSpaces(): Array<{ name: string; basePath: string }>;
   /** 目前啟用的窗格（S4R6 新增，供自動化驗證命令接線）：id／root／父窗格／follow／預設集。 */
-  getPanes(): Array<{ id: string; root: string | null; parentPaneId: string | null; follow: boolean; preset: string }>;
+  getPanes(): Array<{ id: string; root: string | null; roots: string[]; parentPaneId: string | null; follow: boolean; preset: string }>;
 }
 
 /** Runtime of one enabled pane: provider + TreeView + cascade scope (paneId-keyed, S4R6). */
@@ -58,16 +59,20 @@ function paneIndexOf(paneId: string): number {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<FolderSpacesApi> {
+  setLeafFolderIcon(context.extensionUri);
   const log = getLogChannel();
   log.info('Activating Folder Spaces');
 
   const store = new SpaceStore();
-  const viewState = new PaneStateStore(context.workspaceState);
+  const viewState = new PaneStateStore(context.globalState);
+  // OP-15：升級至 Global/Profile 級別儲存；若 globalState 尚無資料，嘗試自 workspaceState 平滑轉移
+  await viewState.migrateFromWorkspaceStateIfEmpty(context.workspaceState);
   const settings = () => vscode.workspace.getConfiguration('codeFolderSpaces');
   const paneInitContext = () => ({
     spaces: store.getDefinitions(),
     showFilesDefault: settings().get<boolean>('view.showFiles', true),
     configuredCount: settings().get<number>('panes.count', 2),
+    followWorkspaceDirectoryDefault: settings().get<boolean>('followWorkspaceDirectory', true),
   });
   const layout = await viewState.initialize(paneInitContext());
   if (layout.kind === 'rebuilt') {
@@ -131,6 +136,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       writeSnapshot();
     }, SNAPSHOT_WRITE_DEBOUNCE_MS);
   };
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      void syncWorkspaceDirectory();
+    })
+  );
   context.subscriptions.push(new vscode.Disposable(() => {
     // deactivate 無法 await：debounce 尚未觸發時同步排定最後一次寫入（接受丟失 800ms 內變動的取捨，快照僅提示）。
     // 與 cache.dispose 合併為單一註冊：無論 subscriptions 處置順序，寫入必在 dispose 前（dispose 會清空 stores，造成匯出空快照覆寫好資料）。
@@ -148,19 +158,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     state: {
       getPaneLinks: () => viewState.getPaneLinks(),
       // D74：父 pane 每次選取不同資料夾時寫入子 root（手動值自然被取代），不關閉 follow。
-      setPaneRoot: async (paneId, root) => {
-        await viewState.setPaneRoot(paneId, root);
+      switchRoot: async (paneId, root) => {
+        await viewState.switchRoot(paneId, root);
         applyPaneScope(paneId);
         rebuildWatchers();
         await syncPaneContexts();
       },
+      // S4.1R11-D6：守門以父 pane 的**全部** root 判定（審查 P1-2），
+      // 否則多 root pane 選取 roots[1..N] 內的資料夾時 follow 不會連動。
+      getPaneRoots: (paneId: string) => viewState.get(paneId).roots,
     },
     getRuntime: paneId => paneRuntime.get(paneId),
     // D67：選取項必須位於父 pane 自己的 root 之內（防禦性；不再要求位於子 pane 舊 root 內）。
-    isAllowedRoot: (paneRoot, candidate) => isAllowedSpaceRoot(paneRoot, candidate),
+    isAllowedRoot: (paneRoots, candidate) => paneRoots.some(paneRoot => isAllowedSpaceRoot(paneRoot, candidate)),
     stat: async uri => await vscode.workspace.fs.stat(uri),
     directoryType: vscode.FileType.Directory,
-    onError: error => { void vscode.window.showErrorMessage(vscode.l10n.t('Invalid pane link: {0}', String(error))); },
+    onError: error => { void vscode.window.showErrorMessage(vscode.l10n.t('Invalid folder space link: {0}', String(error))); },
   });
   context.subscriptions.push(cascadeController);
 
@@ -200,42 +213,69 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   // --- pane runtimes ------------------------------------------------------
 
-  const paneDefinitionFor = (paneId: string): SpaceDefinition | null => resolvePaneDefinition(viewState.get(paneId), store.getDefinitions());
+  const paneDefinitionsFor = (paneId: string): SpaceDefinition[] => resolvePaneDefinitions(viewState.get(paneId), store.getDefinitions());
+  const paneDefinitionFor = (paneId: string): SpaceDefinition | null => paneDefinitionsFor(paneId)[0] ?? null;
 
   const applyPaneScope = (paneId: string): void => {
     const runtime = paneRuntime.get(paneId);
     if (!runtime) return;
     const pane = viewState.get(paneId);
-    const definition = paneDefinitionFor(paneId);
-    runtime.scope = pane.root ? { paneId, root: pane.root } : undefined;
-    runtime.provider.setScope(definition ? { paneId, definition } : undefined);
-    const rootName = pane.root ? path.basename(pane.root) : '';
-    runtime.treeView.title = paneRuntime.size === 1 && rootName ? rootName : `Folder Spaces ${paneIndexOf(paneId)}`;
-    runtime.treeView.description = pane.root ?? '';
+    const definitions = paneDefinitionsFor(paneId);
+    const root = activeRoot(pane);
+    runtime.scope = root ? { paneId, root } : undefined;
+    runtime.provider.expandRoot = Boolean(pane.parentPaneId);
+    runtime.provider.setScope(definitions.length > 0 ? { paneId, definitions } : undefined);
+    // S4.1：pane 標題一律為「Folder Space <n>」（根路徑由 description 顯示）。
+    runtime.treeView.title = vscode.l10n.t('Folder Space {0}', paneIndexOf(paneId));
+    runtime.treeView.description = definitions.length === 1
+      ? root ?? paneDefinitionFor(paneId)?.basePath ?? definitions[0].basePath
+      : definitions.length > 1 ? vscode.l10n.t('{0} folders', definitions.length) : '';
   };
 
   const createPaneDragAndDrop = (paneId: string) => createTreeDragAndDropController(paneId, {
     // 拖放內部／外部判斷以目前所有 pane 的 root 為界（D67/D68：pane 即獨立空間）。
-    getDefinitions: () => [...paneRuntime.values()].flatMap(runtime => runtime.provider.scope ? [runtime.provider.scope.definition] : []),
+    getDefinitions: () => [...paneRuntime.values()].flatMap(runtime => runtime.provider.scope?.definitions ?? []),
     undoStack,
     requireTrust: () => requireTrust(),
     clearDrillStateForMovedSources: sources => clearDrillStateForMovedSources(sources),
-    onChanged: () => { for (const runtime of paneRuntime.values()) runtime.provider.refresh(); rebuildWatchers(); },
+    onChanged: () => { for (const runtime of paneRuntime.values()) runtime.provider.refresh(); rebuildWatchers(); void syncContext(); },
     onError: error => operationError(error),
   });
+
+  // S4.1R4：標題列「收合全部／展開」切換——樹無 expandAll API，「展開」＝展開目前層級一層（expandLevelForPane）。
+  const collapsedPanes = new Set<string>();
+  // S4.1R5（OP-8）：記錄各 pane 已展開節點 id，供「Expand level」判斷下一個尚未展開的層級（逐次加深）。
+  const expandedIds = new Map<string, Set<string>>();
+  const expandedSet = (paneId: string): Set<string> => {
+    let set = expandedIds.get(paneId);
+    if (!set) { set = new Set(); expandedIds.set(paneId, set); }
+    return set;
+  };
+  const setCollapsedContext = async (paneId: string): Promise<void> => {
+    await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${paneId}.collapsed`, collapsedPanes.has(paneId));
+  };
 
   const createPane = (paneId: string): PaneRuntime => {
     // 第 4 參注入共享 cache（W2 凍結的簽名：store, viewState, scope?, directoryCache?）；注入時 provider 不 dispose 它。
     const provider = new SpaceTreeDataProvider(store, viewState, undefined, directoryCache);
     const treeView = vscode.window.createTreeView(`codeFolderSpaces.${paneId}`, {
       treeDataProvider: provider,
-      showCollapseAll: true,
+      showCollapseAll: false, // S4.1R4：改用自訂「收合全部／展開」切換按鈕（paneN.collapseAll／expandAll）
       dragAndDropController: createPaneDragAndDrop(paneId),
     });
     const runtime: PaneRuntime = { id: paneId, provider, treeView, disposables: [] };
     runtime.disposables.push(
       provider,
       treeView,
+      treeView.onDidExpandElement(event => {
+        const id = (event.element as vscode.TreeItem).id;
+        if (id) expandedSet(paneId).add(id);
+        if (collapsedPanes.delete(paneId)) void setCollapsedContext(paneId);
+      }),
+      treeView.onDidCollapseElement(event => {
+        const id = (event.element as vscode.TreeItem).id;
+        if (id) expandedSet(paneId).delete(id);
+      }),
       provider.onDidChangeTreeData(() => {
         if (!runtime.staleRoot) treeView.message = provider.filterMessage;
         // D81：樹活動後排定快照寫入——展開／重繪觸發的列舉完成後，持久化最新快照（800ms debounce）。
@@ -246,8 +286,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         if (!runtime.staleRoot) treeView.message = provider.filterMessage;
       }),
     );
-    // active-file follow 沿用既有行為：只跟 pane1（可見性條件需要 pane1 的 TreeView）。
-    if (paneId === 'pane1') runtime.disposables.push(treeView.onDidChangeVisibility(scheduleFollow));
+    // active-file follow 跟「主 pane」（最低編號啟用窗格，S4.1R3-D：pane1 可關閉）；每個 pane 的可見性變化都重新排程。
+    runtime.disposables.push(treeView.onDidChangeVisibility(scheduleFollow));
     context.subscriptions.push(new vscode.Disposable(() => { for (const disposable of runtime.disposables) disposable.dispose(); }));
     paneRuntime.set(paneId, runtime);
     return runtime;
@@ -260,6 +300,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (!runtime) return;
     for (const disposable of runtime.disposables.reverse()) disposable.dispose();
     paneRuntime.delete(paneId);
+    // 插槽可能被重用：清除該 pane 的收合狀態與 context key，避免新 pane 顯示舊狀態。
+    collapsedPanes.delete(paneId);
+    expandedIds.delete(paneId);
+    void setCollapsedContext(paneId);
   };
 
   const attachPaneCascade = (runtime: PaneRuntime): void => {
@@ -269,6 +313,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       listener(info ? { uri: info.uri, isDirectory: info.isDirectory } : undefined);
     }));
     cascadeDisposables.set(runtime.id, disposable);
+  };
+
+
+  /**
+   * OP-15：Follow Workspace Directory。
+   * 當開啟新專案或切換工作區時，若啟用此設定，主窗格（primary pane，通常為 pane1）
+   * 的根目錄自動同步對齊目前工作區的第一個資料夾。
+   */
+    const syncWorkspaceDirectory = async (): Promise<void> => {
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    const roots = folders.map(folder => folder.uri.fsPath);
+    for (const paneId of viewState.getEnabledPaneIds()) {
+      const pane = viewState.get(paneId);
+      if (!pane.followWorkspaceDirectory) continue;
+      if (!shouldSyncWorkspaceRoots(pane.roots, roots, isSamePath)) continue;
+      await viewState.setPaneRoots(paneId, roots);
+      await paneChanged(paneId);
+    }
   };
 
   const syncPaneViews = (): void => {
@@ -284,6 +346,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     rebuildWatchers();
   };
 
+
+  /**
+   * OP-13：接龍自適應父面板模式（對齊 Obsidian handleAdaptiveCascadeParent）。
+   * 檢查所有啟用的 pane：若有連動中的子 pane，父面板切換為 cascadeParentPreset；
+   * 若無連動子 pane，父面板無損還原備份的獨立檢視。
+   */
+  const reconcileAdaptiveParents = async (): Promise<void> => {
+    const adaptiveEnabled = settings().get<boolean>('adaptiveCascadeParent', true);
+    const parentPreset = resolveConfiguredCascadeParentPreset(settings().get<string>('cascadeParentPreset'));
+    const links = viewState.getPaneLinks();
+    const enabledIds = viewState.getEnabledPaneIds();
+
+    for (const paneId of enabledIds) {
+      // 判定是否有子 pane 且其 parent 為當前 paneId 且正在 follow
+      const hasFollowingChild = enabledIds.some(childId => {
+        const link = links[childId];
+        return link && link.parentPaneId === paneId && link.follow;
+      });
+      // 當設定關閉時，hasFollowingChild 視為 false，促使父面板自動還原並清除 backup
+      const shouldBeAdaptive = adaptiveEnabled && hasFollowingChild;
+      const changed = await viewState.handleAdaptiveCascadeParent(paneId, shouldBeAdaptive, parentPreset);
+      if (changed) {
+        repaintPane(paneId);
+      }
+    }
+  };
+
   const syncPaneContexts = async (): Promise<void> => {
     const links = viewState.getPaneLinks();
     const enabled = viewState.getEnabledPaneIds();
@@ -291,13 +380,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const id = `pane${index}`;
       const pane = links[id];
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.enabled`, Boolean(pane));
-      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasRoot`, Boolean(pane?.root));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasRoot`, Boolean(pane && viewState.get(id).roots.length > 0));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.canRemoveRoot`, Boolean(pane && viewState.get(id).roots.length > 1));
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasParent`, Boolean(pane?.parentPaneId));
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.follow`, Boolean(pane?.follow));
     }
     // D65/D71：上下限只看 pane 狀態，不再看 spaces 數量。
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canAddPane', enabled.length < MAX_PANE_INDEX);
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canRemovePane', enabled.length > 1);
+    // S4.1R3：pane1 可關閉，其 `when` 改為 `!layoutReady || pane1.enabled`；啟動後才為 true，確保冷啟動時 pane1 恆可見（S4R6-D77）。
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.layoutReady', true);
+    await reconcileAdaptiveParents();
   };
 
   const reconcilePaneRoots = async (): Promise<void> => {
@@ -319,7 +412,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
           runtime.provider.refresh();
         }
       } catch {
-        runtime.treeView.message = vscode.l10n.t('Pane root is stale: {0}. Select a folder in its parent pane or reset the layout.', root);
+        runtime.treeView.message = vscode.l10n.t('Folder space folder is stale: {0}. Select a folder in its parent folder space or reset the layout.', root);
         if (runtime.staleRoot !== root) void vscode.window.showWarningMessage(runtime.treeView.message);
         runtime.staleRoot = root;
       }
@@ -327,6 +420,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 
   const paneChanged = async (paneId: string): Promise<void> => {
+    expandedIds.delete(paneId); // 換根／重繪後節點展開狀態不再可靠，重新由「Expand level」逐層建立。
     applyPaneScope(paneId);
     rebuildWatchers();
     await syncPaneContexts();
@@ -355,8 +449,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const rebuildWatchers = (): void => {
     const desired = new Map<string, string>();
     for (const runtime of paneRuntime.values()) {
-      const root = runtime.scope?.root;
-      if (root) desired.set(normalizeSpaceKey(root), root);
+      for (const definition of runtime.provider.scope?.definitions ?? []) {
+        const root = definition.basePath;
+        desired.set(normalizeSpaceKey(root), root);
+      }
     }
     for (const [key, watcher] of watchers) {
       if (!desired.has(key)) {
@@ -382,7 +478,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   let followTimer: ReturnType<typeof setTimeout> | undefined;
   let followGeneration = 0;
-  const pane1 = (): PaneRuntime | undefined => paneRuntime.get('pane1');
+  // S4.1R3：pane1 可關閉，原本寫死 pane1 的全域命令／follow 改以「主 pane」（最低編號啟用窗格）為標的。
+  const primaryPaneId = (): string => viewState.getEnabledPaneIds()[0] ?? 'pane1';
+  const pane1 = (): PaneRuntime | undefined => paneRuntime.get(primaryPaneId());
 
   /**
    * D84：reveal 前等待已開始的列舉收斂。whenSettled 內部已吸收 rejection，理論不 reject；
@@ -399,7 +497,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const followActiveFile = async (generation: number, uri: vscode.Uri | undefined): Promise<void> => {
     const runtime = pane1();
     const canFollow = (): boolean => shouldFollowActiveFile({
-      enabled: settings().get<boolean>('followActiveFile', false),
+      enabled: settings().get<boolean>('followActiveFile', true),
       generation,
       currentGeneration: followGeneration,
       visible: runtime?.treeView.visible ?? false,
@@ -420,7 +518,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const scheduleFollow = (): void => {
     followGeneration++;
     if (followTimer) clearTimeout(followTimer);
-    if (!settings().get<boolean>('followActiveFile', false)) return;
+    if (!settings().get<boolean>('followActiveFile', true)) return;
     const generation = followGeneration;
     followTimer = setTimeout(() => {
       followTimer = undefined;
@@ -429,8 +527,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
   const followConfiguration = vscode.workspace.onDidChangeConfiguration(event => {
     if (event.affectsConfiguration('codeFolderSpaces.followActiveFile')) {
-      void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', settings().get<boolean>('followActiveFile', false));
+      void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', settings().get<boolean>('followActiveFile', true));
       scheduleFollow();
+    }
+    if (event.affectsConfiguration('codeFolderSpaces.followWorkspaceDirectory')) {
+      void (async () => {
+        const enabled = settings().get<boolean>('followWorkspaceDirectory', true);
+        for (const paneId of viewState.getEnabledPaneIds()) {
+          await viewState.setPaneFollowWorkspaceDirectory(paneId, enabled);
+        }
+        await syncWorkspaceDirectory();
+      })();
+    }
+    if (event.affectsConfiguration('codeFolderSpaces.adaptiveCascadeParent') || event.affectsConfiguration('codeFolderSpaces.cascadeParentPreset')) {
+      void reconcileAdaptiveParents();
     }
   });
   context.subscriptions.push(
@@ -440,7 +550,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.window.onDidChangeVisibleTextEditors(scheduleFollow),
     new vscode.Disposable(() => { if (followTimer) clearTimeout(followTimer); followGeneration++; })
   );
-  void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', settings().get<boolean>('followActiveFile', false));
+  void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', settings().get<boolean>('followActiveFile', true));
 
   // --- refresh debounce（S4R7-D85：啟動窗口內有上限合併，純邏輯在 refreshScheduler.ts） ---
 
@@ -462,16 +572,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const scheduleRefresh = (): void => refreshScheduler.schedule();
   context.subscriptions.push(new vscode.Disposable(() => refreshScheduler.dispose()));
 
-  // --- context keys（pane1 的 view/title 按鈕狀態） -------------------------
+  // --- context keys（各 pane 的 title bar 按鈕狀態；pane1 另保留舊全域 key 供外部相容） ---
 
   const syncContext = async (): Promise<void> => {
     const definitions = store.getDefinitions();
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasSpaces', definitions.length > 0);
-    const pane = viewState.get('pane1');
+    const pane = viewState.get(primaryPaneId());
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasFilter', Boolean(pane.filter));
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canDrillUp', pane.drillStack.length > 0);
-    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.preset', pane.preset);
-    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', VIEW_PRESETS[pane.preset]?.mode ?? 'tree');
+    const paneView = effectiveView(pane);
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.preset', matchPresetName(paneView) ?? 'Custom');
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', paneView.mode);
+    // S4.1：每個 pane 自己的 title bar 按鈕狀態（行內按鈕一致、不再只服務 pane1）。
+    const enabledIds = new Set(viewState.getEnabledPaneIds());
+    for (let index = 1; index <= MAX_PANE_INDEX; index++) {
+      const id = `pane${index}`;
+      const state = enabledIds.has(id) ? viewState.get(id) : undefined;
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasFilter`, Boolean(state?.filter));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.canDrillUp`, Boolean(state && state.drillStack.length > 0));
+      // 子選單的勾選狀態（toggled condition）。
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.preset`, state ? (matchPresetName(effectiveView(state)) ?? 'Custom') : '');
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.mode`, state ? effectiveView(state).mode : '');
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.level`, state ? String(effectiveView(state).level) : '');
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.content`, state ? effectiveView(state).content : '');
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.sort`, state ? `${state.sort.key}:${state.sort.direction}` : '');
+    }
   };
 
   // --- file operations ------------------------------------------------------
@@ -485,14 +610,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const sourcePaths = sources.map(source => path.resolve(source.fsPath));
     for (const paneId of viewState.getEnabledPaneIds()) {
       const pane = viewState.get(paneId);
-      const paths = [pane.root, ...pane.drillStack.map(snapshot => snapshot.root)].filter((value): value is string => Boolean(value)).map(value => path.resolve(value));
+      const paths = [...pane.roots, ...(pane.drillRoot ? [pane.drillRoot] : []), ...pane.drillStack.map(snapshot => snapshot.root)].map(value => path.resolve(value));
       if (hasDrillStateWithinMovedSources(paths, sourcePaths)) {
         await viewState.resetRoot(paneId);
         applyPaneScope(paneId);
       }
     }
   };
-  const selectionTarget = (node?: unknown): unknown => node ?? pane1()?.treeView.selection[0];
+  // 鍵盤快捷鍵以 keybinding `args: { paneId }` 指明焦點 pane（keybinding 不帶節點；S4.1R3），其餘沿用節點或主 pane 的選取項。
+  const rootNodeForPane = (paneId: string): SpaceRootNode | undefined => {
+    const root = rootOf(paneId);
+    const definition = paneRuntime.get(paneId)?.provider.scope?.definitions.find(item => isSamePath(item.basePath, root ?? ''));
+    return root && definition ? new SpaceRootNode(definition, paneId) : undefined;
+  };
+  const selectionTarget = (node?: unknown): unknown => {
+    if (node && !nodeInfo(node) && typeof (node as { paneId?: unknown }).paneId === 'string') {
+      const paneId = (node as { paneId: string }).paneId;
+      return paneRuntime.get(paneId)?.treeView.selection[0] ?? rootNodeForPane(paneId);
+    }
+    return node ?? pane1()?.treeView.selection[0] ?? rootNodeForPane(primaryPaneId());
+  };
+  const fileActionTarget = (node?: unknown): unknown => {
+    if (nodeInfo(node)) return node;
+    if (typeof (node as { paneId?: unknown } | undefined)?.paneId === 'string') return selectionTarget(node);
+    return rootNodeForPane(targetPaneId(node));
+  };
   const pasteEntries = async (node?: unknown): Promise<void> => {
     const payload = clipboard.get();
     const target = selectionTarget(node);
@@ -531,7 +673,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (!requireTrust()) return;
     const entry = getEntry(node); if (!entry) return;
     const destination = entry.isDirectory ? entry.uri : vscode.Uri.file(path.dirname(entry.uri.fsPath));
-    const name = await vscode.window.showInputBox({ prompt: vscode.l10n.t(directory ? 'Enter folder name' : 'Enter file name') });
+    const name = await vscode.window.showInputBox({ prompt: directory ? vscode.l10n.t('Enter folder name') : vscode.l10n.t('Enter file name') });
     if (name === undefined) return;
     if (!isValidEntryName(name)) { void vscode.window.showErrorMessage(vscode.l10n.t('Enter a valid single file or folder name.')); return; }
     const target = vscode.Uri.joinPath(destination, name);
@@ -548,6 +690,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (node instanceof SpaceRootNode) return;
     if (!requireTrust()) return;
     const entry = getEntry(node); if (!entry) return;
+    // flat Contents 的「.」群組代表 pane root 本身：同樣拒絕（S4.1R6 審查 P1）。
+    if (isSamePath(entry.uri.fsPath, entry.basePath)) return;
     const name = await vscode.window.showInputBox({ prompt: vscode.l10n.t('Enter a new name'), value: path.basename(entry.uri.fsPath) });
     if (name === undefined) return;
     if (!isValidEntryName(name)) { void vscode.window.showErrorMessage(vscode.l10n.t('Enter a valid single file or folder name.')); return; }
@@ -565,6 +709,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (node instanceof SpaceRootNode) return;
     if (!requireTrust()) return;
     const entry = getEntry(node); if (!entry) return;
+    // flat Contents 的「.」群組代表 pane root 本身：同樣拒絕（S4.1R6 審查 P1）。
+    if (isSamePath(entry.uri.fsPath, entry.basePath)) return;
     const folders: Array<vscode.QuickPickItem & { uri: vscode.Uri }> = [];
     const pending = [vscode.Uri.file(entry.basePath)];
     try {
@@ -598,6 +744,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (node instanceof SpaceRootNode) return;
     if (!requireTrust()) return;
     const entry = getEntry(node); if (!entry) return;
+    // flat Contents 的「.」群組代表 pane root 本身：同樣拒絕（S4.1R6 審查 P1）。
+    if (isSamePath(entry.uri.fsPath, entry.basePath)) return;
     try {
       await vscode.workspace.fs.stat(entry.uri);
       const confirmDelete = vscode.workspace.getConfiguration('explorer').get<boolean>('confirmDelete', true);
@@ -617,20 +765,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   // --- pane-scoped view actions（供 paneN.menu 與 pane1 命令共用） ----------
 
-  const rootOf = (paneId: string): string | null => paneRuntime.get(paneId)?.scope?.root ?? viewState.get(paneId).root;
+  const rootOf = (paneId: string): string | null => activeRoot(viewState.get(paneId));
 
   const pickPaneRoot = async (): Promise<string | undefined> => {
     type RootItem = vscode.QuickPickItem & { rootPath?: string; browse?: boolean };
     const items: RootItem[] = store.getDefinitions().map(space => ({ label: space.name, description: space.basePath, rootPath: space.basePath }));
     items.push({ label: vscode.l10n.t('Browse for folder…'), browse: true });
-    const picked = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a pane root') });
+    const picked = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a folder for this folder space') });
     if (!picked) return undefined;
     if (picked.rootPath) return picked.rootPath;
     const folder = await vscode.window.showOpenDialog({
       canSelectFiles: false,
       canSelectFolders: true,
       canSelectMany: false,
-      openLabel: vscode.l10n.t('Choose a pane root'),
+      openLabel: vscode.l10n.t('Choose a folder for this folder space'),
     });
     return folder?.[0]?.fsPath;
   };
@@ -650,7 +798,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       return undefined;
     }
     items.push({ label: vscode.l10n.t('Browse for folder…'), rootPath: current });
-    const picked = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a pane root') });
+    const picked = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a folder for this folder space') });
     if (!picked) return undefined;
     if (picked.rootPath === current) return pickPaneRoot();
     let stat: vscode.FileStat | undefined;
@@ -669,7 +817,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const setPresetForPane = async (paneId: string, preset?: unknown): Promise<void> => {
     let selected = preset;
     if (!isViewPresetName(selected)) {
-      selected = await vscode.window.showQuickPick(Object.keys(VIEW_PRESETS), { placeHolder: vscode.l10n.t('Choose a view preset') });
+      const presets = stableQuickPickItems([
+        { id: 'Explorer', label: vscode.l10n.t('Explorer') },
+        { id: 'Navigate', label: vscode.l10n.t('Navigate') },
+        { id: 'Columns', label: vscode.l10n.t('Columns') },
+        { id: 'Context', label: vscode.l10n.t('Context') },
+        { id: 'Contents', label: vscode.l10n.t('Contents') },
+        { id: 'Files', label: vscode.l10n.t('Files') },
+        { id: 'List', label: vscode.l10n.t('List') },
+      ] as const);
+      selected = selectedQuickPickId(await vscode.window.showQuickPick(presets, { placeHolder: vscode.l10n.t('Choose a view preset') }));
     }
     if (!isViewPresetName(selected)) return;
     await viewState.setPreset(paneId, selected);
@@ -678,10 +835,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 
   const setSortForPane = async (paneId: string, key?: unknown, direction?: unknown): Promise<void> => {
-    const options = ['name', 'mtime', 'ctime'];
-    const selectedKey = options.includes(String(key)) ? String(key) : await vscode.window.showQuickPick(options, { placeHolder: vscode.l10n.t('Choose sort field') });
+    const fields = stableQuickPickItems([
+      { id: 'name', label: vscode.l10n.t('Name') },
+      { id: 'mtime', label: vscode.l10n.t('Modified') },
+      { id: 'ctime', label: vscode.l10n.t('Created') },
+    ] as const);
+    const selectedKey = key === 'name' || key === 'mtime' || key === 'ctime'
+      ? key
+      : selectedQuickPickId(await vscode.window.showQuickPick(fields, { placeHolder: vscode.l10n.t('Choose sort field') }));
     if (!selectedKey) return;
-    const selectedDirection = direction === 'desc' || direction === 'asc' ? direction : await vscode.window.showQuickPick(['asc', 'desc'], { placeHolder: vscode.l10n.t('Choose sort direction') });
+    const directions = stableQuickPickItems([
+      { id: 'asc', label: vscode.l10n.t('Ascending') },
+      { id: 'desc', label: vscode.l10n.t('Descending') },
+    ] as const);
+    const selectedDirection = direction === 'desc' || direction === 'asc'
+      ? direction
+      : selectedQuickPickId(await vscode.window.showQuickPick(directions, { placeHolder: vscode.l10n.t('Choose sort direction') }));
     if (selectedDirection !== 'asc' && selectedDirection !== 'desc') return;
     await viewState.setSort(paneId, selectedKey as 'name' | 'mtime' | 'ctime', selectedDirection);
     repaintPane(paneId);
@@ -704,13 +873,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 
   const toggleModeForPane = async (paneId: string): Promise<void> => {
-    const current = viewState.get(paneId).preset;
-    const currentSettings = VIEW_PRESETS[current];
-    const next = Object.entries(VIEW_PRESETS).find(([, value]) => value.mode !== currentSettings.mode && value.content === currentSettings.content && value.level === currentSettings.level)?.[0]
-      ?? (currentSettings.mode === 'tree' ? 'Contents' : DEFAULT_VIEW_PRESET);
-    await viewState.setPreset(paneId, next as keyof typeof VIEW_PRESETS);
+    // OP-14：只翻轉「模式」維度，層級與內容保持不變（組合不必落在預設集內）。
+    const mode: ViewMode = effectiveView(viewState.get(paneId)).mode === 'tree' ? 'flat' : 'tree';
+    await viewState.setViewAxis(paneId, { axis: 'mode', value: mode });
     repaintPane(paneId);
-    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', VIEW_PRESETS[next as keyof typeof VIEW_PRESETS].mode);
+    await syncContext();
   };
 
   const drillUpForPane = async (paneId: string): Promise<void> => {
@@ -723,6 +890,40 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (!chosen) return;
     await viewState.switchRoot(paneId, chosen);
     await paneChanged(paneId);
+  };
+
+  const addRootForPane = async (paneId: string, given?: string): Promise<void> => {
+    // `given`＝明確路徑（比照 `addSpace` 的 given 參數，供自動化驗證命令接線）。
+    const chosen = given ?? await browsePaneRoot(paneId);
+    if (!chosen) return;
+    if (given) {
+      try {
+        const stat = await vscode.workspace.fs.stat(vscode.Uri.file(chosen));
+        if (!(stat.type & vscode.FileType.Directory)) return;
+      } catch {
+        return;
+      }
+    }
+    if (!await viewState.addPaneRoot(paneId, chosen)) {
+      void vscode.window.showInformationMessage(vscode.l10n.t('Folder is already in this folder space.'));
+      return;
+    }
+    await paneChanged(paneId);
+    await syncPaneContexts();
+  };
+
+  const removeRootForPane = async (paneId: string, root?: string): Promise<void> => {
+    const target = root ?? rootOf(paneId) ?? undefined;
+    if (!target) return;
+    // 守門（審查 P1-3）：唯一 root 不可移除——那不叫「移除資料夾」而是清空資料夾空間，
+    // 選單已由 canRemoveRoot gate 隱藏；命令面板等路徑可繞過選單，故於此再擋一次。
+    if (viewState.get(paneId).roots.length <= 1) {
+      void vscode.window.showInformationMessage(vscode.l10n.t('A folder space needs at least one folder. Use Close Folder Space instead.'));
+      return;
+    }
+    if (!await viewState.removePaneRoot(paneId, target)) return;
+    await paneChanged(paneId);
+    await syncPaneContexts();
   };
 
   const setRootForPane = async (paneId: string): Promise<void> => {
@@ -757,26 +958,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (paneRuntime.get(paneId) !== runtime || runtime.provider.scope !== scopeBefore) return;
     const selection = runtime.treeView.selection[0];
     const info = nodeInfo(selection);
-    const parents = selection && info?.isDirectory ? [selection as SpaceRootNode | SpaceEntryNode] : await runtime.provider.getChildren();
-    for (const parent of parents) {
-      for (const child of await runtime.provider.getChildren(parent)) {
-        if (child.collapsibleState !== vscode.TreeItemCollapsibleState.None) {
-          await runtime.treeView.reveal(child, { select: false, focus: false, expand: true });
+    // OP-8：從選取的資料夾（無則 pane root）起，逐層找出「最淺且尚未展開」的資料夾並展開；
+    // 每按一次加深一層（全部已展開則 no-op）。
+    const expanded = expandedSet(paneId);
+    const isOpen = (node: vscode.TreeItem): boolean => !!node.id && expanded.has(node.id);
+    let level: Array<SpaceRootNode | SpaceEntryNode> = selection && info?.isDirectory ? [selection as SpaceRootNode | SpaceEntryNode] : await runtime.provider.getChildren();
+    for (let depth = 0; depth < 64 && level.length > 0; depth++) {
+      const toExpand = level.filter(node => node.collapsibleState !== vscode.TreeItemCollapsibleState.None && !isOpen(node));
+      if (toExpand.length > 0) {
+        for (const node of toExpand) {
+          await runtime.treeView.reveal(node, { select: false, focus: false, expand: true });
+          if (node.id) expanded.add(node.id);
         }
+        return;
       }
+      const next: Array<SpaceRootNode | SpaceEntryNode> = [];
+      for (const node of level) next.push(...await runtime.provider.getChildren(node));
+      level = next;
     }
-  };
-
-  const revealActiveFileForPane = async (paneId: string): Promise<void> => {
-    const runtime = paneRuntime.get(paneId);
-    const uri = getActiveTabUri();
-    if (!runtime || !uri) return;
-    // D84：reveal 前 settle，settle 後重查 pane／root 未變（與命令面板路徑保持一致行為）。
-    const scopeBefore = runtime.provider.scope;
-    await settleProvider(runtime.provider);
-    if (paneRuntime.get(paneId) !== runtime || runtime.provider.scope !== scopeBefore) return;
-    const node = await runtime.provider.findNodeByPath(uri.fsPath);
-    if (node) await runtime.treeView.reveal(node, { select: true, focus: false, expand: true });
   };
 
   /** 「在此開子 pane」（D62/D64）：插槽取最低編號空閒且大於來源編號，維持 parentIndex < childIndex。 */
@@ -787,28 +986,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     // 審查 F-11：插槽決策抽為純函式（`nextChildPaneId`）以便單元測試。
     const childId = nextChildPaneId(info.paneId, viewState.getEnabledPaneIds());
     if (!childId) {
-      void vscode.window.showInformationMessage(vscode.l10n.t('Folder Spaces supports at most 8 panes.'));
+      void vscode.window.showInformationMessage(vscode.l10n.t('Folder Spaces supports at most 8 folder space slots.'));
       return;
     }
     try {
+      const childPreset = resolveConfiguredDefaultChildPreset(settings().get<string>('defaultChildPreset'));
       await viewState.enablePane(childId, {
-        root: info.uri.fsPath,
+        roots: [info.uri.fsPath],
         parentPaneId: info.paneId,
         follow: true,
+        preset: childPreset,
         showFiles: sourcePane.showFiles,
         include: [...sourcePane.include],
         exclude: [...sourcePane.exclude],
       });
     } catch (error) {
-      void vscode.window.showErrorMessage(vscode.l10n.t('Invalid pane link: {0}', String(error)));
+      void vscode.window.showErrorMessage(vscode.l10n.t('Invalid folder space link: {0}', String(error)));
       return;
     }
     syncPaneViews();
     await syncPaneContexts();
     await reconcilePaneRoots();
+    await syncContext();
   };
 
-  /** 關閉 pane（D71：pane1 不可關閉；子 pane 重掛到被關閉 pane 的父）。 */
+  /** 關閉 pane（D71（S4.1R3 修訂）：任一窗格可關閉；子 pane 重掛到被關閉 pane 的父）。 */
   const closePane = async (paneId?: string): Promise<void> => {
     const enabled = viewState.getEnabledPaneIds();
     const target = paneId ?? enabled[enabled.length - 1];
@@ -818,20 +1020,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     syncPaneViews();
     await syncPaneContexts();
     await reconcilePaneRoots();
+    await syncContext();
   };
 
-  const addPane = async (): Promise<void> => {
+  const addPane = async (presetRoot?: string): Promise<void> => {
     const paneId = viewState.allocatePaneId();
     if (!paneId) {
-      void vscode.window.showInformationMessage(vscode.l10n.t('Folder Spaces supports at most 8 panes.'));
+      void vscode.window.showInformationMessage(vscode.l10n.t('Folder Spaces supports at most 8 folder space slots.'));
       return;
     }
-    const root = await pickPaneRoot();
+    const root = presetRoot ?? await pickPaneRoot();
     if (!root) return;
-    const source = viewState.get('pane1');
-    // D64：頂層新 pane 的顯示設定繼承 pane1。
+    const source = viewState.get(primaryPaneId());
+    const initialPreset = resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset'));
+    // D64：頂層新 pane 的顯示設定繼承主 pane（最低編號啟用窗格）。
     await viewState.enablePane(paneId, {
-      root,
+      roots: [root],
+      preset: initialPreset,
       showFiles: source.showFiles,
       include: [...source.include],
       exclude: [...source.exclude],
@@ -839,56 +1044,64 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     syncPaneViews();
     await syncPaneContexts();
     await reconcilePaneRoots();
+    await syncContext();
   };
 
-  const paneMenu = async (paneId: string): Promise<void> => {
-    const runtime = paneRuntime.get(paneId);
-    if (!runtime) return;
-    const actions = [
-      'Preset', 'Mode', 'Level', 'Content', 'Filter', 'Clear filter', 'Sort',
-      'Drill up', 'Switch root', 'Set root', 'Add child pane', 'Close pane',
-      'Expand level', 'Reveal active file', 'Refresh',
-      'New file', 'New folder', 'Rename', 'Delete', 'Copy', 'Cut', 'Paste',
-      'Undo', 'Reveal in Explorer', 'Reveal in OS', 'Toggle follow',
-    ];
-    const action = await vscode.window.showQuickPick(actions, { placeHolder: vscode.l10n.t('Choose a pane action') });
-    if (!action) return;
-    const target = runtime.treeView.selection[0];
-    const refresh = (): void => repaintPane(paneId);
-    if (action === 'Refresh') { refresh(); return; }
-    if (action === 'Toggle follow') { await toggleFollowForPane(paneId); return; }
-    if (action === 'Set root') { await setRootForPane(paneId); return; }
-    if (action === 'Add child pane') { await addChildPane(target ?? (runtime.provider.scope ? new SpaceRootNode(runtime.provider.scope.definition, paneId) : undefined)); return; }
-    if (action === 'Close pane') { await closePane(paneId); return; }
-    if (action === 'Reveal in Explorer' || action === 'Reveal in OS') {
-      const uri = selectedUri(target); if (uri) await vscode.commands.executeCommand(action === 'Reveal in Explorer' ? 'revealInExplorer' : 'revealFileInOS', uri); return;
-    }
-    if (action === 'Copy' || action === 'Cut') { const entry = getEntry(target); if (entry && !(target instanceof SpaceRootNode)) clipboard.set([entry.uri.toString()], action === 'Copy' ? 'copy' : 'cut'); return; }
-    if (action === 'Paste') { await pasteEntries(target); refresh(); return; }
-    if (action === 'New file' || action === 'New folder') { await createEntry(target ?? (await runtime.provider.getChildren())[0], action === 'New folder'); refresh(); return; }
-    if (action === 'Rename') { await renameEntry(target); refresh(); return; }
-    if (action === 'Delete') { await deleteEntry(target); refresh(); return; }
-    if (action === 'Undo') { await vscode.commands.executeCommand('codeFolderSpaces.undoFileOperation'); refresh(); return; }
-    if (action === 'Preset') { await setPresetForPane(paneId); return; }
-    if (action === 'Mode') { await toggleModeForPane(paneId); return; }
-    if (action === 'Level' || action === 'Content') {
-      const state = viewState.get(paneId);
-      const candidates = Object.entries(VIEW_PRESETS).filter(([, preset]) => action === 'Level' ? preset.level !== VIEW_PRESETS[state.preset].level : preset.content !== VIEW_PRESETS[state.preset].content);
-      const selected = await vscode.window.showQuickPick(candidates.map(([name]) => name));
-      if (isViewPresetName(selected)) { await viewState.setPreset(paneId, selected); refresh(); }
+  /**
+   * S4.1R5（OP-9）：Palette「Add Folder Space」寫入 spaces 設定後，同時讓該資料夾在窗格中可見——
+   * 已有窗格以此為根則不重複；有空窗格（root 為 null）則填入；否則開新頂層窗格（滿 8 提示）。
+   */
+  const showRootInPane = async (root: string): Promise<void> => {
+    const enabled = viewState.getEnabledPaneIds();
+    if (enabled.some(id => rootOf(id) && isSamePath(rootOf(id) as string, root))) return;
+    // 只填入頂層（無父窗格）的空窗格：鏈結子窗格的 root 會被父選取覆寫（D61/D74），新空間會看似消失。
+    const emptyId = enabled.find(id => !rootOf(id) && !viewState.get(id).parentPaneId);
+    if (emptyId) {
+      await viewState.switchRoot(emptyId, root);
+      await paneChanged(emptyId);
       return;
     }
-    if (action === 'Filter') { await filterForPane(paneId); return; }
-    if (action === 'Clear filter') { await viewState.clearFilter(paneId); refresh(); return; }
-    if (action === 'Sort') { await setSortForPane(paneId); return; }
-    if (action === 'Drill up') { await drillUpForPane(paneId); return; }
-    if (action === 'Switch root') { await switchRootForPane(paneId); return; }
-    if (action === 'Expand level') { await expandLevelForPane(paneId); return; }
-    if (action === 'Reveal active file') { await revealActiveFileForPane(paneId); return; }
+    await addPane(root);
   };
 
-  const selectedUri = (node: unknown): vscode.Uri | undefined => nodeInfo(node)?.uri;
-  const targetPaneId = (node?: unknown): string => nodeInfo(node)?.paneId ?? 'pane1';
+  const clearFilterForPane = async (paneId: string): Promise<void> => {
+    await viewState.clearFilter(paneId);
+    repaintPane(paneId);
+    const runtime = paneRuntime.get(paneId);
+    if (runtime) runtime.treeView.message = '';
+    await syncContext();
+  };
+
+  // S4.1R2：「…」改為原生下拉（view/title 非 navigation 群組）；每個動作以 pane 專屬命令 id 路由（D47）。
+  const applyAxisForPane = async (paneId: string, change: Exclude<ViewAxisChange, { axis: 'mode' }>): Promise<void> => {
+    await viewState.setViewAxis(paneId, change);
+    repaintPane(paneId);
+    await syncContext();
+  };
+  const collapseAllForPane = async (paneId: string): Promise<void> => {
+    const runtime = paneRuntime.get(paneId);
+    if (!runtime) return;
+    const [root] = await runtime.provider.getChildren();
+    if (!root) return; // 無 root／scope 時不送出作用於「目前焦點 list」的全域命令
+    await runtime.treeView.reveal(root, { select: false, focus: true });
+    await vscode.commands.executeCommand('list.collapseAll');
+    expandedSet(paneId).clear();
+    collapsedPanes.add(paneId);
+    await setCollapsedContext(paneId);
+  };
+  const expandAllForPane = async (paneId: string): Promise<void> => {
+    collapsedPanes.delete(paneId);
+    await setCollapsedContext(paneId);
+    await expandLevelForPane(paneId);
+  };
+  const closePaneFromNode = (node?: unknown): Promise<void> => closePane(targetPaneId(node));
+
+  const selectedUri = (node: unknown): vscode.Uri | undefined => nodeInfo(node)?.uri ?? (() => {
+    const paneId = targetPaneId(node);
+    const root = rootOf(paneId);
+    return root ? vscode.Uri.file(root) : undefined;
+  })();
+  const targetPaneId = (node?: unknown): string => nodeInfo(node)?.paneId ?? (typeof (node as { paneId?: unknown } | undefined)?.paneId === 'string' ? (node as { paneId: string }).paneId : primaryPaneId());
 
   // --- wiring ---------------------------------------------------------------
 
@@ -940,6 +1153,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   await syncPaneContexts();
   await reconcilePaneRoots();
   await syncContext();
+  
+  await syncWorkspaceDirectory();
+
 
   // --- commands --------------------------------------------------------------
 
@@ -957,10 +1173,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: beside ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active });
     }),
     vscode.commands.registerCommand('codeFolderSpaces.copyEntry', (node?: unknown) => { const targetNode = selectionTarget(node); const entry = getEntry(targetNode); if (entry && !(targetNode instanceof SpaceRootNode)) clipboard.set([entry.uri.toString()], 'copy'); }),
-    vscode.commands.registerCommand('codeFolderSpaces.cutEntry', (node?: unknown) => { const targetNode = selectionTarget(node); const entry = getEntry(targetNode); if (entry && !(targetNode instanceof SpaceRootNode)) clipboard.set([entry.uri.toString()], 'cut'); }),
+    vscode.commands.registerCommand('codeFolderSpaces.cutEntry', (node?: unknown) => { const targetNode = selectionTarget(node); const entry = getEntry(targetNode); if (entry && !(targetNode instanceof SpaceRootNode) && !isSamePath(entry.uri.fsPath, entry.basePath)) clipboard.set([entry.uri.toString()], 'cut'); }),
     vscode.commands.registerCommand('codeFolderSpaces.pasteEntries', (node?: unknown) => pasteEntries(node)),
-    vscode.commands.registerCommand('codeFolderSpaces.newFile', (node?: unknown) => createEntry(selectionTarget(node), false)),
-    vscode.commands.registerCommand('codeFolderSpaces.newFolder', (node?: unknown) => createEntry(selectionTarget(node), true)),
+    vscode.commands.registerCommand('codeFolderSpaces.newFile', (node?: unknown) => createEntry(fileActionTarget(node), false)),
+    vscode.commands.registerCommand('codeFolderSpaces.newFolder', (node?: unknown) => createEntry(fileActionTarget(node), true)),
     vscode.commands.registerCommand('codeFolderSpaces.renameEntry', (node?: unknown) => renameEntry(selectionTarget(node))),
     vscode.commands.registerCommand('codeFolderSpaces.moveTo', (node?: unknown) => moveEntry(node)),
     vscode.commands.registerCommand('codeFolderSpaces.deleteEntry', (node?: unknown) => deleteEntry(selectionTarget(node))),
@@ -978,6 +1194,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }),
     vscode.commands.registerCommand('codeFolderSpaces.refresh', () => repaintAllPanes()),
     vscode.commands.registerCommand('codeFolderSpaces.pane.add', () => addPane()),
+    // root 列的 inline X（view/item/context）：**單一項目**涵蓋所有 pane 的所有 root 列，
+    // 故必須用 pane 無關的全域 id 並由**被點擊節點**解析 paneId（D47；審查 P1-1）。
+    vscode.commands.registerCommand('codeFolderSpaces.root.remove', (node?: unknown) => {
+      const candidate = node && typeof node === 'object' ? node as { paneId?: unknown; rootPath?: unknown } : undefined;
+      const paneId = typeof candidate?.paneId === 'string' && /^pane[1-8]$/.test(candidate.paneId) ? candidate.paneId : targetPaneId(node);
+      const root = typeof candidate?.rootPath === 'string' ? candidate.rootPath : undefined;
+      return removeRootForPane(paneId, root);
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane.close', (node?: unknown) => closePaneFromNode(node)),
     vscode.commands.registerCommand('codeFolderSpaces.pane.remove', (paneId?: unknown) => closePane(typeof paneId === 'string' ? paneId : undefined)),
     vscode.commands.registerCommand('codeFolderSpaces.pane.addChild', (node?: unknown) => addChildPane(node ?? pane1()?.treeView.selection[0])),
     vscode.commands.registerCommand('codeFolderSpaces.pane.setRoot', (node?: unknown) => setRootForPane(targetPaneId(node))),
@@ -985,13 +1210,53 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await viewState.resetToDefaults(paneInitContext());
       syncPaneViews();
       await syncPaneContexts();
+      await syncContext();
       await reconcilePaneRoots();
+      await syncWorkspaceDirectory();
     }),
     ...Array.from({ length: MAX_PANE_INDEX }, (_, index) => {
       const id = `pane${index + 1}`;
       return [
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.toggleFollow`, () => toggleFollowForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.menu`, () => paneMenu(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.mode`, () => toggleModeForPane(id)),
+        ...(Object.keys(VIEW_PRESETS) as Array<keyof typeof VIEW_PRESETS>).map(name =>
+          vscode.commands.registerCommand(`codeFolderSpaces.${id}.preset.${name}`, () => setPresetForPane(id, name))),
+        ...(([1, 2, 'all'] as ViewLevel[]).map(level =>
+          vscode.commands.registerCommand(`codeFolderSpaces.${id}.level.${level}`, () => applyAxisForPane(id, { axis: 'level', value: level })))),
+        ...(([ 'all', 'folders', 'files' ] as ViewContent[]).map(content =>
+          vscode.commands.registerCommand(`codeFolderSpaces.${id}.content.${content}`, () => applyAxisForPane(id, { axis: 'content', value: content })))),
+        ...(['name', 'mtime', 'ctime'] as const).flatMap(key => (['asc', 'desc'] as const).map(direction =>
+          vscode.commands.registerCommand(`codeFolderSpaces.${id}.sort.${key}.${direction}`, () => setSortForPane(id, key, direction)))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.switchRoot`, () => switchRootForPane(id)),
+        // S4.1R11b：per-pane id 路由（D47——view/title 不提供 view id，全域 id 會操作錯 pane）。
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.add`, (given?: unknown) => addRootForPane(id, typeof given === 'string' ? given : undefined)),
+        // 兩個呼叫情境：
+        //  (a) view/title 的「…」——**不帶節點**，以閉包 `id` 為 pane。
+        //  (b) view/item/context 的 root 列 X——帶被點擊節點，**必須**以節點為準：
+        //      該 menu 項目只有單一命令 id（pane1.root.remove）卻涵蓋 pane1..8，
+        //      若用閉包 id 會讓 pane2..8 的 X 错路由到 pane1（審查 P1-1）。
+        // 注意：不可改用 `targetPaneId(node)`——無節點時它會退化成主 pane，反而破壞 (a)。
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.remove`, (node?: unknown) => {
+          const candidate = node && typeof node === 'object' ? node as { paneId?: unknown; rootPath?: unknown } : undefined;
+          const nodePaneId = typeof candidate?.paneId === 'string' && /^pane[1-8]$/.test(candidate.paneId)
+            ? candidate.paneId : id;
+          const root = typeof candidate?.rootPath === 'string' ? candidate.rootPath : undefined;
+          return removeRootForPane(nodePaneId, root);
+        }),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.addChild`, () => {
+          const runtime = paneRuntime.get(id);
+          const selected = runtime?.treeView.selection[0];
+          const target = nodeInfo(selected)?.isDirectory ? selected : (runtime?.provider.scope ? new SpaceRootNode(runtime.provider.scope.definitions[0], id) : undefined);
+          return addChildPane(target);
+        }),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.close`, () => closePane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.collapseAll`, () => collapseAllForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.expandAll`, () => expandAllForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.refresh`, () => repaintPane(id)),
+        // S4.1：行內按鈕以 pane 專屬 id 路由（D47），各 pane 一致。
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.filter`, () => filterForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.clearFilter`, () => clearFilterForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.drillUp`, () => drillUpForPane(id)),
         // 審查 F-08：命令 id 描述的是**狀態**（follow 開／關），handler 則為切換，兩者故意相反。
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOn`, () => setFollowForPane(id, false)),
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOff`, () => setFollowForPane(id, true)),
@@ -1002,41 +1267,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (!info?.isDirectory || !info.paneId) return;
       // D67：下鑽以該 pane 自己的 root 為界（節點本質上在 pane root 內）。
       if (!isAllowedSpaceRoot(info.definition.basePath, info.uri.fsPath)) return;
-      await viewState.drillDown(info.paneId, info.uri.fsPath);
+      const childPreset = resolveConfiguredDefaultChildPreset(settings().get<string>('defaultChildPreset'));
+      await viewState.drillDown(info.paneId, info.uri.fsPath, childPreset);
       await paneChanged(info.paneId);
     }),
     vscode.commands.registerCommand('codeFolderSpaces.drillUp', (node?: unknown) => drillUpForPane(targetPaneId(node))),
     vscode.commands.registerCommand('codeFolderSpaces.switchRoot', (node?: unknown) => switchRootForPane(targetPaneId(node))),
-    vscode.commands.registerCommand('codeFolderSpaces.renameSpace', async (node?: unknown) => {
-      const runtime = pane1();
-      const target = node instanceof SpaceRootNode ? node : runtime?.treeView.selection.find((item): item is SpaceRootNode => item instanceof SpaceRootNode);
-      if (!runtime || !target) return;
-      const proposed = await vscode.window.showInputBox({ prompt: vscode.l10n.t('Enter a new space name'), value: target.definition.name });
-      if (proposed === undefined) return;
-      const name = validateSpaceName(target.definition.name, proposed);
-      if (!name) return;
-      try {
-        // 只有 pane root 恰好是已配置 space 時才可改名；否則拒絕以免誤改其他 space。
-        if (!(await store.renameSpace(target.definition.basePath, name))) return;
-        void vscode.window.showInformationMessage(vscode.l10n.t('Renamed space to: {0}', name));
-        applyPaneScope(target.paneId);
-      } catch (error) {
-        void vscode.window.showErrorMessage(vscode.l10n.t('Could not rename space: {0}', String(error)));
-      }
-    }),
-    vscode.commands.registerCommand('codeFolderSpaces.setPreset', (preset?: unknown) => setPresetForPane('pane1', preset)),
-    vscode.commands.registerCommand('codeFolderSpaces.filter', () => filterForPane('pane1')),
+    vscode.commands.registerCommand('codeFolderSpaces.setPreset', (preset?: unknown) => setPresetForPane(primaryPaneId(), preset)),
+    vscode.commands.registerCommand('codeFolderSpaces.filter', () => filterForPane(primaryPaneId())),
     vscode.commands.registerCommand('codeFolderSpaces.clearFilter', async () => {
-      await viewState.clearFilter('pane1');
-      repaintPane('pane1');
+      await viewState.clearFilter(primaryPaneId());
+      repaintPane(primaryPaneId());
       const runtime = pane1();
       if (runtime) runtime.treeView.message = '';
       await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasFilter', false);
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.setSort', (key?: unknown, direction?: unknown) => setSortForPane('pane1', key, direction)),
-    vscode.commands.registerCommand('codeFolderSpaces.toggleMode', () => toggleModeForPane('pane1')),
-    vscode.commands.registerCommand('codeFolderSpaces.addSpace', async () => {
-      const picked = await vscode.window.showOpenDialog({
+    vscode.commands.registerCommand('codeFolderSpaces.setSort', (key?: unknown, direction?: unknown) => setSortForPane(primaryPaneId(), key, direction)),
+    vscode.commands.registerCommand('codeFolderSpaces.toggleMode', () => toggleModeForPane(primaryPaneId())),
+    // 可選參數（資料夾路徑字串或 Uri）供自動化／其他命令略過原生對話框。
+    vscode.commands.registerCommand('codeFolderSpaces.addSpace', async (target?: unknown) => {
+      const given = typeof target === 'string' ? vscode.Uri.file(target) : target instanceof vscode.Uri ? target : undefined;
+      const picked = given ? [given] : await vscode.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -1046,11 +1297,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (!uri) {
         return;
       }
+      if (given) {
+        // 參數路徑未經原生對話框，寫入前確認是既有資料夾。
+        try {
+          const stat = await vscode.workspace.fs.stat(uri);
+          if (!(stat.type & vscode.FileType.Directory)) return;
+        } catch {
+          return;
+        }
+      }
       const added = await store.addSpace(uri.fsPath);
       if (added) {
         log.info(`Added folder space: ${uri.fsPath}`);
         void vscode.window.showInformationMessage(vscode.l10n.t('Added folder space: {0}', uri.fsPath));
       }
+      // OP-9：新增（或重複選取既有）空間後，確保它在窗格中顯示。
+      await showRootInPane(uri.fsPath);
     }),
     vscode.commands.registerCommand('codeFolderSpaces.removeSpace', async (node?: unknown) => {
       const runtime = pane1();
@@ -1070,12 +1332,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }),
     vscode.commands.registerCommand('codeFolderSpaces.toggleFollowActiveFile', async () => {
       const config = settings();
-      const enabled = !config.get<boolean>('followActiveFile', false);
+      const enabled = !config.get<boolean>('followActiveFile', true);
       await config.update('followActiveFile', enabled, vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global);
       await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', enabled);
       scheduleFollow();
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.expandLevel', () => expandLevelForPane('pane1')),
+    vscode.commands.registerCommand('codeFolderSpaces.expandLevel', () => expandLevelForPane(primaryPaneId())),
     vscode.commands.registerCommand('codeFolderSpaces.revealActiveFile', async () => {
       const uri = getActiveTabUri();
       const runtime = pane1();
@@ -1086,7 +1348,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       // D84：reveal 前 settle；settle 後重查 pane 仍啟用且 root 未變，避免 reveal 到新樹。
       const scopeBefore = runtime.provider.scope;
       await settleProvider(runtime.provider);
-      if (paneRuntime.get('pane1') !== runtime || runtime.provider.scope !== scopeBefore) return;
+      if (paneRuntime.get(runtime.id) !== runtime || runtime.provider.scope !== scopeBefore) return;
       const node = await runtime.provider.findNodeByPath(uri.fsPath);
       if (!node) {
         void vscode.window.showInformationMessage(
@@ -1109,7 +1371,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     getSpaces: () => store.getDefinitions().map((definition) => ({ name: definition.name, basePath: definition.basePath })),
     getPanes: () => viewState.getEnabledPaneIds().map((id) => {
       const pane = viewState.get(id);
-      return { id, root: pane.root, parentPaneId: pane.parentPaneId, follow: pane.follow, preset: pane.preset };
+      return { id, root: rootOf(id), roots: [...pane.roots], parentPaneId: pane.parentPaneId, follow: pane.follow, preset: matchPresetName(effectiveView(pane)) ?? 'Custom' };
     }),
   };
 }

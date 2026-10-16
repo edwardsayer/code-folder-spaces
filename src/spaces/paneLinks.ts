@@ -85,9 +85,34 @@ export function nextChildPaneId(sourcePaneId: string, enabledPaneIds: readonly s
   return undefined;
 }
 
-/** `pane1` is never closable and at least one pane must stay (S4R6-D71). */
+/** Any enabled pane may close while at least one pane stays (S4.1R3 revises S4R6-D71: pane1 is closable). */
 export function canClosePane(paneId: string, enabledPaneIds: readonly string[]): boolean {
-  return paneId !== 'pane1' && enabledPaneIds.length > 1 && enabledPaneIds.includes(paneId);
+  return enabledPaneIds.length > 1 && enabledPaneIds.includes(paneId);
+}
+
+/**
+ * 是否應將 follow pane 的 roots 同步為工作區資料夾（S4.1R11 OP-16）。
+ *
+ * 早退條件（回傳 false）：
+ * 1. 已完全同步（同序、同集合）——避免無謂 persist。
+ * 2. 工作區僅**單一**資料夾且等於目前鏈根——R10 P1 保護，保留下鑽狀態與無損返回能力。
+ *
+ * 注意：多資料夾工作區必須同步全部 roots；僅以「首項相同」判斷會遺漏
+ * workspace 新增第二個資料夾的情境（回歸：pane=[a]、workspace=[a,b] 必須更新）。
+ */
+export function shouldSyncWorkspaceRoots(
+  paneRoots: readonly string[],
+  workspaceRoots: readonly string[],
+  samePath: (left: string, right: string) => boolean,
+): boolean {
+  // 已完全同步（同序、同集合）時早退，避免無謂 persist。
+  // 其餘情況一律同步：多→單、單→多、換根、順序變更皆尖。
+  // R10 P1 的下鑽狀態保護由 `PaneStateStore.setPaneRoots` 承接
+  // （仅當 `drillRoot` 不落於任何新 root 內才清空），
+  // 故此處**不得**再以「首項相同」早退，否則 workspace 少一個資料夾時
+  // 會永久留下已失效的 root 與其 watcher。
+  return !(workspaceRoots.length === paneRoots.length &&
+    workspaceRoots.every((root, index) => samePath(root, paneRoots[index])));
 }
 
 function paneIndex(id: string): number {

@@ -42,14 +42,54 @@
     },
     "views": {
       "code-folder-spaces": [
-        { "id": "codeFolderSpaces.pane1", "name": "%view.pane1.name%", "contextualTitle": "%container.title%" },
-        { "id": "codeFolderSpaces.pane2", "name": "%view.pane2.name%", "when": "codeFolderSpaces.pane2.enabled", "contextualTitle": "%container.title%" },
-        { "id": "codeFolderSpaces.pane3", "name": "%view.pane3.name%", "when": "codeFolderSpaces.pane3.enabled", "contextualTitle": "%container.title%" },
-        { "id": "codeFolderSpaces.pane4", "name": "%view.pane4.name%", "when": "codeFolderSpaces.pane4.enabled", "contextualTitle": "%container.title%" },
-        { "id": "codeFolderSpaces.pane5", "name": "%view.pane5.name%", "when": "codeFolderSpaces.pane5.enabled", "contextualTitle": "%container.title%" },
-        { "id": "codeFolderSpaces.pane6", "name": "%view.pane6.name%", "when": "codeFolderSpaces.pane6.enabled", "contextualTitle": "%container.title%" },
-        { "id": "codeFolderSpaces.pane7", "name": "%view.pane7.name%", "when": "codeFolderSpaces.pane7.enabled", "contextualTitle": "%container.title%" },
-        { "id": "codeFolderSpaces.pane8", "name": "%view.pane8.name%", "when": "codeFolderSpaces.pane8.enabled", "contextualTitle": "%container.title%" }
+        {
+          "id": "codeFolderSpaces.pane1",
+          "name": "%view.pane1.name%",
+          "when": "!codeFolderSpaces.layoutReady || codeFolderSpaces.pane1.enabled",
+          "contextualTitle": "%container.title%"
+        },
+        {
+          "id": "codeFolderSpaces.pane2",
+          "name": "%view.pane2.name%",
+          "when": "codeFolderSpaces.pane2.enabled",
+          "contextualTitle": "%container.title%"
+        },
+        {
+          "id": "codeFolderSpaces.pane3",
+          "name": "%view.pane3.name%",
+          "when": "codeFolderSpaces.pane3.enabled",
+          "contextualTitle": "%container.title%"
+        },
+        {
+          "id": "codeFolderSpaces.pane4",
+          "name": "%view.pane4.name%",
+          "when": "codeFolderSpaces.pane4.enabled",
+          "contextualTitle": "%container.title%"
+        },
+        {
+          "id": "codeFolderSpaces.pane5",
+          "name": "%view.pane5.name%",
+          "when": "codeFolderSpaces.pane5.enabled",
+          "contextualTitle": "%container.title%"
+        },
+        {
+          "id": "codeFolderSpaces.pane6",
+          "name": "%view.pane6.name%",
+          "when": "codeFolderSpaces.pane6.enabled",
+          "contextualTitle": "%container.title%"
+        },
+        {
+          "id": "codeFolderSpaces.pane7",
+          "name": "%view.pane7.name%",
+          "when": "codeFolderSpaces.pane7.enabled",
+          "contextualTitle": "%container.title%"
+        },
+        {
+          "id": "codeFolderSpaces.pane8",
+          "name": "%view.pane8.name%",
+          "when": "codeFolderSpaces.pane8.enabled",
+          "contextualTitle": "%container.title%"
+        }
       ]
     },
     "viewsWelcome": [
@@ -98,227 +138,3046 @@
       {
         "command": "codeFolderSpaces.refresh",
         "title": "%command.refresh.title%",
-        "icon": "$(refresh)"
+        "icon": "$(refresh)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.addSpace",
         "title": "%command.addSpace.title%",
-        "icon": "$(add)"
+        "icon": "$(add)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.removeSpace",
         "title": "%command.removeSpace.title%",
-        "icon": "$(remove)"
+        "icon": "$(remove)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.revealActiveFile",
         "title": "%command.revealActiveFile.title%",
-        "icon": "$(target)"
+        "icon": "$(target)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.toggleFollowActiveFile",
         "title": "%command.toggleFollowActiveFile.title%",
-        "icon": "$(eye)"
+        "icon": "$(eye)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.expandLevel",
         "title": "%command.expandLevel.title%",
-        "icon": "$(chevron-down)"
+        "icon": "$(chevron-down)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.setPreset",
         "title": "%command.setPreset.title%",
-        "icon": "$(list-selection)"
+        "icon": "$(list-selection)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.toggleMode",
         "title": "%command.toggleMode.title%",
-        "icon": "$(list-tree)"
+        "icon": "$(list-tree)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.filter",
         "title": "%command.filter.title%",
-        "icon": "$(filter)"
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.clearFilter",
         "title": "%command.clearFilter.title%",
-        "icon": "$(clear-all)"
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.setSort",
         "title": "%command.setSort.title%",
-        "icon": "$(sort-precedence)"
+        "icon": "$(sort-precedence)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.drillDown",
         "title": "%command.drillDown.title%",
-        "icon": "$(arrow-right)"
+        "icon": "$(arrow-right)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)"
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.switchRoot",
         "title": "%command.switchRoot.title%",
-        "icon": "$(folder-opened)"
+        "icon": "$(folder-opened)",
+        "category": "%category.folderSpaces%"
       },
       {
-        "command": "codeFolderSpaces.renameSpace",
-        "title": "%command.renameSpace.title%",
-        "icon": "$(edit)"
+        "command": "codeFolderSpaces.openEntry",
+        "title": "%command.openEntry.title%",
+        "category": "%category.folderSpaces%"
       },
-      { "command": "codeFolderSpaces.openEntry", "title": "%command.openEntry.title%" },
-      { "command": "codeFolderSpaces.copyEntry", "title": "%command.copyEntry.title%" },
-      { "command": "codeFolderSpaces.cutEntry", "title": "%command.cutEntry.title%" },
-      { "command": "codeFolderSpaces.pasteEntries", "title": "%command.pasteEntries.title%" },
-      { "command": "codeFolderSpaces.newFile", "title": "%command.newFile.title%" },
-      { "command": "codeFolderSpaces.newFolder", "title": "%command.newFolder.title%" },
-      { "command": "codeFolderSpaces.renameEntry", "title": "%command.renameEntry.title%" },
-      { "command": "codeFolderSpaces.moveTo", "title": "%command.moveTo.title%" },
-      { "command": "codeFolderSpaces.deleteEntry", "title": "%command.deleteEntry.title%" },
-      { "command": "codeFolderSpaces.undoFileOperation", "title": "%command.undo.title%" },
-      { "command": "codeFolderSpaces.revealInExplorer", "title": "%command.revealInExplorer.title%" },
-      { "command": "codeFolderSpaces.revealFileInOS", "title": "%command.revealFileInOS.title%" },
-      { "command": "codeFolderSpaces.openInTerminal", "title": "%command.openInTerminal.title%" },
-      { "command": "codeFolderSpaces.findInFolder", "title": "%command.findInFolder.title%" },
-      { "command": "codeFolderSpaces.copyFilePath", "title": "%command.copyFilePath.title%" },
-      { "command": "codeFolderSpaces.copyRelativeFilePath", "title": "%command.copyRelativeFilePath.title%" },
-      { "command": "codeFolderSpaces.pane.add", "title": "%command.pane.add.title%", "icon": "$(add)" },
-      { "command": "codeFolderSpaces.pane.remove", "title": "%command.pane.remove.title%", "icon": "$(remove)" },
-      { "command": "codeFolderSpaces.pane.resetLayout", "title": "%command.pane.resetLayout.title%" },
-      { "command": "codeFolderSpaces.pane.addChild", "title": "%command.pane.addChild.title%", "icon": "$(add)" },
-      { "command": "codeFolderSpaces.pane.setRoot", "title": "%command.pane.setRoot.title%", "icon": "$(root-folder)" },
-      { "command": "codeFolderSpaces.pane1.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane1.menu", "title": "%command.pane.menu.title%" },
-      { "command": "codeFolderSpaces.pane2.menu", "title": "%command.pane.menu.title%" },
-      { "command": "codeFolderSpaces.pane3.menu", "title": "%command.pane.menu.title%" },
-      { "command": "codeFolderSpaces.pane4.menu", "title": "%command.pane.menu.title%" },
-      { "command": "codeFolderSpaces.pane5.menu", "title": "%command.pane.menu.title%" },
-      { "command": "codeFolderSpaces.pane6.menu", "title": "%command.pane.menu.title%" },
-      { "command": "codeFolderSpaces.pane7.menu", "title": "%command.pane.menu.title%" },
-      { "command": "codeFolderSpaces.pane8.menu", "title": "%command.pane.menu.title%" },
-      { "command": "codeFolderSpaces.pane2.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane3.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane4.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane5.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane6.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane7.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane8.toggleFollow", "title": "%command.pane.toggleFollow.title%" },
-      { "command": "codeFolderSpaces.pane1.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
-      { "command": "codeFolderSpaces.pane1.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
-      { "command": "codeFolderSpaces.pane2.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
-      { "command": "codeFolderSpaces.pane2.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
-      { "command": "codeFolderSpaces.pane3.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
-      { "command": "codeFolderSpaces.pane3.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
-      { "command": "codeFolderSpaces.pane4.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
-      { "command": "codeFolderSpaces.pane4.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
-      { "command": "codeFolderSpaces.pane5.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
-      { "command": "codeFolderSpaces.pane5.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
-      { "command": "codeFolderSpaces.pane6.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
-      { "command": "codeFolderSpaces.pane6.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
-      { "command": "codeFolderSpaces.pane7.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
-      { "command": "codeFolderSpaces.pane7.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" },
-      { "command": "codeFolderSpaces.pane8.followOn", "title": "%command.pane.toggleFollow.title%", "icon": "$(link)" },
-      { "command": "codeFolderSpaces.pane8.followOff", "title": "%command.pane.toggleFollow.title%", "icon": "$(debug-disconnect)" }
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "title": "%command.copyEntry.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "title": "%command.cutEntry.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "title": "%command.pasteEntries.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.newFile",
+        "title": "%command.newFile.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.newFolder",
+        "title": "%command.newFolder.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "title": "%command.renameEntry.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.moveTo",
+        "title": "%command.moveTo.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "title": "%command.deleteEntry.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.undoFileOperation",
+        "title": "%command.undo.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.revealInExplorer",
+        "title": "%command.revealInExplorer.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.revealFileInOS",
+        "title": "%command.revealFileInOS.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.openInTerminal",
+        "title": "%command.openInTerminal.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.findInFolder",
+        "title": "%command.findInFolder.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.copyFilePath",
+        "title": "%command.copyFilePath.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.copyRelativeFilePath",
+        "title": "%command.copyRelativeFilePath.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane.add",
+        "title": "%command.pane.add.title%",
+        "icon": "$(add)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane.remove",
+        "title": "%command.pane.remove.title%",
+        "icon": "$(remove)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane.resetLayout",
+        "title": "%command.pane.resetLayout.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane.addChild",
+        "title": "%command.pane.addChild.title%",
+        "icon": "$(add)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane.setRoot",
+        "title": "%command.pane.setRoot.title%",
+        "icon": "$(root-folder)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.mode",
+        "title": "%command.paneAction.mode.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.switchRoot",
+        "title": "%command.paneAction.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.root.add",
+        "title": "%command.paneAction.root.add.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.root.remove",
+        "title": "%command.paneAction.root.remove.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.addChild",
+        "title": "%command.paneAction.addChild.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.close",
+        "title": "%command.paneAction.close.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.refresh",
+        "title": "%command.paneAction.refresh.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.mode",
+        "title": "%command.paneAction.mode.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.switchRoot",
+        "title": "%command.paneAction.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.root.add",
+        "title": "%command.paneAction.root.add.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.root.remove",
+        "title": "%command.paneAction.root.remove.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.addChild",
+        "title": "%command.paneAction.addChild.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.close",
+        "title": "%command.paneAction.close.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.refresh",
+        "title": "%command.paneAction.refresh.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.mode",
+        "title": "%command.paneAction.mode.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.switchRoot",
+        "title": "%command.paneAction.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.root.add",
+        "title": "%command.paneAction.root.add.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.root.remove",
+        "title": "%command.paneAction.root.remove.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.addChild",
+        "title": "%command.paneAction.addChild.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.close",
+        "title": "%command.paneAction.close.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.refresh",
+        "title": "%command.paneAction.refresh.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.mode",
+        "title": "%command.paneAction.mode.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.switchRoot",
+        "title": "%command.paneAction.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.root.add",
+        "title": "%command.paneAction.root.add.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.root.remove",
+        "title": "%command.paneAction.root.remove.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.addChild",
+        "title": "%command.paneAction.addChild.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.close",
+        "title": "%command.paneAction.close.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.refresh",
+        "title": "%command.paneAction.refresh.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.mode",
+        "title": "%command.paneAction.mode.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.switchRoot",
+        "title": "%command.paneAction.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.root.add",
+        "title": "%command.paneAction.root.add.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.root.remove",
+        "title": "%command.paneAction.root.remove.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.addChild",
+        "title": "%command.paneAction.addChild.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.close",
+        "title": "%command.paneAction.close.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.refresh",
+        "title": "%command.paneAction.refresh.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.mode",
+        "title": "%command.paneAction.mode.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.switchRoot",
+        "title": "%command.paneAction.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.root.add",
+        "title": "%command.paneAction.root.add.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.root.remove",
+        "title": "%command.paneAction.root.remove.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.addChild",
+        "title": "%command.paneAction.addChild.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.close",
+        "title": "%command.paneAction.close.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.refresh",
+        "title": "%command.paneAction.refresh.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.mode",
+        "title": "%command.paneAction.mode.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.switchRoot",
+        "title": "%command.paneAction.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.root.add",
+        "title": "%command.paneAction.root.add.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.root.remove",
+        "title": "%command.paneAction.root.remove.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.addChild",
+        "title": "%command.paneAction.addChild.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.close",
+        "title": "%command.paneAction.close.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.refresh",
+        "title": "%command.paneAction.refresh.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.mode",
+        "title": "%command.paneAction.mode.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.switchRoot",
+        "title": "%command.paneAction.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.root.add",
+        "title": "%command.paneAction.root.add.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.root.remove",
+        "title": "%command.paneAction.root.remove.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.addChild",
+        "title": "%command.paneAction.addChild.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.close",
+        "title": "%command.paneAction.close.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.refresh",
+        "title": "%command.paneAction.refresh.title%"
+      },
+      {
+        "command": "codeFolderSpaces.root.remove",
+        "title": "%command.root.remove.title%",
+        "icon": "$(remove)"
+      },
+      {
+        "command": "codeFolderSpaces.pane.close",
+        "title": "%command.paneAction.close.title%",
+        "icon": "$(close)"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.preset.Explorer",
+        "title": "%command.paneAction.preset.Explorer.title%",
+        "toggled": "codeFolderSpaces.pane1.preset == 'Explorer'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.preset.Navigate",
+        "title": "%command.paneAction.preset.Navigate.title%",
+        "toggled": "codeFolderSpaces.pane1.preset == 'Navigate'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.preset.Columns",
+        "title": "%command.paneAction.preset.Columns.title%",
+        "toggled": "codeFolderSpaces.pane1.preset == 'Columns'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.preset.Context",
+        "title": "%command.paneAction.preset.Context.title%",
+        "toggled": "codeFolderSpaces.pane1.preset == 'Context'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.preset.Contents",
+        "title": "%command.paneAction.preset.Contents.title%",
+        "toggled": "codeFolderSpaces.pane1.preset == 'Contents'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.preset.Files",
+        "title": "%command.paneAction.preset.Files.title%",
+        "toggled": "codeFolderSpaces.pane1.preset == 'Files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.preset.List",
+        "title": "%command.paneAction.preset.List.title%",
+        "toggled": "codeFolderSpaces.pane1.preset == 'List'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.level.1",
+        "title": "%command.paneAction.level.1.title%",
+        "toggled": "codeFolderSpaces.pane1.level == '1'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.level.2",
+        "title": "%command.paneAction.level.2.title%",
+        "toggled": "codeFolderSpaces.pane1.level == '2'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.level.all",
+        "title": "%command.paneAction.level.all.title%",
+        "toggled": "codeFolderSpaces.pane1.level == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.content.all",
+        "title": "%command.paneAction.content.all.title%",
+        "toggled": "codeFolderSpaces.pane1.content == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.content.folders",
+        "title": "%command.paneAction.content.folders.title%",
+        "toggled": "codeFolderSpaces.pane1.content == 'folders'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.content.files",
+        "title": "%command.paneAction.content.files.title%",
+        "toggled": "codeFolderSpaces.pane1.content == 'files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.collapseAll",
+        "title": "%command.paneAction.collapseAll.title%",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.expandAll",
+        "title": "%command.paneAction.expandAll.title%",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.preset.Explorer",
+        "title": "%command.paneAction.preset.Explorer.title%",
+        "toggled": "codeFolderSpaces.pane2.preset == 'Explorer'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.preset.Navigate",
+        "title": "%command.paneAction.preset.Navigate.title%",
+        "toggled": "codeFolderSpaces.pane2.preset == 'Navigate'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.preset.Columns",
+        "title": "%command.paneAction.preset.Columns.title%",
+        "toggled": "codeFolderSpaces.pane2.preset == 'Columns'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.preset.Context",
+        "title": "%command.paneAction.preset.Context.title%",
+        "toggled": "codeFolderSpaces.pane2.preset == 'Context'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.preset.Contents",
+        "title": "%command.paneAction.preset.Contents.title%",
+        "toggled": "codeFolderSpaces.pane2.preset == 'Contents'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.preset.Files",
+        "title": "%command.paneAction.preset.Files.title%",
+        "toggled": "codeFolderSpaces.pane2.preset == 'Files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.preset.List",
+        "title": "%command.paneAction.preset.List.title%",
+        "toggled": "codeFolderSpaces.pane2.preset == 'List'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.level.1",
+        "title": "%command.paneAction.level.1.title%",
+        "toggled": "codeFolderSpaces.pane2.level == '1'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.level.2",
+        "title": "%command.paneAction.level.2.title%",
+        "toggled": "codeFolderSpaces.pane2.level == '2'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.level.all",
+        "title": "%command.paneAction.level.all.title%",
+        "toggled": "codeFolderSpaces.pane2.level == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.content.all",
+        "title": "%command.paneAction.content.all.title%",
+        "toggled": "codeFolderSpaces.pane2.content == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.content.folders",
+        "title": "%command.paneAction.content.folders.title%",
+        "toggled": "codeFolderSpaces.pane2.content == 'folders'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.content.files",
+        "title": "%command.paneAction.content.files.title%",
+        "toggled": "codeFolderSpaces.pane2.content == 'files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane2.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane2.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane2.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane2.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane2.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane2.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.collapseAll",
+        "title": "%command.paneAction.collapseAll.title%",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.expandAll",
+        "title": "%command.paneAction.expandAll.title%",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.preset.Explorer",
+        "title": "%command.paneAction.preset.Explorer.title%",
+        "toggled": "codeFolderSpaces.pane3.preset == 'Explorer'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.preset.Navigate",
+        "title": "%command.paneAction.preset.Navigate.title%",
+        "toggled": "codeFolderSpaces.pane3.preset == 'Navigate'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.preset.Columns",
+        "title": "%command.paneAction.preset.Columns.title%",
+        "toggled": "codeFolderSpaces.pane3.preset == 'Columns'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.preset.Context",
+        "title": "%command.paneAction.preset.Context.title%",
+        "toggled": "codeFolderSpaces.pane3.preset == 'Context'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.preset.Contents",
+        "title": "%command.paneAction.preset.Contents.title%",
+        "toggled": "codeFolderSpaces.pane3.preset == 'Contents'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.preset.Files",
+        "title": "%command.paneAction.preset.Files.title%",
+        "toggled": "codeFolderSpaces.pane3.preset == 'Files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.preset.List",
+        "title": "%command.paneAction.preset.List.title%",
+        "toggled": "codeFolderSpaces.pane3.preset == 'List'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.level.1",
+        "title": "%command.paneAction.level.1.title%",
+        "toggled": "codeFolderSpaces.pane3.level == '1'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.level.2",
+        "title": "%command.paneAction.level.2.title%",
+        "toggled": "codeFolderSpaces.pane3.level == '2'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.level.all",
+        "title": "%command.paneAction.level.all.title%",
+        "toggled": "codeFolderSpaces.pane3.level == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.content.all",
+        "title": "%command.paneAction.content.all.title%",
+        "toggled": "codeFolderSpaces.pane3.content == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.content.folders",
+        "title": "%command.paneAction.content.folders.title%",
+        "toggled": "codeFolderSpaces.pane3.content == 'folders'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.content.files",
+        "title": "%command.paneAction.content.files.title%",
+        "toggled": "codeFolderSpaces.pane3.content == 'files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane3.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane3.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane3.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane3.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane3.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane3.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.collapseAll",
+        "title": "%command.paneAction.collapseAll.title%",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.expandAll",
+        "title": "%command.paneAction.expandAll.title%",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.preset.Explorer",
+        "title": "%command.paneAction.preset.Explorer.title%",
+        "toggled": "codeFolderSpaces.pane4.preset == 'Explorer'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.preset.Navigate",
+        "title": "%command.paneAction.preset.Navigate.title%",
+        "toggled": "codeFolderSpaces.pane4.preset == 'Navigate'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.preset.Columns",
+        "title": "%command.paneAction.preset.Columns.title%",
+        "toggled": "codeFolderSpaces.pane4.preset == 'Columns'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.preset.Context",
+        "title": "%command.paneAction.preset.Context.title%",
+        "toggled": "codeFolderSpaces.pane4.preset == 'Context'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.preset.Contents",
+        "title": "%command.paneAction.preset.Contents.title%",
+        "toggled": "codeFolderSpaces.pane4.preset == 'Contents'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.preset.Files",
+        "title": "%command.paneAction.preset.Files.title%",
+        "toggled": "codeFolderSpaces.pane4.preset == 'Files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.preset.List",
+        "title": "%command.paneAction.preset.List.title%",
+        "toggled": "codeFolderSpaces.pane4.preset == 'List'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.level.1",
+        "title": "%command.paneAction.level.1.title%",
+        "toggled": "codeFolderSpaces.pane4.level == '1'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.level.2",
+        "title": "%command.paneAction.level.2.title%",
+        "toggled": "codeFolderSpaces.pane4.level == '2'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.level.all",
+        "title": "%command.paneAction.level.all.title%",
+        "toggled": "codeFolderSpaces.pane4.level == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.content.all",
+        "title": "%command.paneAction.content.all.title%",
+        "toggled": "codeFolderSpaces.pane4.content == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.content.folders",
+        "title": "%command.paneAction.content.folders.title%",
+        "toggled": "codeFolderSpaces.pane4.content == 'folders'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.content.files",
+        "title": "%command.paneAction.content.files.title%",
+        "toggled": "codeFolderSpaces.pane4.content == 'files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane4.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane4.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane4.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane4.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane4.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane4.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.collapseAll",
+        "title": "%command.paneAction.collapseAll.title%",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.expandAll",
+        "title": "%command.paneAction.expandAll.title%",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.preset.Explorer",
+        "title": "%command.paneAction.preset.Explorer.title%",
+        "toggled": "codeFolderSpaces.pane5.preset == 'Explorer'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.preset.Navigate",
+        "title": "%command.paneAction.preset.Navigate.title%",
+        "toggled": "codeFolderSpaces.pane5.preset == 'Navigate'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.preset.Columns",
+        "title": "%command.paneAction.preset.Columns.title%",
+        "toggled": "codeFolderSpaces.pane5.preset == 'Columns'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.preset.Context",
+        "title": "%command.paneAction.preset.Context.title%",
+        "toggled": "codeFolderSpaces.pane5.preset == 'Context'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.preset.Contents",
+        "title": "%command.paneAction.preset.Contents.title%",
+        "toggled": "codeFolderSpaces.pane5.preset == 'Contents'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.preset.Files",
+        "title": "%command.paneAction.preset.Files.title%",
+        "toggled": "codeFolderSpaces.pane5.preset == 'Files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.preset.List",
+        "title": "%command.paneAction.preset.List.title%",
+        "toggled": "codeFolderSpaces.pane5.preset == 'List'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.level.1",
+        "title": "%command.paneAction.level.1.title%",
+        "toggled": "codeFolderSpaces.pane5.level == '1'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.level.2",
+        "title": "%command.paneAction.level.2.title%",
+        "toggled": "codeFolderSpaces.pane5.level == '2'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.level.all",
+        "title": "%command.paneAction.level.all.title%",
+        "toggled": "codeFolderSpaces.pane5.level == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.content.all",
+        "title": "%command.paneAction.content.all.title%",
+        "toggled": "codeFolderSpaces.pane5.content == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.content.folders",
+        "title": "%command.paneAction.content.folders.title%",
+        "toggled": "codeFolderSpaces.pane5.content == 'folders'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.content.files",
+        "title": "%command.paneAction.content.files.title%",
+        "toggled": "codeFolderSpaces.pane5.content == 'files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane5.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane5.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane5.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane5.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane5.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane5.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.collapseAll",
+        "title": "%command.paneAction.collapseAll.title%",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.expandAll",
+        "title": "%command.paneAction.expandAll.title%",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.preset.Explorer",
+        "title": "%command.paneAction.preset.Explorer.title%",
+        "toggled": "codeFolderSpaces.pane6.preset == 'Explorer'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.preset.Navigate",
+        "title": "%command.paneAction.preset.Navigate.title%",
+        "toggled": "codeFolderSpaces.pane6.preset == 'Navigate'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.preset.Columns",
+        "title": "%command.paneAction.preset.Columns.title%",
+        "toggled": "codeFolderSpaces.pane6.preset == 'Columns'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.preset.Context",
+        "title": "%command.paneAction.preset.Context.title%",
+        "toggled": "codeFolderSpaces.pane6.preset == 'Context'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.preset.Contents",
+        "title": "%command.paneAction.preset.Contents.title%",
+        "toggled": "codeFolderSpaces.pane6.preset == 'Contents'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.preset.Files",
+        "title": "%command.paneAction.preset.Files.title%",
+        "toggled": "codeFolderSpaces.pane6.preset == 'Files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.preset.List",
+        "title": "%command.paneAction.preset.List.title%",
+        "toggled": "codeFolderSpaces.pane6.preset == 'List'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.level.1",
+        "title": "%command.paneAction.level.1.title%",
+        "toggled": "codeFolderSpaces.pane6.level == '1'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.level.2",
+        "title": "%command.paneAction.level.2.title%",
+        "toggled": "codeFolderSpaces.pane6.level == '2'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.level.all",
+        "title": "%command.paneAction.level.all.title%",
+        "toggled": "codeFolderSpaces.pane6.level == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.content.all",
+        "title": "%command.paneAction.content.all.title%",
+        "toggled": "codeFolderSpaces.pane6.content == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.content.folders",
+        "title": "%command.paneAction.content.folders.title%",
+        "toggled": "codeFolderSpaces.pane6.content == 'folders'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.content.files",
+        "title": "%command.paneAction.content.files.title%",
+        "toggled": "codeFolderSpaces.pane6.content == 'files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane6.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane6.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane6.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane6.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane6.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane6.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.collapseAll",
+        "title": "%command.paneAction.collapseAll.title%",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.expandAll",
+        "title": "%command.paneAction.expandAll.title%",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.preset.Explorer",
+        "title": "%command.paneAction.preset.Explorer.title%",
+        "toggled": "codeFolderSpaces.pane7.preset == 'Explorer'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.preset.Navigate",
+        "title": "%command.paneAction.preset.Navigate.title%",
+        "toggled": "codeFolderSpaces.pane7.preset == 'Navigate'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.preset.Columns",
+        "title": "%command.paneAction.preset.Columns.title%",
+        "toggled": "codeFolderSpaces.pane7.preset == 'Columns'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.preset.Context",
+        "title": "%command.paneAction.preset.Context.title%",
+        "toggled": "codeFolderSpaces.pane7.preset == 'Context'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.preset.Contents",
+        "title": "%command.paneAction.preset.Contents.title%",
+        "toggled": "codeFolderSpaces.pane7.preset == 'Contents'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.preset.Files",
+        "title": "%command.paneAction.preset.Files.title%",
+        "toggled": "codeFolderSpaces.pane7.preset == 'Files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.preset.List",
+        "title": "%command.paneAction.preset.List.title%",
+        "toggled": "codeFolderSpaces.pane7.preset == 'List'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.level.1",
+        "title": "%command.paneAction.level.1.title%",
+        "toggled": "codeFolderSpaces.pane7.level == '1'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.level.2",
+        "title": "%command.paneAction.level.2.title%",
+        "toggled": "codeFolderSpaces.pane7.level == '2'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.level.all",
+        "title": "%command.paneAction.level.all.title%",
+        "toggled": "codeFolderSpaces.pane7.level == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.content.all",
+        "title": "%command.paneAction.content.all.title%",
+        "toggled": "codeFolderSpaces.pane7.content == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.content.folders",
+        "title": "%command.paneAction.content.folders.title%",
+        "toggled": "codeFolderSpaces.pane7.content == 'folders'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.content.files",
+        "title": "%command.paneAction.content.files.title%",
+        "toggled": "codeFolderSpaces.pane7.content == 'files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane7.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane7.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane7.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane7.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane7.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane7.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.collapseAll",
+        "title": "%command.paneAction.collapseAll.title%",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.expandAll",
+        "title": "%command.paneAction.expandAll.title%",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.preset.Explorer",
+        "title": "%command.paneAction.preset.Explorer.title%",
+        "toggled": "codeFolderSpaces.pane8.preset == 'Explorer'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.preset.Navigate",
+        "title": "%command.paneAction.preset.Navigate.title%",
+        "toggled": "codeFolderSpaces.pane8.preset == 'Navigate'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.preset.Columns",
+        "title": "%command.paneAction.preset.Columns.title%",
+        "toggled": "codeFolderSpaces.pane8.preset == 'Columns'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.preset.Context",
+        "title": "%command.paneAction.preset.Context.title%",
+        "toggled": "codeFolderSpaces.pane8.preset == 'Context'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.preset.Contents",
+        "title": "%command.paneAction.preset.Contents.title%",
+        "toggled": "codeFolderSpaces.pane8.preset == 'Contents'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.preset.Files",
+        "title": "%command.paneAction.preset.Files.title%",
+        "toggled": "codeFolderSpaces.pane8.preset == 'Files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.preset.List",
+        "title": "%command.paneAction.preset.List.title%",
+        "toggled": "codeFolderSpaces.pane8.preset == 'List'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.level.1",
+        "title": "%command.paneAction.level.1.title%",
+        "toggled": "codeFolderSpaces.pane8.level == '1'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.level.2",
+        "title": "%command.paneAction.level.2.title%",
+        "toggled": "codeFolderSpaces.pane8.level == '2'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.level.all",
+        "title": "%command.paneAction.level.all.title%",
+        "toggled": "codeFolderSpaces.pane8.level == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.content.all",
+        "title": "%command.paneAction.content.all.title%",
+        "toggled": "codeFolderSpaces.pane8.content == 'all'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.content.folders",
+        "title": "%command.paneAction.content.folders.title%",
+        "toggled": "codeFolderSpaces.pane8.content == 'folders'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.content.files",
+        "title": "%command.paneAction.content.files.title%",
+        "toggled": "codeFolderSpaces.pane8.content == 'files'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane8.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane8.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane8.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane8.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane8.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane8.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.collapseAll",
+        "title": "%command.paneAction.collapseAll.title%",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.expandAll",
+        "title": "%command.paneAction.expandAll.title%",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.toggleFollow",
+        "title": "%command.pane.toggleFollow.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.drillUp",
+        "title": "%command.drillUp.title%",
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.drillUp",
+        "title": "%command.drillUp.title%",
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.drillUp",
+        "title": "%command.drillUp.title%",
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.drillUp",
+        "title": "%command.drillUp.title%",
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.drillUp",
+        "title": "%command.drillUp.title%",
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.drillUp",
+        "title": "%command.drillUp.title%",
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.drillUp",
+        "title": "%command.drillUp.title%",
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.filter",
+        "title": "%command.filter.title%",
+        "icon": "$(filter)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.clearFilter",
+        "title": "%command.clearFilter.title%",
+        "icon": "$(clear-all)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.drillUp",
+        "title": "%command.drillUp.title%",
+        "icon": "$(arrow-left)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.toggleFollow",
+        "title": "%command.pane.toggleFollow.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.toggleFollow",
+        "title": "%command.pane.toggleFollow.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.toggleFollow",
+        "title": "%command.pane.toggleFollow.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.toggleFollow",
+        "title": "%command.pane.toggleFollow.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.toggleFollow",
+        "title": "%command.pane.toggleFollow.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.toggleFollow",
+        "title": "%command.pane.toggleFollow.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.toggleFollow",
+        "title": "%command.pane.toggleFollow.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.followOn",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(link)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.followOff",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.followOn",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(link)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.followOff",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.followOn",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(link)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane3.followOff",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.followOn",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(link)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane4.followOff",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.followOn",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(link)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane5.followOff",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.followOn",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(link)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane6.followOff",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.followOn",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(link)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane7.followOff",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.followOn",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(link)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.pane8.followOff",
+        "title": "%command.pane.toggleFollow.title%",
+        "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      }
     ],
     "keybindings": [
-      { "command": "codeFolderSpaces.newFile", "key": "ctrl+n", "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)" },
-      { "command": "codeFolderSpaces.copyEntry", "key": "ctrl+c", "when": "focusedView == codeFolderSpaces.pane1 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)" },
-      { "command": "codeFolderSpaces.cutEntry", "key": "ctrl+x", "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)" },
-      { "command": "codeFolderSpaces.pasteEntries", "key": "ctrl+v", "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)" },
-      { "command": "codeFolderSpaces.renameEntry", "key": "f2", "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)" },
-      { "command": "codeFolderSpaces.deleteEntry", "key": "delete", "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)" },
-      { "command": "codeFolderSpaces.undoFileOperation", "key": "ctrl+z", "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted" }
+      {
+        "command": "codeFolderSpaces.newFile",
+        "key": "ctrl+n",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane1"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.newFile",
+        "key": "ctrl+n",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane2"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.newFile",
+        "key": "ctrl+n",
+        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane3"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.newFile",
+        "key": "ctrl+n",
+        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane4"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.newFile",
+        "key": "ctrl+n",
+        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane5"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.newFile",
+        "key": "ctrl+n",
+        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane6"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.newFile",
+        "key": "ctrl+n",
+        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane7"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.newFile",
+        "key": "ctrl+n",
+        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane8"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "key": "ctrl+c",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane1"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "key": "ctrl+c",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane2"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "key": "ctrl+c",
+        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane3"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "key": "ctrl+c",
+        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane4"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "key": "ctrl+c",
+        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane5"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "key": "ctrl+c",
+        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane6"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "key": "ctrl+c",
+        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane7"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.copyEntry",
+        "key": "ctrl+c",
+        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane8"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "key": "ctrl+x",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane1"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "key": "ctrl+x",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane2"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "key": "ctrl+x",
+        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane3"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "key": "ctrl+x",
+        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane4"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "key": "ctrl+x",
+        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane5"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "key": "ctrl+x",
+        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane6"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "key": "ctrl+x",
+        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane7"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.cutEntry",
+        "key": "ctrl+x",
+        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane8"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "key": "ctrl+v",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane1"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "key": "ctrl+v",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane2"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "key": "ctrl+v",
+        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane3"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "key": "ctrl+v",
+        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane4"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "key": "ctrl+v",
+        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane5"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "key": "ctrl+v",
+        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane6"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "key": "ctrl+v",
+        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane7"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.pasteEntries",
+        "key": "ctrl+v",
+        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane8"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "key": "f2",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane1"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "key": "f2",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane2"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "key": "f2",
+        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane3"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "key": "f2",
+        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane4"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "key": "f2",
+        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane5"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "key": "f2",
+        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane6"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "key": "f2",
+        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane7"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.renameEntry",
+        "key": "f2",
+        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane8"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "key": "delete",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane1"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "key": "delete",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane2"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "key": "delete",
+        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane3"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "key": "delete",
+        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane4"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "key": "delete",
+        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane5"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "key": "delete",
+        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane6"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "key": "delete",
+        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane7"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.deleteEntry",
+        "key": "delete",
+        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "args": {
+          "paneId": "pane8"
+        }
+      },
+      {
+        "command": "codeFolderSpaces.undoFileOperation",
+        "key": "ctrl+z",
+        "when": "focusedView =~ /^codeFolderSpaces.pane[1-8]$/ && listFocus && isWorkspaceTrusted"
+      }
     ],
     "menus": {
-      "view/title": [
-        { "command": "codeFolderSpaces.pane1.menu", "when": "view == codeFolderSpaces.pane1", "group": "navigation@0" },
-        { "command": "codeFolderSpaces.pane2.menu", "when": "view == codeFolderSpaces.pane2", "group": "navigation@0" },
-        { "command": "codeFolderSpaces.pane3.menu", "when": "view == codeFolderSpaces.pane3", "group": "navigation@0" },
-        { "command": "codeFolderSpaces.pane4.menu", "when": "view == codeFolderSpaces.pane4", "group": "navigation@0" },
-        { "command": "codeFolderSpaces.pane5.menu", "when": "view == codeFolderSpaces.pane5", "group": "navigation@0" },
-        { "command": "codeFolderSpaces.pane6.menu", "when": "view == codeFolderSpaces.pane6", "group": "navigation@0" },
-        { "command": "codeFolderSpaces.pane7.menu", "when": "view == codeFolderSpaces.pane7", "group": "navigation@0" },
-        { "command": "codeFolderSpaces.pane8.menu", "when": "view == codeFolderSpaces.pane8", "group": "navigation@0" },
+      "commandPalette": [
         {
-          "command": "codeFolderSpaces.pane.add",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.canAddPane",
-          "group": "navigation@9"
+          "command": "codeFolderSpaces.pane1.mode",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane.remove",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.canRemovePane",
-          "group": "navigation@10"
+          "command": "codeFolderSpaces.pane1.switchRoot",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.addSpace",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@1"
+          "command": "codeFolderSpaces.pane1.addChild",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.refresh",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@2"
+          "command": "codeFolderSpaces.pane1.close",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.revealActiveFile",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@2"
+          "command": "codeFolderSpaces.pane1.refresh",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.toggleFollowActiveFile",
-          "when": "view == codeFolderSpaces.pane1 && (!codeFolderSpaces.followActiveFile)",
-          "group": "navigation@2"
+          "command": "codeFolderSpaces.pane2.mode",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.toggleFollowActiveFile",
-          "when": "view == codeFolderSpaces.pane1 && (codeFolderSpaces.followActiveFile)",
-          "group": "navigation@2"
+          "command": "codeFolderSpaces.pane2.switchRoot",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.expandLevel",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@2"
+          "command": "codeFolderSpaces.pane2.addChild",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.setPreset",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@3"
+          "command": "codeFolderSpaces.pane2.close",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.toggleMode",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@4"
+          "command": "codeFolderSpaces.pane2.refresh",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.filter",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@5"
+          "command": "codeFolderSpaces.pane3.mode",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.clearFilter",
-          "when": "view == codeFolderSpaces.pane1 && (codeFolderSpaces.hasFilter)",
-          "group": "navigation@6"
+          "command": "codeFolderSpaces.pane3.switchRoot",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.setSort",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@7"
+          "command": "codeFolderSpaces.pane3.addChild",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.drillUp",
-          "when": "view == codeFolderSpaces.pane1 && (codeFolderSpaces.canDrillUp)",
-          "group": "navigation@8"
+          "command": "codeFolderSpaces.pane3.close",
+          "when": "false"
         },
         {
-          "command": "codeFolderSpaces.switchRoot",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "navigation@9"
+          "command": "codeFolderSpaces.pane3.refresh",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.mode",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.switchRoot",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.addChild",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.close",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.refresh",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.mode",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.switchRoot",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.addChild",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.close",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.refresh",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.mode",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.switchRoot",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.addChild",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.close",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.refresh",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.mode",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.switchRoot",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.addChild",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.close",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.refresh",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.mode",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.switchRoot",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.addChild",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.close",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.refresh",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane.close",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Navigate",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Columns",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Context",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Contents",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.List",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.level.1",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.level.2",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.level.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.content.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.content.folders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.content.files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.collapseAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Navigate",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Columns",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Context",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Contents",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.List",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.level.1",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.level.2",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.level.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.content.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.content.folders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.content.files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.collapseAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Navigate",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Columns",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Context",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Contents",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.List",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.level.1",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.level.2",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.level.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.content.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.content.folders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.content.files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.collapseAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Navigate",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Columns",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Context",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Contents",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.List",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.level.1",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.level.2",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.level.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.content.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.content.folders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.content.files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.collapseAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Navigate",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Columns",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Context",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Contents",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.List",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.level.1",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.level.2",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.level.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.content.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.content.folders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.content.files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.collapseAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Navigate",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Columns",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Context",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Contents",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.List",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.level.1",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.level.2",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.level.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.content.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.content.folders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.content.files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.collapseAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Navigate",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Columns",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Context",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Contents",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.List",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.level.1",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.level.2",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.level.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.content.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.content.folders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.content.files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.collapseAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Navigate",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Columns",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Context",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Contents",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.List",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.level.1",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.level.2",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.level.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.content.all",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.content.folders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.content.files",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.collapseAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.expandAll",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.toggleFollow",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.filter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.clearFilter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.drillUp",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.filter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.clearFilter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.drillUp",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.filter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.clearFilter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.drillUp",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.filter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.clearFilter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.drillUp",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.filter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.clearFilter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.drillUp",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.filter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.clearFilter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.drillUp",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.filter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.clearFilter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.drillUp",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.filter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.clearFilter",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.drillUp",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.toggleFollow",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.toggleFollow",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.toggleFollow",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.toggleFollow",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.toggleFollow",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.toggleFollow",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.toggleFollow",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.followOn",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.followOff",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.followOn",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.followOff",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.followOn",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.followOff",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.followOn",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.followOff",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.followOn",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.followOff",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.followOn",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.followOff",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.followOn",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.followOff",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.followOn",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.followOff",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.root.add",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.root.remove",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.root.add",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.root.remove",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.root.add",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.root.remove",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.root.add",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.root.remove",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.root.add",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.root.remove",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.root.add",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.root.remove",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.root.add",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.root.remove",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.root.add",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.root.remove",
+          "when": "false"
         }
-,
+      ],
+      "view/title": [
         {
           "command": "codeFolderSpaces.pane1.followOn",
           "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.hasParent && codeFolderSpaces.pane1.follow",
@@ -328,6 +3187,66 @@
           "command": "codeFolderSpaces.pane1.followOff",
           "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.hasParent && !codeFolderSpaces.pane1.follow",
           "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.filter",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.clearFilter",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.hasFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.drillUp",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.canDrillUp",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.collapseAll",
+          "when": "view == codeFolderSpaces.pane1 && !codeFolderSpaces.pane1.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.expandAll",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.mode",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_view@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.switchRoot",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "2_root@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.addChild",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "2_root@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.refresh",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "3_pane@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "4_layout@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.close",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.canRemovePane",
+          "group": "4_layout@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "4_layout@3"
         },
         {
           "command": "codeFolderSpaces.pane2.followOn",
@@ -340,6 +3259,66 @@
           "group": "navigation@1"
         },
         {
+          "command": "codeFolderSpaces.pane2.filter",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.clearFilter",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.hasFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.drillUp",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.canDrillUp",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.collapseAll",
+          "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.expandAll",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.mode",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_view@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.switchRoot",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "2_root@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.addChild",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "2_root@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.refresh",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "3_pane@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "4_layout@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.close",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.canRemovePane",
+          "group": "4_layout@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "4_layout@3"
+        },
+        {
           "command": "codeFolderSpaces.pane3.followOn",
           "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.hasParent && codeFolderSpaces.pane3.follow",
           "group": "navigation@1"
@@ -348,6 +3327,66 @@
           "command": "codeFolderSpaces.pane3.followOff",
           "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.hasParent && !codeFolderSpaces.pane3.follow",
           "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.filter",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.clearFilter",
+          "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.hasFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.drillUp",
+          "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.canDrillUp",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.collapseAll",
+          "when": "view == codeFolderSpaces.pane3 && !codeFolderSpaces.pane3.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.expandAll",
+          "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.mode",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_view@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.switchRoot",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "2_root@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.addChild",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "2_root@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.refresh",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "3_pane@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "4_layout@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.close",
+          "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.canRemovePane",
+          "group": "4_layout@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "4_layout@3"
         },
         {
           "command": "codeFolderSpaces.pane4.followOn",
@@ -360,6 +3399,66 @@
           "group": "navigation@1"
         },
         {
+          "command": "codeFolderSpaces.pane4.filter",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.clearFilter",
+          "when": "view == codeFolderSpaces.pane4 && codeFolderSpaces.pane4.hasFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.drillUp",
+          "when": "view == codeFolderSpaces.pane4 && codeFolderSpaces.pane4.canDrillUp",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.collapseAll",
+          "when": "view == codeFolderSpaces.pane4 && !codeFolderSpaces.pane4.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.expandAll",
+          "when": "view == codeFolderSpaces.pane4 && codeFolderSpaces.pane4.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.mode",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_view@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.switchRoot",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "2_root@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.addChild",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "2_root@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.refresh",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "3_pane@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "4_layout@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.close",
+          "when": "view == codeFolderSpaces.pane4 && codeFolderSpaces.canRemovePane",
+          "group": "4_layout@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "4_layout@3"
+        },
+        {
           "command": "codeFolderSpaces.pane5.followOn",
           "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.hasParent && codeFolderSpaces.pane5.follow",
           "group": "navigation@1"
@@ -368,6 +3467,66 @@
           "command": "codeFolderSpaces.pane5.followOff",
           "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.hasParent && !codeFolderSpaces.pane5.follow",
           "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.filter",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.clearFilter",
+          "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.hasFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.drillUp",
+          "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.canDrillUp",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.collapseAll",
+          "when": "view == codeFolderSpaces.pane5 && !codeFolderSpaces.pane5.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.expandAll",
+          "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.mode",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_view@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.switchRoot",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "2_root@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.addChild",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "2_root@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.refresh",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "3_pane@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "4_layout@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.close",
+          "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.canRemovePane",
+          "group": "4_layout@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "4_layout@3"
         },
         {
           "command": "codeFolderSpaces.pane6.followOn",
@@ -380,6 +3539,66 @@
           "group": "navigation@1"
         },
         {
+          "command": "codeFolderSpaces.pane6.filter",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.clearFilter",
+          "when": "view == codeFolderSpaces.pane6 && codeFolderSpaces.pane6.hasFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.drillUp",
+          "when": "view == codeFolderSpaces.pane6 && codeFolderSpaces.pane6.canDrillUp",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.collapseAll",
+          "when": "view == codeFolderSpaces.pane6 && !codeFolderSpaces.pane6.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.expandAll",
+          "when": "view == codeFolderSpaces.pane6 && codeFolderSpaces.pane6.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.mode",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_view@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.switchRoot",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "2_root@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.addChild",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "2_root@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.refresh",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "3_pane@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "4_layout@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.close",
+          "when": "view == codeFolderSpaces.pane6 && codeFolderSpaces.canRemovePane",
+          "group": "4_layout@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "4_layout@3"
+        },
+        {
           "command": "codeFolderSpaces.pane7.followOn",
           "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.hasParent && codeFolderSpaces.pane7.follow",
           "group": "navigation@1"
@@ -390,6 +3609,66 @@
           "group": "navigation@1"
         },
         {
+          "command": "codeFolderSpaces.pane7.filter",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.clearFilter",
+          "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.hasFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.drillUp",
+          "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.canDrillUp",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.collapseAll",
+          "when": "view == codeFolderSpaces.pane7 && !codeFolderSpaces.pane7.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.expandAll",
+          "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.mode",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_view@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.switchRoot",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "2_root@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.addChild",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "2_root@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.refresh",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "3_pane@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "4_layout@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.close",
+          "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.canRemovePane",
+          "group": "4_layout@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "4_layout@3"
+        },
+        {
           "command": "codeFolderSpaces.pane8.followOn",
           "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.hasParent && codeFolderSpaces.pane8.follow",
           "group": "navigation@1"
@@ -398,40 +3677,1017 @@
           "command": "codeFolderSpaces.pane8.followOff",
           "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.hasParent && !codeFolderSpaces.pane8.follow",
           "group": "navigation@1"
-        }      ],
+        },
+        {
+          "command": "codeFolderSpaces.pane8.filter",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.clearFilter",
+          "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.hasFilter",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.drillUp",
+          "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.canDrillUp",
+          "group": "navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.collapseAll",
+          "when": "view == codeFolderSpaces.pane8 && !codeFolderSpaces.pane8.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.expandAll",
+          "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.collapsed",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.mode",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_view@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.switchRoot",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "2_root@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.addChild",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "2_root@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.refresh",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "3_pane@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane.add",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "4_layout@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.close",
+          "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.canRemovePane",
+          "group": "4_layout@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "4_layout@3"
+        },
+        {
+          "submenu": "codeFolderSpaces.presetMenu",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "1_view@1"
+        },
+        {
+          "submenu": "codeFolderSpaces.levelMenu",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "1_view@2"
+        },
+        {
+          "submenu": "codeFolderSpaces.contentMenu",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "1_view@3"
+        },
+        {
+          "submenu": "codeFolderSpaces.sortMenu",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "1_view@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.root.add",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "2_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.root.remove",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.canRemoveRoot",
+          "group": "2_root@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.root.add",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "2_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.root.remove",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.canRemoveRoot",
+          "group": "2_root@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.root.add",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "2_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.root.remove",
+          "when": "view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.canRemoveRoot",
+          "group": "2_root@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.root.add",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "2_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.root.remove",
+          "when": "view == codeFolderSpaces.pane4 && codeFolderSpaces.pane4.canRemoveRoot",
+          "group": "2_root@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.root.add",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "2_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.root.remove",
+          "when": "view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.canRemoveRoot",
+          "group": "2_root@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.root.add",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "2_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.root.remove",
+          "when": "view == codeFolderSpaces.pane6 && codeFolderSpaces.pane6.canRemoveRoot",
+          "group": "2_root@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.root.add",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "2_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.root.remove",
+          "when": "view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.canRemoveRoot",
+          "group": "2_root@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.root.add",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "2_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.root.remove",
+          "when": "view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.canRemoveRoot",
+          "group": "2_root@4"
+        }
+      ],
       "view/item/context": [
         {
           "command": "codeFolderSpaces.drillDown",
-          "when": "view == codeFolderSpaces.pane1 && viewItem == codeFolderSpaces.folder",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && viewItem == codeFolderSpaces.folder",
           "group": "inline@1"
+        },
+        {
+          "command": "codeFolderSpaces.drillDown",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && viewItem == codeFolderSpaces.folder",
+          "group": "1_modification@0"
         },
         {
           "command": "codeFolderSpaces.pane.addChild",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.canAddPane && viewItem == codeFolderSpaces.folder",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && codeFolderSpaces.canAddPane && viewItem == codeFolderSpaces.folder",
           "group": "inline@2"
         },
         {
-          "command": "codeFolderSpaces.renameSpace",
-          "when": "view == codeFolderSpaces.pane1 && viewItem == codeFolderSpaces.spaceRoot",
+          "command": "codeFolderSpaces.root.remove",
+          "when": "(view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.canRemoveRoot || view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.canRemoveRoot || view == codeFolderSpaces.pane3 && codeFolderSpaces.pane3.canRemoveRoot || view == codeFolderSpaces.pane4 && codeFolderSpaces.pane4.canRemoveRoot || view == codeFolderSpaces.pane5 && codeFolderSpaces.pane5.canRemoveRoot || view == codeFolderSpaces.pane6 && codeFolderSpaces.pane6.canRemoveRoot || view == codeFolderSpaces.pane7 && codeFolderSpaces.pane7.canRemoveRoot || view == codeFolderSpaces.pane8 && codeFolderSpaces.pane8.canRemoveRoot) && viewItem == codeFolderSpaces.spaceRoot",
           "group": "inline@1"
         },
         {
-          "command": "codeFolderSpaces.removeSpace",
-          "when": "view == codeFolderSpaces.pane1 && viewItem == codeFolderSpaces.spaceRoot",
-          "group": "inline@2"
+          "command": "codeFolderSpaces.newFile",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted",
+          "group": "1_modification@1"
         },
-        { "command": "codeFolderSpaces.newFile", "when": "view == codeFolderSpaces.pane1 && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "1_modification@1" },
-        { "command": "codeFolderSpaces.newFolder", "when": "view == codeFolderSpaces.pane1 && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "1_modification@2" },
-        { "command": "codeFolderSpaces.renameEntry", "when": "view == codeFolderSpaces.pane1 && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)", "group": "1_modification@3" },
-        { "command": "codeFolderSpaces.moveTo", "when": "view == codeFolderSpaces.pane1 && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)", "group": "1_modification@4" },
-        { "command": "codeFolderSpaces.deleteEntry", "when": "view == codeFolderSpaces.pane1 && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)", "group": "1_modification@5" },
-        { "command": "codeFolderSpaces.undoFileOperation", "when": "view == codeFolderSpaces.pane1 && isWorkspaceTrusted", "group": "1_modification@6" },
-        { "command": "codeFolderSpaces.revealInExplorer", "when": "view == codeFolderSpaces.pane1 && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "2_navigation@1" },
-        { "command": "codeFolderSpaces.revealFileInOS", "when": "view == codeFolderSpaces.pane1 && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "2_navigation@2" },
-        { "command": "codeFolderSpaces.openInTerminal", "when": "view == codeFolderSpaces.pane1 && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "2_navigation@3" },
-        { "command": "codeFolderSpaces.findInFolder", "when": "view == codeFolderSpaces.pane1 && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "2_navigation@4" },
-        { "command": "codeFolderSpaces.copyFilePath", "when": "view == codeFolderSpaces.pane1 && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "3_clipboard@1" },
-        { "command": "codeFolderSpaces.copyRelativeFilePath", "when": "view == codeFolderSpaces.pane1 && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)", "group": "3_clipboard@2" }
+        {
+          "command": "codeFolderSpaces.newFolder",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted",
+          "group": "1_modification@2"
+        },
+        {
+          "command": "codeFolderSpaces.renameEntry",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+          "group": "1_modification@3"
+        },
+        {
+          "command": "codeFolderSpaces.moveTo",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+          "group": "1_modification@4"
+        },
+        {
+          "command": "codeFolderSpaces.deleteEntry",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+          "group": "1_modification@5"
+        },
+        {
+          "command": "codeFolderSpaces.undoFileOperation",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted",
+          "group": "1_modification@6"
+        },
+        {
+          "command": "codeFolderSpaces.revealInExplorer",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "2_navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.revealFileInOS",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "2_navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.openInTerminal",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "2_navigation@3"
+        },
+        {
+          "command": "codeFolderSpaces.findInFolder",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "2_navigation@4"
+        },
+        {
+          "command": "codeFolderSpaces.copyFilePath",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "3_clipboard@1"
+        },
+        {
+          "command": "codeFolderSpaces.copyRelativeFilePath",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "group": "3_clipboard@2"
+        }
+      ],
+      "codeFolderSpaces.presetMenu": [
+        {
+          "command": "codeFolderSpaces.pane1.preset.Explorer",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_preset@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Navigate",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_preset@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Columns",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_preset@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Context",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_preset@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Contents",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_preset@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.Files",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_preset@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.preset.List",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_preset@7"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Explorer",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_preset@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Navigate",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_preset@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Columns",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_preset@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Context",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_preset@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Contents",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_preset@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.Files",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_preset@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.preset.List",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_preset@7"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Explorer",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_preset@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Navigate",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_preset@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Columns",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_preset@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Context",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_preset@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Contents",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_preset@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.Files",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_preset@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.preset.List",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_preset@7"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Explorer",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_preset@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Navigate",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_preset@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Columns",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_preset@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Context",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_preset@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Contents",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_preset@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.Files",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_preset@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.preset.List",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_preset@7"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Explorer",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_preset@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Navigate",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_preset@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Columns",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_preset@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Context",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_preset@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Contents",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_preset@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.Files",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_preset@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.preset.List",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_preset@7"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Explorer",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_preset@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Navigate",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_preset@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Columns",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_preset@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Context",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_preset@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Contents",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_preset@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.Files",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_preset@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.preset.List",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_preset@7"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Explorer",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_preset@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Navigate",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_preset@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Columns",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_preset@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Context",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_preset@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Contents",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_preset@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.Files",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_preset@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.preset.List",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_preset@7"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Explorer",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_preset@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Navigate",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_preset@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Columns",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_preset@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Context",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_preset@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Contents",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_preset@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.Files",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_preset@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.preset.List",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_preset@7"
+        }
+      ],
+      "codeFolderSpaces.levelMenu": [
+        {
+          "command": "codeFolderSpaces.pane1.level.1",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_level@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.level.2",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_level@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.level.all",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_level@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.level.1",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_level@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.level.2",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_level@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.level.all",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_level@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.level.1",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_level@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.level.2",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_level@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.level.all",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_level@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.level.1",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_level@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.level.2",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_level@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.level.all",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_level@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.level.1",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_level@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.level.2",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_level@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.level.all",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_level@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.level.1",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_level@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.level.2",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_level@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.level.all",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_level@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.level.1",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_level@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.level.2",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_level@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.level.all",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_level@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.level.1",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_level@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.level.2",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_level@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.level.all",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_level@3"
+        }
+      ],
+      "codeFolderSpaces.contentMenu": [
+        {
+          "command": "codeFolderSpaces.pane1.content.all",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_content@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.content.folders",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_content@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.content.files",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_content@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.content.all",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_content@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.content.folders",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_content@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.content.files",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_content@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.content.all",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_content@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.content.folders",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_content@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.content.files",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_content@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.content.all",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_content@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.content.folders",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_content@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.content.files",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_content@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.content.all",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_content@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.content.folders",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_content@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.content.files",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_content@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.content.all",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_content@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.content.folders",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_content@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.content.files",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_content@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.content.all",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_content@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.content.folders",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_content@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.content.files",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_content@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.content.all",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_content@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.content.folders",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_content@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.content.files",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_content@3"
+        }
+      ],
+      "codeFolderSpaces.sortMenu": [
+        {
+          "command": "codeFolderSpaces.pane1.sort.name.asc",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.name.desc",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.mtime.asc",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.mtime.desc",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_sort@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.ctime.asc",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_sort@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.ctime.desc",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_sort@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.asc",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.desc",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.asc",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.desc",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_sort@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.asc",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_sort@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.desc",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "1_sort@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.name.asc",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.name.desc",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.mtime.asc",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.mtime.desc",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_sort@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.ctime.asc",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_sort@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane3.sort.ctime.desc",
+          "when": "view == codeFolderSpaces.pane3",
+          "group": "1_sort@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.name.asc",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.name.desc",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.mtime.asc",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.mtime.desc",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_sort@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.ctime.asc",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_sort@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane4.sort.ctime.desc",
+          "when": "view == codeFolderSpaces.pane4",
+          "group": "1_sort@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.name.asc",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.name.desc",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.mtime.asc",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.mtime.desc",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_sort@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.ctime.asc",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_sort@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane5.sort.ctime.desc",
+          "when": "view == codeFolderSpaces.pane5",
+          "group": "1_sort@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.name.asc",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.name.desc",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.mtime.asc",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.mtime.desc",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_sort@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.ctime.asc",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_sort@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane6.sort.ctime.desc",
+          "when": "view == codeFolderSpaces.pane6",
+          "group": "1_sort@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.name.asc",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.name.desc",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.mtime.asc",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.mtime.desc",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_sort@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.ctime.asc",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_sort@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane7.sort.ctime.desc",
+          "when": "view == codeFolderSpaces.pane7",
+          "group": "1_sort@6"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.name.asc",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_sort@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.name.desc",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_sort@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.mtime.asc",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_sort@3"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.mtime.desc",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_sort@4"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.ctime.asc",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_sort@5"
+        },
+        {
+          "command": "codeFolderSpaces.pane8.sort.ctime.desc",
+          "when": "view == codeFolderSpaces.pane8",
+          "group": "1_sort@6"
+        }
       ]
     },
     "configuration": {
@@ -494,14 +4750,20 @@
         },
         "codeFolderSpaces.openFilesIn": {
           "type": "string",
-          "enum": ["current", "beside"],
+          "enum": [
+            "current",
+            "beside"
+          ],
           "default": "current",
-          "enumDescriptions": ["%configuration.openFilesIn.current%", "%configuration.openFilesIn.beside%"],
+          "enumDescriptions": [
+            "%configuration.openFilesIn.current%",
+            "%configuration.openFilesIn.beside%"
+          ],
           "description": "%configuration.openFilesIn.description%"
         },
         "codeFolderSpaces.followActiveFile": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "%configuration.followActiveFile.description%"
         },
         "codeFolderSpaces.panes.count": {
@@ -510,9 +4772,79 @@
           "minimum": 1,
           "maximum": 8,
           "description": "%configuration.panes.count.description%"
+        },
+        "codeFolderSpaces.defaultPreset": {
+          "type": "string",
+          "enum": [
+            "Explorer",
+            "Navigate",
+            "Columns",
+            "Context",
+            "Contents",
+            "Files",
+            "List"
+          ],
+          "default": "Explorer",
+          "description": "%configuration.defaultPreset.description%"
+        },
+        "codeFolderSpaces.defaultChildPreset": {
+          "type": "string",
+          "enum": [
+            "Explorer",
+            "Navigate",
+            "Columns",
+            "Context",
+            "Contents",
+            "Files",
+            "List"
+          ],
+          "default": "Contents",
+          "description": "%configuration.defaultChildPreset.description%"
+        },
+        "codeFolderSpaces.adaptiveCascadeParent": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.adaptiveCascadeParent.description%"
+        },
+        "codeFolderSpaces.cascadeParentPreset": {
+          "type": "string",
+          "enum": [
+            "Explorer",
+            "Navigate",
+            "Columns",
+            "Context",
+            "Contents",
+            "Files",
+            "List"
+          ],
+          "default": "Navigate",
+          "description": "%configuration.cascadeParentPreset.description%"
+        },
+        "codeFolderSpaces.followWorkspaceDirectory": {
+          "type": "boolean",
+          "default": true,
+          "description": "%configuration.followWorkspaceDirectory.description%"
         }
       }
-    }
+    },
+    "submenus": [
+      {
+        "id": "codeFolderSpaces.presetMenu",
+        "label": "%submenu.preset.label%"
+      },
+      {
+        "id": "codeFolderSpaces.levelMenu",
+        "label": "%submenu.level.label%"
+      },
+      {
+        "id": "codeFolderSpaces.contentMenu",
+        "label": "%submenu.content.label%"
+      },
+      {
+        "id": "codeFolderSpaces.sortMenu",
+        "label": "%submenu.sort.label%"
+      }
+    ]
   },
   "scripts": {
     "build": "node esbuild.mjs",

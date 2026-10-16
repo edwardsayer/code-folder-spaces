@@ -7,6 +7,7 @@ import {
   nextChildPaneId,
   reattachChildren,
   shouldCascadeSelection,
+  shouldSyncWorkspaceRoots,
   wouldCreateCycle,
 } from '../../src/spaces/paneLinks';
 import type { PaneLinkState } from '../../src/spaces/viewState';
@@ -162,10 +163,29 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     expect(nextChildPaneId('pane8', ['pane1', 'pane8'])).toBeUndefined();
   });
 
-  it('only closes non-pane1 panes while at least one pane stays (F-11/D71)', () => {
+  it('closes any enabled pane (including pane1) while at least one pane stays (F-11, S4.1R3 revises D71)', () => {
     expect(canClosePane('pane2', ['pane1', 'pane2'])).toBe(true);
-    expect(canClosePane('pane1', ['pane1', 'pane2'])).toBe(false);
+    expect(canClosePane('pane1', ['pane1', 'pane2'])).toBe(true);
+    expect(canClosePane('pane1', ['pane1'])).toBe(false);
     expect(canClosePane('pane2', ['pane2'])).toBe(false);
     expect(canClosePane('pane3', ['pane1', 'pane2'])).toBe(false);
+  });
+
+  it('syncs follow pane roots when a multi-folder workspace gains another folder (S4.1R11 OP-16)', () => {
+    const same = (a: string, b: string) => a === b;
+    // 加入第二個專案資料夾是 OP-16 的核心用例，不可因首項相同而早退。
+    expect(shouldSyncWorkspaceRoots(['D:/a'], ['D:/a', 'D:/b'], same)).toBe(true);
+    // 完全同步時早退（避免無謂 persist）。
+    expect(shouldSyncWorkspaceRoots(['D:/a', 'D:/b'], ['D:/a', 'D:/b'], same)).toBe(false);
+    // R10 P1 的下鑽保護由 setPaneRoots 承接，不得以首項相同早退。
+    expect(shouldSyncWorkspaceRoots(['D:/a'], ['D:/a'], same)).toBe(false);
+    // 換掉第一個專案仍須同步。
+    expect(shouldSyncWorkspaceRoots(['D:/a'], ['D:/c'], same)).toBe(true);
+    // 多根收回單根：必須同步，否則已失效的 root 與 watcher 會殘留（審查 P1-1 回歸）。
+    expect(shouldSyncWorkspaceRoots(['D:/a', 'D:/b'], ['D:/a'], same)).toBe(true);
+    // 尚無 root 的 follow pane 必須被填入。
+    expect(shouldSyncWorkspaceRoots([], ['D:/a'], same)).toBe(true);
+    // 順序不同視為不同集合。
+    expect(shouldSyncWorkspaceRoots(['D:/b', 'D:/a'], ['D:/a', 'D:/b'], same)).toBe(true);
   });
 });

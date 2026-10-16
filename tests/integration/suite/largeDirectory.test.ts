@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import type { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
-import { clearGlobalSettings, createPaneProvider, createPaneStateHarness, seedPane } from './helpers';
+import { clearGlobalSettings, createPaneProvider, createPaneStateHarness, paneRootNode, seedPane } from './helpers';
 
 suite('S1-5 大型目錄量測', () => {
   let tmpRoot: string;
@@ -42,7 +42,7 @@ suite('S1-5 大型目錄量測', () => {
       const { state: viewState } = createPaneStateHarness();
       await seedPane(viewState, 'pane1', { root: tmpRoot });
       provider = createPaneProvider(store, viewState, 'pane1');
-      const root = (await provider.getChildren())[0];
+      const root = paneRootNode(provider);
       const deepPath = path.join(tmpRoot, 'deep', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'target.txt');
       await provider.getChildren(root); // warm-up
       await provider.getChildren(root);
@@ -51,7 +51,8 @@ suite('S1-5 大型目錄量測', () => {
         let started = performance.now();
         const rootChildren = await provider.getChildren() as SpaceNode[];
         samples.rootMilliseconds.push(performance.now() - started);
-        assert.equal(rootChildren.length, 1);
+        assert.equal(rootChildren.length, 4501);
+        assert.ok(rootChildren.every(node => node.contextValue !== 'codeFolderSpaces.spaceRoot'));
 
         started = performance.now();
         const children = await provider.getChildren(root) as SpaceNode[];

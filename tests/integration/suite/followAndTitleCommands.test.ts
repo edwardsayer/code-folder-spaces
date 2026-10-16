@@ -3,7 +3,7 @@ import { shouldFollowActiveFile } from '../../../src/spaces/followActiveFile';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { SpaceConfigEntry } from '../../../src/types';
-import { assertFixtureWorkspace, fixtureWorkspace, withGlobalSettings, withPaneProviders } from './helpers';
+import { assertFixtureWorkspace, fixtureWorkspace, paneRootNode, withGlobalSettings, withPaneProviders } from './helpers';
 
 // S4R6：provider 一律綁定單一 pane（scope = paneId＋definition），檢視狀態亦以 paneId 為 key。
 // 「標題列命令」在这里验证的是 provider 端可观察效果（filter／preset／根列），
@@ -46,15 +46,15 @@ suite('follow 與標題列操作 provider 驗證', () => {
   test('切換為扁平 preset 後 provider 只呈現檔案節點', async () => withStateProvider([alpha], async ({ provider, state }) => {
     await state.setPreset('pane1', 'Files');
     provider('pane1').refresh();
-    const root = (await provider('pane1').getChildren())[0];
+    const root = paneRootNode(provider('pane1'));
     const entries = await provider('pane1').getChildren(root);
     assert.ok(entries.length > 0);
     assert.ok(entries.every(node => node.contextValue === 'codeFolderSpaces.file'));
-    assert.ok(entries.some(node => node.description === 'nested/deep.md'));
+    assert.ok(entries.some(node => String(node.label) === 'nested/deep.md'));
   }));
 
-  test('根節點展開一層時目錄具可展開狀態', async () => withStateProvider([alpha], async ({ provider }) => {
-    const root = (await provider('pane1').getChildren())[0];
+  test('根層展開時目錄具可展開狀態', async () => withStateProvider([alpha], async ({ provider }) => {
+    const root = paneRootNode(provider('pane1'));
     const children = await provider('pane1').getChildren(root);
     const nested = children.find(node => node.label === 'nested');
     assert.ok(nested);

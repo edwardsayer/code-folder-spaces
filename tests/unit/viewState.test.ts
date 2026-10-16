@@ -8,6 +8,7 @@ import {
   defaultPaneState,
   getEnabledPaneCount,
   LEGACY_PANE_STATE_KEY,
+  LEGACY_V1_PANE_STATE_KEY,
   migrateV1ToV2,
   MAX_PANE_COUNT,
   normalizePane,
@@ -71,35 +72,35 @@ function doc(value: unknown): PaneStateDocument {
 
 describe('pane view state v2 schema (S4R6-D60/D63)', () => {
   it('stores per-pane state under the v2 key and keeps v1 as a legacy source key only', () => {
-    expect(PANE_STATE_KEY).toBe('codeFolderSpaces.panes.v2');
-    expect(LEGACY_PANE_STATE_KEY).toBe('codeFolderSpaces.panes.v1');
+    expect(PANE_STATE_KEY).toBe('codeFolderSpaces.panes.v3');
+    expect(LEGACY_PANE_STATE_KEY).toBe('codeFolderSpaces.panes.v2');
   });
 
   it('normalizes a v2 document and preserves unknown document and pane fields', () => {
     const normalized = normalizePaneState({
-      version: 2,
+      version: 3,
       future: 'retained',
       panes: {
         pane1: { root: P('alpha', '..', 'alpha'), futurePane: 7 },
         pane2: { root: P('beta'), parentPaneId: 'pane1', follow: true, preset: 'Files' },
       },
     });
-    expect(normalized.version).toBe(2);
+    expect(normalized.version).toBe(3);
     expect(normalized.future).toBe('retained');
-    expect(normalized.panes.pane1).toMatchObject({ root: path.normalize(P('alpha')), futurePane: 7 });
+    expect(normalized.panes.pane1).toMatchObject({ roots: [path.normalize(P('alpha'))], futurePane: 7 });
     expect(normalized.panes.pane2).toMatchObject({ parentPaneId: 'pane1', follow: true, preset: 'Files' });
   });
 
   it('drops unknown pane ids and any foreign-version document instead of half-reading it', () => {
     const normalized = normalizePaneState({
-      version: 2,
+      version: 3,
       panes: { pane1: { root: P('alpha') }, pane9: { root: P('nine') }, bogus: { root: P('b') } },
     });
     expect(Object.keys(normalized.panes)).toEqual(['pane1']);
-    expect(normalizePaneState({ version: 1, bySpace: { [P('alpha')]: { preset: 'Files' } } })).toEqual({ version: 2, panes: {} });
-    expect(normalizePaneState(undefined)).toEqual({ version: 2, panes: {} });
-    expect(normalizePaneState([])).toEqual({ version: 2, panes: {} });
-    expect(normalizePaneState({ version: 2, panes: [] })).toEqual({ version: 2, panes: {} });
+    expect(normalizePaneState({ version: 1, bySpace: { [P('alpha')]: { preset: 'Files' } } })).toEqual({ version: 3, panes: {} });
+    expect(normalizePaneState(undefined)).toEqual({ version: 3, panes: {} });
+    expect(normalizePaneState([])).toEqual({ version: 3, panes: {} });
+    expect(normalizePaneState({ version: 3, panes: [] })).toEqual({ version: 3, panes: {} });
   });
 
   it('normalizes one pane to complete v2 defaults, coercing every malformed field', () => {
@@ -118,7 +119,8 @@ describe('pane view state v2 schema (S4R6-D60/D63)', () => {
       exclude: 'not-an-array',
     });
     expect(pane).toEqual({
-      root: path.normalize(P('alpha', 'nested')),
+      roots: [path.normalize(P('alpha', 'nested'))],
+      drillRoot: null, followWorkspaceDirectory: false,
       parentPaneId: null,
       follow: false,
       preset: 'Explorer',
@@ -137,8 +139,8 @@ describe('pane view state v2 schema (S4R6-D60/D63)', () => {
     expect(normalizePane({}, false).showFiles).toBe(false);
     expect(normalizePane({ showFiles: false }, true).showFiles).toBe(false);
     expect(defaultPaneState().showFiles).toBe(true);
-    expect(defaultPaneState({ root: P('alpha'), parentPaneId: 'pane1', follow: true, preset: 'List', showFiles: false, include: ['a'], exclude: ['b'] })).toEqual({
-      root: P('alpha'), parentPaneId: 'pane1', follow: true, preset: 'List', filter: '', sort: { key: 'name', direction: 'asc' },
+    expect(defaultPaneState({ roots: [P('alpha')], parentPaneId: 'pane1', follow: true, preset: 'List', showFiles: false, include: ['a'], exclude: ['b'] })).toEqual({
+      roots: [P('alpha')], drillRoot: null, followWorkspaceDirectory: false, parentPaneId: 'pane1', follow: true, preset: 'List', filter: '', sort: { key: 'name', direction: 'asc' },
       drillStack: [], name: null, icon: null, showFiles: false, include: ['a'], exclude: ['b'],
     });
   });
@@ -160,8 +162,8 @@ describe('pane activation count (S4R6-D65)', () => {
   it('builds min(count, 8) panes for a workspace with no configured spaces', () => {
     const empty = buildDefaultLayout([], 4, true);
     expect(Object.keys(empty.panes)).toEqual(['pane1', 'pane2', 'pane3', 'pane4']);
-    expect(empty.panes.pane1.root).toBeNull();
-    expect(empty.panes.pane2).toMatchObject({ root: null, parentPaneId: 'pane1', follow: true });
+    expect(empty.panes.pane1.roots).toEqual([]);
+    expect(empty.panes.pane2).toMatchObject({ roots: [], parentPaneId: 'pane1', follow: true });
 
     const single = buildDefaultLayout([], 1, false);
     expect(Object.keys(single.panes)).toEqual(['pane1']);
@@ -171,9 +173,9 @@ describe('pane activation count (S4R6-D65)', () => {
   it('seeds each default pane from the space at the same position and chains it to its predecessor', () => {
     const spaces = [space(P('alpha'), { showFiles: false, include: ['*.ts'], exclude: ['tmp'] }), space(P('beta'), { icon: 'folder' })];
     const layout = buildDefaultLayout(spaces, 3, true);
-    expect(layout.panes.pane1).toMatchObject({ root: path.normalize(P('alpha')), parentPaneId: null, follow: false, showFiles: false, include: ['*.ts'], exclude: ['tmp'] });
-    expect(layout.panes.pane2).toMatchObject({ root: path.normalize(P('beta')), parentPaneId: 'pane1', follow: true, showFiles: true, include: [], exclude: [] });
-    expect(layout.panes.pane3).toMatchObject({ root: null, parentPaneId: 'pane2', follow: true });
+    expect(layout.panes.pane1).toMatchObject({ roots: [path.normalize(P('alpha'))], parentPaneId: null, follow: false, showFiles: false, include: ['*.ts'], exclude: ['tmp'] });
+    expect(layout.panes.pane2).toMatchObject({ roots: [path.normalize(P('beta'))], parentPaneId: 'pane1', follow: true, showFiles: true, include: [], exclude: [] });
+    expect(layout.panes.pane3).toMatchObject({ roots: [], parentPaneId: 'pane2', follow: true });
   });
 });
 
@@ -265,37 +267,37 @@ describe('PaneStateStore lifecycle', () => {
   it('creates the default layout for a fresh workspace and persists it under v2', async () => {
     const memento = new MemoryMemento();
     const store = new PaneStateStore(memento);
-    const outcome = await store.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2 });
+    const outcome = await store.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false });
     expect(outcome).toEqual({ kind: 'created', enabled: 2 });
-    expect(doc(memento.read()).version).toBe(2);
+    expect(doc(memento.read()).version).toBe(3);
     expect(Object.keys(doc(memento.read()).panes)).toEqual(['pane1', 'pane2']);
   });
 
   it('migrates a stored v1 document once and removes the legacy key', async () => {
     const alpha = P('alpha');
     const memento = new MemoryMemento({
-      [LEGACY_PANE_STATE_KEY]: {
+      [LEGACY_V1_PANE_STATE_KEY]: {
         version: 1,
         bySpace: { [normalizeSpaceKey(alpha)]: { root: alpha, preset: 'Files', filter: 'x', sort: { key: 'mtime', direction: 'desc' }, drillStack: [] } },
         panes: { pane1: { root: alpha, parentPaneId: null, follow: false }, pane2: { root: P('beta'), parentPaneId: 'pane1', follow: true } },
       },
     });
     const store = new PaneStateStore(memento);
-    const outcome = await store.initialize({ spaces: [space(alpha)], showFilesDefault: true, configuredCount: 8 });
+    const outcome = await store.initialize({ spaces: [space(alpha)], showFilesDefault: true, configuredCount: 8, followWorkspaceDirectoryDefault: false });
     expect(outcome).toEqual({ kind: 'migrated', enabled: 2 });
     expect(memento.has(LEGACY_PANE_STATE_KEY)).toBe(false);
-    expect(store.get('pane1')).toMatchObject({ root: path.normalize(alpha), preset: 'Files', filter: 'x' });
+    expect(store.get('pane1')).toMatchObject({ roots: [path.normalize(alpha)], preset: 'Files', filter: 'x' });
     // D72: eight configured panes must not auto-fill the two migrated panes.
     expect(store.getEnabledPaneIds()).toEqual(['pane1', 'pane2']);
   });
 
   it('restores an existing v2 document and clears a stale legacy key', async () => {
     const memento = new MemoryMemento({
-      [PANE_STATE_KEY]: { version: 2, panes: { pane1: { root: P('alpha'), preset: 'List' } } },
+      [PANE_STATE_KEY]: { version: 3, panes: { pane1: { root: P('alpha'), preset: 'List' } } },
       [LEGACY_PANE_STATE_KEY]: { version: 1, bySpace: {} },
     });
     const store = new PaneStateStore(memento);
-    await expect(store.initialize({ spaces: [], showFilesDefault: true, configuredCount: 3 })).resolves.toEqual({ kind: 'restored', enabled: 1 });
+    await expect(store.initialize({ spaces: [], showFilesDefault: true, configuredCount: 3, followWorkspaceDirectoryDefault: false })).resolves.toEqual({ kind: 'restored', enabled: 1 });
     expect(memento.has(LEGACY_PANE_STATE_KEY)).toBe(false);
     expect(store.get('pane1').preset).toBe('List');
   });
@@ -303,49 +305,49 @@ describe('PaneStateStore lifecycle', () => {
   it('rebuilds the default layout when the stored document cannot be migrated', async () => {
     const memento = new MemoryMemento({ [PANE_STATE_KEY]: { version: 1, bySpace: {} } });
     const store = new PaneStateStore(memento);
-    const outcome = await store.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2 });
+    const outcome = await store.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false });
     expect(outcome.kind).toBe('rebuilt');
     expect(Object.keys(doc(memento.read()).panes)).toEqual(['pane1', 'pane2']);
   });
 
   it('rebuilds when the stored layout has invalid pane links or no pane1 (F-10)', async () => {
     // 反向鏈（pane1 掛在 pane2 之下）→ 佈局不合法
-    const reversed = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: {
+    const reversed = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: {
       pane1: { root: P('alpha'), parentPaneId: 'pane2', follow: true },
       pane2: { root: P('beta') },
     } } });
     const reversedStore = new PaneStateStore(reversed);
-    const reversedOutcome = await reversedStore.initialize({ spaces: [space(P('alpha')), space(P('beta'))], showFilesDefault: true, configuredCount: 2 });
+    const reversedOutcome = await reversedStore.initialize({ spaces: [space(P('alpha')), space(P('beta'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false });
     expect(reversedOutcome.kind).toBe('rebuilt');
     expect(reversedStore.get('pane1').parentPaneId).toBeNull();
 
     // 循環（pane2 ↔ pane3）
-    const cyclic = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: {
+    const cyclic = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: {
       pane1: { root: P('alpha') },
       pane2: { root: P('beta'), parentPaneId: 'pane3', follow: true },
       pane3: { root: P('gamma'), parentPaneId: 'pane2', follow: true },
     } } });
     const cyclicStore = new PaneStateStore(cyclic);
-    await expect(cyclicStore.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2 })).resolves.toMatchObject({ kind: 'rebuilt' });
+    await expect(cyclicStore.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false })).resolves.toMatchObject({ kind: 'rebuilt' });
 
     // 缺 pane1（D71 要求 pane1 恆存在）
-    const noPane1 = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: { pane3: { root: P('gamma') } } } });
+    const noPane1 = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane3: { root: P('gamma') } } } });
     const noPane1Store = new PaneStateStore(noPane1);
-    const noPane1Outcome = await noPane1Store.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2 });
-    expect(noPane1Outcome.kind).toBe('rebuilt');
-    expect(noPane1Store.getEnabledPaneIds()).toEqual(['pane1', 'pane2']);
+    const noPane1Outcome = await noPane1Store.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false });
+    expect(noPane1Outcome.kind).toBe('restored');
+    expect(noPane1Store.getEnabledPaneIds()).toEqual(['pane3']);
   });
 
   it('resets to the default layout for pane.resetLayout', async () => {
-    const memento = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: { pane1: { root: P('alpha') }, pane4: { root: P('delta'), parentPaneId: 'pane1', follow: true } } } });
+    const memento = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane1: { root: P('alpha') }, pane4: { root: P('delta'), parentPaneId: 'pane1', follow: true } } } });
     const store = new PaneStateStore(memento);
-    await store.resetToDefaults({ spaces: [space(P('alpha')), space(P('beta'))], showFilesDefault: true, configuredCount: 2 });
+    await store.resetToDefaults({ spaces: [space(P('alpha')), space(P('beta'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false });
     expect(store.getEnabledPaneIds()).toEqual(['pane1', 'pane2']);
     expect(store.get('pane4')).toEqual(defaultPaneState());
   });
 
   it('treats disabled or unknown pane ids as an empty default pane', async () => {
-    const store = new PaneStateStore(new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: { pane1: { root: P('alpha') } } } }));
+    const store = new PaneStateStore(new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane1: { root: P('alpha') } } } }));
     expect(store.get('pane7')).toEqual(defaultPaneState());
     expect(store.getEnabledPaneIds()).toEqual(['pane1']);
   });
@@ -354,7 +356,7 @@ describe('PaneStateStore lifecycle', () => {
 describe('slot allocation (PD-U2, S4R6-D62)', () => {
   function loaded(paneIds: string[]): PaneStateStore {
     return new PaneStateStore(new MemoryMemento({
-      [PANE_STATE_KEY]: { version: 2, panes: Object.fromEntries(paneIds.map((id, index) => [id, { root: P(`p${index}`), parentPaneId: index ? paneIds[index - 1] : null, follow: index > 0 }])) },
+      [PANE_STATE_KEY]: { version: 3, panes: Object.fromEntries(paneIds.map((id, index) => [id, { root: P(`p${index}`), parentPaneId: index ? paneIds[index - 1] : null, follow: index > 0 }])) },
     }));
   }
 
@@ -383,7 +385,7 @@ describe('slot allocation (PD-U2, S4R6-D62)', () => {
     const source = store.get('pane1');
     // 與 extension.ts 的 addChildPane 同形：**只**帶顯示設定（D75），preset／filter／sort 不繼承。
     await store.enablePane(slot as string, {
-      root: P('alpha', 'nested'),
+      roots: [P('alpha', 'nested')],
       parentPaneId: 'pane1',
       follow: true,
       showFiles: source.showFiles,
@@ -391,7 +393,7 @@ describe('slot allocation (PD-U2, S4R6-D62)', () => {
       exclude: source.exclude,
     });
     const child = store.get('pane3');
-    expect(child).toMatchObject({ root: path.join(P('alpha'), 'nested'), parentPaneId: 'pane1', follow: true, drillStack: [] });
+    expect(child).toMatchObject({ roots: [path.join(P('alpha'), 'nested')], parentPaneId: 'pane1', follow: true, drillStack: [] });
     // D75：只繼承顯示設定（來源值）。
     expect(child.showFiles).toBe(false);
     expect(child.include).toEqual(['**/*.ts']);
@@ -423,7 +425,7 @@ describe('slot allocation (PD-U2, S4R6-D62)', () => {
 describe('closing a pane through the store (PD-U3 persistence)', () => {
   function chainStore() {
     const memento = new MemoryMemento({
-      [PANE_STATE_KEY]: { version: 2, panes: {
+      [PANE_STATE_KEY]: { version: 3, panes: {
         pane1: { root: P('a'), parentPaneId: null, follow: false },
         pane2: { root: P('b'), parentPaneId: 'pane1', follow: true },
         pane3: { root: P('c'), parentPaneId: 'pane2', follow: true },
@@ -455,7 +457,7 @@ describe('per-pane view state is keyed by paneId (S4R6-D63)', () => {
   async function twoPanes() {
     const memento = new MemoryMemento();
     const store = new PaneStateStore(memento);
-    await store.initialize({ spaces: [space(P('alpha')), space(P('beta'))], showFilesDefault: true, configuredCount: 2 });
+    await store.initialize({ spaces: [space(P('alpha')), space(P('beta'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false });
     return { memento, store };
   }
 
@@ -465,8 +467,8 @@ describe('per-pane view state is keyed by paneId (S4R6-D63)', () => {
     await store.drillDown('pane1', path.join(P('alpha'), 'nested'));
     await store.setPreset('pane2', 'Contents');
     await store.switchRoot('pane1', P('other'));
-    expect(store.get('pane1')).toMatchObject({ root: path.normalize(P('other')), preset: 'Explorer', drillStack: [] });
-    expect(store.get('pane2')).toMatchObject({ root: path.normalize(P('beta')), preset: 'Contents' });
+    expect(store.get('pane1')).toMatchObject({ roots: [path.normalize(P('other'))], preset: 'Contents', drillStack: [] });
+    expect(store.get('pane2')).toMatchObject({ roots: [path.normalize(P('beta'))], preset: 'Contents' });
   });
 
   it('drills down and up per pane, restoring the previous view state', async () => {
@@ -476,17 +478,17 @@ describe('per-pane view state is keyed by paneId (S4R6-D63)', () => {
     await store.setSort('pane1', 'mtime', 'desc');
     await store.drillDown('pane1', path.join(P('alpha'), 'nested'));
     expect(store.get('pane1')).toMatchObject({
-      root: path.join(path.normalize(P('alpha')), 'nested'), preset: 'Explorer', filter: 'nested', sort: { key: 'mtime', direction: 'desc' },
+      drillRoot: path.join(path.normalize(P('alpha')), 'nested'), preset: 'Contents', filter: 'nested', sort: { key: 'mtime', direction: 'desc' },
       drillStack: [{ root: path.normalize(P('alpha')), preset: 'Files', filter: 'nested', sort: { key: 'mtime', direction: 'desc' } }],
     });
     // A sibling pane drilling into the same space is unaffected (F-S4R4-8 regression).
     await store.drillDown('pane2', path.join(P('beta'), 'nested'));
-    expect(store.get('pane2').root).toBe(path.join(path.normalize(P('beta')), 'nested'));
-    expect(store.get('pane1').root).toBe(path.join(path.normalize(P('alpha')), 'nested'));
+    expect(store.get('pane2').drillRoot).toBe(path.join(path.normalize(P('beta')), 'nested'));
+    expect(store.get('pane1').drillRoot).toBe(path.join(path.normalize(P('alpha')), 'nested'));
 
     await store.setFilter('pane1', 'other');
     await expect(store.drillUp('pane1')).resolves.toBe(true);
-    expect(store.get('pane1')).toMatchObject({ root: path.normalize(P('alpha')), preset: 'Files', filter: 'nested', sort: { key: 'mtime', direction: 'desc' }, drillStack: [] });
+    expect(store.get('pane1')).toMatchObject({ roots: [path.normalize(P('alpha'))], preset: 'Files', filter: 'nested', sort: { key: 'mtime', direction: 'desc' }, drillStack: [] });
     await expect(store.drillUp('pane1')).resolves.toBe(false);
   });
 
@@ -495,7 +497,7 @@ describe('per-pane view state is keyed by paneId (S4R6-D63)', () => {
     await store.drillDown('pane1', path.join(P('alpha'), 'a'));
     await store.drillDown('pane1', path.join(P('alpha'), 'b'));
     await store.resetRoot('pane1');
-    expect(store.get('pane1')).toMatchObject({ root: path.normalize(P('alpha')), drillStack: [] });
+    expect(store.get('pane1')).toMatchObject({ roots: [path.normalize(P('alpha'))], drillRoot: null, drillStack: [] });
   });
 
   it('persists preset, filter, sort, and display patches under the v2 key for every pane', async () => {
@@ -507,7 +509,7 @@ describe('per-pane view state is keyed by paneId (S4R6-D63)', () => {
     await store.clearFilter('pane2');
 
     const saved = doc(memento.read());
-    expect(saved.version).toBe(2);
+    expect(saved.version).toBe(3);
     expect('bySpace' in saved).toBe(false);
     expect(saved.panes.pane2).toMatchObject({
       preset: 'List', filter: '', sort: { key: 'ctime', direction: 'desc' },
@@ -520,7 +522,7 @@ describe('per-pane view state is keyed by paneId (S4R6-D63)', () => {
   it('ignores view-state writes addressed to a disabled pane', async () => {
     const { memento, store } = await twoPanes();
     await store.setPreset('pane7', 'Files');
-    await store.setPaneRoot('pane7', P('ghost'));
+    await store.switchRoot('pane7', P('ghost'));
     await store.setPaneDisplay('pane7', { name: 'Ghost' });
     expect(Object.keys(doc(memento.read()).panes)).toEqual(['pane1', 'pane2']);
   });
@@ -556,7 +558,7 @@ describe('follow with a temporary manual root (PD-U4, S4R6-D61/D74)', () => {
     const parent = P('alpha');
     const memento = new MemoryMemento({
       [PANE_STATE_KEY]: {
-        version: 2,
+        version: 3,
         panes: {
           pane1: { root: path.join(parent, 'first'), parentPaneId: null, follow: false },
           pane2: { root: path.join(parent, 'first'), parentPaneId: 'pane1', follow },
@@ -570,7 +572,7 @@ describe('follow with a temporary manual root (PD-U4, S4R6-D61/D74)', () => {
     const { store, parent } = await parentChild(true);
     const manual = path.join(parent, 'manual');
     await store.switchRoot('pane2', manual);
-    expect(store.get('pane2')).toMatchObject({ root: path.normalize(manual), follow: true, parentPaneId: 'pane1' });
+    expect(store.get('pane2')).toMatchObject({ roots: [path.normalize(manual)], follow: true, parentPaneId: 'pane1' });
     // The cascade still targets this child on the next parent selection.
     expect(getFollowingChildPaneIds(store.getPaneLinks(), 'pane1')).toEqual(['pane2']);
   });
@@ -580,9 +582,9 @@ describe('follow with a temporary manual root (PD-U4, S4R6-D61/D74)', () => {
     await store.switchRoot('pane2', path.join(parent, 'manual'));
     // PaneCascadeStateAdapter.setPaneRoot is exactly this store write (S4R6-D74).
     const nextParentSelection = path.join(parent, 'next');
-    await store.setPaneRoot('pane2', nextParentSelection);
-    expect(store.get('pane2')).toMatchObject({ root: path.normalize(nextParentSelection), follow: true });
-    expect(store.get('pane1').root).toBe(path.join(parent, 'first'));
+    await store.switchRoot('pane2', nextParentSelection);
+    expect(store.get('pane2')).toMatchObject({ roots: [path.normalize(nextParentSelection)], follow: true });
+    expect(store.get('pane1').roots[0]).toBe(path.join(parent, 'first'));
   });
 
   it('leaves a paused child alone when the parent moves', async () => {
@@ -590,8 +592,8 @@ describe('follow with a temporary manual root (PD-U4, S4R6-D61/D74)', () => {
     const manual = path.join(parent, 'manual');
     await store.switchRoot('pane2', manual);
     expect(getFollowingChildPaneIds(store.getPaneLinks(), 'pane1')).toEqual([]);
-    await store.setPaneRoot('pane2', path.join(parent, 'next'));
-    expect(store.get('pane2')).toMatchObject({ root: path.normalize(path.join(parent, 'next')), follow: false });
+    await store.switchRoot('pane2', path.join(parent, 'next'));
+    expect(store.get('pane2')).toMatchObject({ roots: [path.normalize(path.join(parent, 'next'))], follow: false });
   });
 
   it('exposes the follow projection that the cascade controller consumes', async () => {
@@ -609,7 +611,7 @@ describe('rename handling is pane-scoped (S4R6-D68 support)', () => {
   it('rewrites pane roots and drill entries under the renamed directory only', () => {
     const root = P('space');
     const document = normalizePaneState({
-      version: 2,
+      version: 3,
       panes: {
         pane1: { root: path.join(root, 'old', 'nested'), parentPaneId: null, follow: false, drillStack: [{ root: path.join(root, 'old', 'x'), preset: 'Explorer', filter: '', sort: { key: 'name', direction: 'asc' } }] },
         pane2: { root: path.join(root, 'keep'), parentPaneId: 'pane1', follow: true },
@@ -617,18 +619,18 @@ describe('rename handling is pane-scoped (S4R6-D68 support)', () => {
       },
     });
     const rewritten = rewritePaneDocumentRoots(document, path.join(root, 'old'), path.join(root, 'new'));
-    expect(rewritten.panes.pane1.root).toBe(path.join(path.join(root, 'new'), 'nested'));
+    expect(rewritten.panes.pane1.roots[0]).toBe(path.join(path.join(root, 'new'), 'nested'));
     expect(rewritten.panes.pane1.drillStack[0].root).toBe(path.join(path.join(root, 'new'), 'x'));
-    expect(rewritten.panes.pane2.root).toBe(path.join(root, 'keep'));
-    expect(rewritten.panes.pane3.root).toBe(P('elsewhere'));
+    expect(rewritten.panes.pane2.roots[0]).toBe(path.join(root, 'keep'));
+    expect(rewritten.panes.pane3.roots[0]).toBe(P('elsewhere'));
   });
 
   it('persists rewritten roots through the store', async () => {
     const root = P('space');
-    const memento = new MemoryMemento({ [PANE_STATE_KEY]: { version: 2, panes: { pane1: { root: path.join(root, 'old') } } } });
+    const memento = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane1: { root: path.join(root, 'old') } } } });
     const store = new PaneStateStore(memento);
     await store.rewriteRoots(path.join(root, 'old'), path.join(root, 'new'));
-    expect(doc(memento.read()).panes.pane1.root).toBe(path.join(root, 'new'));
+    expect(doc(memento.read()).panes.pane1.roots[0]).toBe(path.join(root, 'new'));
   });
 
   it('classifies space-root, inside-space, and unrelated renames for setting staleness', () => {

@@ -1,13 +1,15 @@
 import * as path from 'node:path';
 import type { SpaceDefinition } from '../types';
-import type { ViewPresetName } from './viewPresets';
-import { DEFAULT_VIEW_PRESET, isViewPresetName } from './viewPresets';
+import type { ViewAxisChange, ViewPresetName, ViewSettings } from './viewPresets';
+import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, applyViewAxis, isViewPresetName, isViewSettings, matchPresetName } from './viewPresets';
 import { hasValidPaneLinks, reattachChildren, wouldCreateCycle } from './paneLinks';
 
 /** Current workspaceState key (S4R6-D63: per-pane view state, no more `bySpace`). */
-export const PANE_STATE_KEY = 'codeFolderSpaces.panes.v2';
+export const PANE_STATE_KEY = 'codeFolderSpaces.panes.v3';
+/** Previous per-pane state schema. */
+export const LEGACY_PANE_STATE_KEY = 'codeFolderSpaces.panes.v2';
 /** Legacy v1 key that stores shared per-space view state; cleared once migrated. */
-export const LEGACY_PANE_STATE_KEY = 'codeFolderSpaces.panes.v1';
+export const LEGACY_V1_PANE_STATE_KEY = 'codeFolderSpaces.panes.v1';
 
 export type SortKey = 'name' | 'mtime' | 'ctime';
 export type SortDirection = 'asc' | 'desc';
@@ -20,6 +22,8 @@ export interface SortState {
 export interface ViewStateSnapshot {
   root: string;
   preset: ViewPresetName;
+  /** 自訂組合（不在任何預設集內）；缺省＝由 preset 決定。 */
+  view?: ViewSettings;
   filter: string;
   sort: SortState;
 }
@@ -40,13 +44,23 @@ export interface PaneLinkState {
  */
 export interface PaneState {
   [key: string]: unknown;
-  root: string | null;
+  roots: string[];
+  drillRoot: string | null;
   parentPaneId: string | null;
   follow: boolean;
+  followWorkspaceDirectory: boolean;
+  /** 最近套用（或目前符合）的預設集名稱；`view` 存在時以 `view` 為準。 */
   preset: ViewPresetName;
+  /** S4.1R7：自訂檢視組合（模式×層級×內容）；缺省＝`VIEW_PRESETS[preset]`。 */
+  view?: ViewSettings;
   filter: string;
   sort: SortState;
   drillStack: ViewStateSnapshot[];
+  /** S4.1R9（OP-13）：接龍自適應父面板備份的獨立檢視模式。 */
+  adaptiveParentBackup?: {
+    preset: ViewPresetName;
+    view?: ViewSettings;
+  } | null;
   /** null = D70 fallback: a configured space hit wins, otherwise the root basename. */
   name: string | null;
   /** null = D70 fallback: a configured space hit wins, otherwise the default folder icon. */
@@ -58,7 +72,7 @@ export interface PaneState {
 
 export interface PaneStateDocument {
   [key: string]: unknown;
-  version: 2;
+  version: 3;
   panes: Record<string, PaneState>;
 }
 
@@ -104,14 +118,17 @@ export interface DefaultPaneOptions {
   showFiles?: boolean;
   include?: string[];
   exclude?: string[];
-  root?: string | null;
+  roots?: string[];
   parentPaneId?: string | null;
   follow?: boolean;
+  followWorkspaceDirectory?: boolean;
 }
 
 export function defaultPaneState(options: DefaultPaneOptions = {}): PaneState {
   return {
-    root: options.root ?? null,
+    roots: options.roots ?? [],
+    drillRoot: null,
+    followWorkspaceDirectory: options.followWorkspaceDirectory ?? false,
     parentPaneId: options.parentPaneId ?? null,
     follow: options.follow ?? false,
     preset: options.preset ?? DEFAULT_VIEW_PRESET,
@@ -124,6 +141,11 @@ export function defaultPaneState(options: DefaultPaneOptions = {}): PaneState {
     include: options.include ?? [],
     exclude: options.exclude ?? [],
   };
+}
+
+/** 目前生效的檢視設定：自訂 `view` 優先，否則由預設集查表。 */
+export function effectiveView(pane: { preset: ViewPresetName; view?: ViewSettings }): ViewSettings {
+  return pane.view && isViewSettings(pane.view) ? pane.view : VIEW_PRESETS[pane.preset] ?? VIEW_PRESETS[DEFAULT_VIEW_PRESET];
 }
 
 function normalizeSort(value: unknown): SortState {
@@ -145,11 +167,15 @@ function isSnapshot(value: unknown): value is ViewStateSnapshot {
 
 function normalizeDrillStack(value: unknown): ViewStateSnapshot[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isSnapshot).map(snapshot => ({
-    ...snapshot,
-    root: path.normalize(snapshot.root),
-    sort: { ...normalizeSort(snapshot.sort) },
-  }));
+  return value.filter(isSnapshot).map(snapshot => {
+    const normalized: ViewStateSnapshot = {
+      ...snapshot,
+      root: path.normalize(snapshot.root),
+      sort: { ...normalizeSort(snapshot.sort) },
+    };
+    if (!isViewSettings(snapshot.view)) delete normalized.view;
+    return normalized;
+  });
 }
 
 function normalizeStringArray(value: unknown): string[] {
@@ -160,49 +186,88 @@ function normalizeOptionalString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
 }
 
-/** Normalize one v2 pane record, preserving unknown fields (spec §2.4.2). */
-export function normalizePane(value: unknown, fallbackShowFiles = true): PaneState {
+/** Normalize one pane record, accepting the v2 `root` shape for migration compatibility. */
+export function normalizePane(value: unknown, fallbackShowFiles = true, isPrimary = false): PaneState {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
-  return {
-    ...source,
-    root: typeof source.root === 'string' ? path.normalize(source.root) : null,
+  const roots = Array.isArray(source.roots) ? normalizeStringArray(source.roots).map(root => path.normalize(root))
+    : typeof source.root === 'string' ? [path.normalize(source.root)] : [];
+  const pane: PaneState = {
+    ...source, roots, drillRoot: typeof source.drillRoot === 'string' ? path.normalize(source.drillRoot) : null,
     parentPaneId: typeof source.parentPaneId === 'string' && PANE_ID_PATTERN.test(source.parentPaneId) ? source.parentPaneId : null,
     follow: source.follow === true,
+    followWorkspaceDirectory: typeof source.followWorkspaceDirectory === 'boolean' ? source.followWorkspaceDirectory : isPrimary,
     preset: isViewPresetName(source.preset) ? source.preset : DEFAULT_VIEW_PRESET,
-    filter: typeof source.filter === 'string' ? source.filter : '',
-    sort: normalizeSort(source.sort),
-    drillStack: normalizeDrillStack(source.drillStack),
-    name: normalizeOptionalString(source.name),
-    icon: normalizeOptionalString(source.icon),
+    filter: typeof source.filter === 'string' ? source.filter : '', sort: normalizeSort(source.sort),
+    drillStack: normalizeDrillStack(source.drillStack), name: normalizeOptionalString(source.name), icon: normalizeOptionalString(source.icon),
     showFiles: typeof source.showFiles === 'boolean' ? source.showFiles : fallbackShowFiles,
-    include: normalizeStringArray(source.include),
-    exclude: normalizeStringArray(source.exclude),
+    include: normalizeStringArray(source.include), exclude: normalizeStringArray(source.exclude),
   };
+  if (isViewSettings(source.view)) pane.view = { mode: source.view.mode, level: source.view.level, content: source.view.content };
+  else delete pane.view;
+  if (source.adaptiveParentBackup && typeof source.adaptiveParentBackup === 'object') {
+    const backup = source.adaptiveParentBackup as Record<string, unknown>;
+    if (isViewPresetName(backup.preset)) pane.adaptiveParentBackup = { preset: backup.preset,
+      ...(isViewSettings(backup.view) ? { view: { mode: backup.view.mode, level: backup.view.level, content: backup.view.content } } : {}) };
+    else delete pane.adaptiveParentBackup;
+  } else delete pane.adaptiveParentBackup;
+  delete (pane as Record<string, unknown>).root;
+  return pane;
 }
 
-/** Normalize a v2 document; anything malformed (or a foreign version) yields the empty default. */
+function lowestPaneId(ids: string[]): string | undefined {
+  return ids.filter(id => PANE_ID_PATTERN.test(id)).sort((a, b) => paneIndexOf(a) - paneIndexOf(b))[0];
+}
+
+/** Normalize a v3 document; malformed or foreign-version values yield the empty default. */
 export function normalizePaneState(value: unknown): PaneStateDocument {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return { version: 2, panes: {} };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { version: 3, panes: {} };
   const source = value as Record<string, unknown>;
-  if (source.version !== 2 || !source.panes || typeof source.panes !== 'object' || Array.isArray(source.panes)) {
-    return { version: 2, panes: {} };
-  }
+  if (source.version !== 3 || !source.panes || typeof source.panes !== 'object' || Array.isArray(source.panes)) return { version: 3, panes: {} };
+  const paneValues = source.panes as Record<string, unknown>;
+  const primary = lowestPaneId(Object.keys(paneValues));
   const panes: Record<string, PaneState> = {};
-  for (const [paneId, raw] of Object.entries(source.panes as Record<string, unknown>)) {
-    if (!PANE_ID_PATTERN.test(paneId)) continue;
-    panes[paneId] = normalizePane(raw);
+  for (const [paneId, raw] of Object.entries(paneValues)) if (PANE_ID_PATTERN.test(paneId)) panes[paneId] = normalizePane(raw, true, paneId === primary);
+  return { ...source, version: 3, panes };
+}
+
+export function activeRoot(pane: PaneState): string | null { return pane.drillRoot ?? pane.roots[0] ?? null; }
+
+/** Find the most-specific configured root containing target. */
+export function rootForUri(roots: readonly string[], target: string): string | null {
+  return roots.filter(root => isPathWithin(path.normalize(target), path.normalize(root)))
+    .sort((a, b) => path.relative(path.normalize(a), path.normalize(target)).length - path.relative(path.normalize(b), path.normalize(target)).length)[0] ?? null;
+}
+
+/** Convert a validated v2 document to v3 and move the global follow default to its primary pane. */
+export function migrateV2ToV3(value: unknown, followWorkspaceDirectoryDefault: boolean): PaneStateDocument {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  if (!value || typeof value !== 'object' || Array.isArray(value) || (value as Record<string, unknown>).version !== 2 ||
+      !(value as Record<string, unknown>).panes || typeof (value as Record<string, unknown>).panes !== 'object' || Array.isArray((value as Record<string, unknown>).panes)) {
+    throw new Error('panes.v2 is malformed');
   }
-  return { ...source, version: 2, panes };
+  const rawPanes = (value as { panes: Record<string, unknown> }).panes;
+  const primary = lowestPaneId(Object.keys(rawPanes));
+  const panes: Record<string, PaneState> = {};
+  for (const [id, raw] of Object.entries(rawPanes)) {
+    if (!PANE_ID_PATTERN.test(id)) continue;
+    const old = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+    const oldRoot = typeof old.root === 'string' ? path.normalize(old.root) : null;
+    const stack = normalizeDrillStack(old.drillStack);
+    panes[id] = normalizePane({ ...old, roots: stack.length ? [stack[0].root] : oldRoot ? [oldRoot] : [],
+      drillRoot: stack.length ? oldRoot : null, followWorkspaceDirectory: id === primary ? followWorkspaceDirectoryDefault : false }, true, id === primary);
+  }
+  return { ...source, version: 3, panes };
 }
 
 /** Initial layout for a new workspace (spec §2.2.2 with S4R6 semantics). */
-export function buildDefaultLayout(spaces: SpaceDefinition[], configuredCount: number, showFilesDefault: boolean): PaneStateDocument {
+export function buildDefaultLayout(spaces: SpaceDefinition[], configuredCount: number, showFilesDefault: boolean, followWorkspaceDirectoryDefault = false): PaneStateDocument {
   const count = getEnabledPaneCount(configuredCount);
   const panes: Record<string, PaneState> = {};
   for (let index = 1; index <= count; index++) {
     const space = spaces[index - 1];
     panes[`pane${index}`] = normalizePane({
-      root: space?.basePath ?? null,
+      roots: space ? [space.basePath] : [],
+      followWorkspaceDirectory: index === 1 ? followWorkspaceDirectoryDefault : false,
       parentPaneId: index > 1 ? `pane${index - 1}` : null,
       follow: index > 1,
       showFiles: space?.showFiles ?? showFilesDefault,
@@ -210,7 +275,7 @@ export function buildDefaultLayout(spaces: SpaceDefinition[], configuredCount: n
       exclude: space?.exclude ?? [],
     });
   }
-  return { version: 2, panes };
+  return { version: 3, panes };
 }
 
 /** One-time v1 → v2 migration (spec §2.4.3); throws when the v1 document is unusable. */
@@ -227,7 +292,7 @@ export function migrateV1ToV2(value: unknown, spaces: SpaceDefinition[], showFil
     const legacyDrillStack = Array.isArray(view?.drillStack) ? view.drillStack : [];
     const drilled = Boolean(view && legacyDrillStack.length > 0 && typeof view.root === 'string');
     const root = drilled ? path.normalize(view!.root as string) : link.root;
-    panes[paneId] = normalizePane({
+    panes[paneId] = { ...normalizePane({
       ...view,
       root,
       parentPaneId: link.parentPaneId,
@@ -237,24 +302,23 @@ export function migrateV1ToV2(value: unknown, spaces: SpaceDefinition[], showFil
       showFiles: space?.showFiles ?? showFilesDefault,
       include: space?.include ?? [],
       exclude: space?.exclude ?? [],
-    });
+    }), root } as unknown as PaneState;
   }
-  return { version: 2, panes };
+  return { version: 2, panes } as unknown as PaneStateDocument;
 }
 
-/** Resolve the per-pane tree definition (S4R6-D69/D70); null when the pane has no root. */
+/** Resolve each pane root into a pane-scoped definition. */
+export function resolvePaneDefinitions(pane: PaneState, spaces: SpaceDefinition[]): SpaceDefinition[] {
+  return pane.roots.map(root => {
+    const hit = spaces.find(space => samePath(space.basePath, root));
+    return { basePath: root, name: pane.name ?? hit?.name ?? path.basename(root), icon: pane.icon ?? hit?.icon,
+      showFiles: pane.showFiles, include: pane.include, exclude: pane.exclude, sourceIndex: hit?.sourceIndex ?? -1 };
+  });
+}
+
+/** Existing single-definition projection retained for compatible callers. */
 export function resolvePaneDefinition(pane: PaneState, spaces: SpaceDefinition[]): SpaceDefinition | null {
-  if (!pane.root) return null;
-  const hit = spaces.find(space => samePath(space.basePath, pane.root as string));
-  return {
-    basePath: pane.root,
-    name: pane.name ?? hit?.name ?? path.basename(pane.root),
-    icon: pane.icon ?? hit?.icon,
-    showFiles: pane.showFiles,
-    include: pane.include,
-    exclude: pane.exclude,
-    sourceIndex: hit?.sourceIndex ?? -1,
-  };
+  return resolvePaneDefinitions(pane, spaces)[0] ?? null;
 }
 
 /** Rewrite every pane root and drill stack path that lives under a renamed directory. */
@@ -267,7 +331,8 @@ export function rewritePaneDocumentRoots(document: PaneStateDocument, oldPath: s
       : root;
     rewritten[paneId] = {
       ...pane,
-      root: pane.root ? rewrite(pane.root) : null,
+      roots: pane.roots.map(rewrite),
+      drillRoot: pane.drillRoot ? rewrite(pane.drillRoot) : null,
       drillStack: pane.drillStack.map(snapshot => ({ ...snapshot, root: rewrite(snapshot.root) })),
     };
   }
@@ -346,6 +411,7 @@ export interface PaneInitContext {
   spaces: SpaceDefinition[];
   showFilesDefault: boolean;
   configuredCount: number;
+  followWorkspaceDirectoryDefault: boolean;
 }
 
 export type PaneInitOutcome =
@@ -369,29 +435,46 @@ export class PaneStateStore {
    * Restore, migrate (v1 → v2, one-time), or create the initial layout.
    * The v1 key is removed after a successful migration.
    */
+    /**
+   * 檢查是否可自舊版 workspaceState 轉移至 globalState。
+   */
+  async migrateFromWorkspaceStateIfEmpty(workspaceMemento?: MementoLike): Promise<void> {
+    if (!workspaceMemento || this.memento.get<unknown>(PANE_STATE_KEY)) return;
+    const globalV3 = workspaceMemento.get<unknown>(PANE_STATE_KEY);
+    if (isV3Document(globalV3)) { this.state = normalizePaneState(globalV3); await this.persist(); return; }
+    const wsV2 = workspaceMemento.get<unknown>(LEGACY_PANE_STATE_KEY);
+    if (isV2Document(wsV2)) { this.state = migrateV2ToV3(wsV2, false); await this.persist(); }
+  }
+
   async initialize(context: PaneInitContext): Promise<PaneInitOutcome> {
-    const storedV2 = this.memento.get<unknown>(PANE_STATE_KEY);
-    const storedV1 = this.memento.get<unknown>(LEGACY_PANE_STATE_KEY);
-    if (isV2Document(storedV2)) {
-      this.state = normalizePaneState(storedV2);
-      if (Object.keys(this.state.panes).length === 0) return this.persistDefault(context, 'created');
-      // 審查 F-10：載入時也要驗證鏈結（反向／循環／超深）與 pane1 存在，
-      // 否則損壞或手改的狀態會讓 cascade 指向編號更小的窗格。
+    const storedV3 = this.memento.get<unknown>(PANE_STATE_KEY);
+    const storedV2 = this.memento.get<unknown>(LEGACY_PANE_STATE_KEY);
+    const storedV1 = this.memento.get<unknown>(LEGACY_V1_PANE_STATE_KEY);
+    if (isV3Document(storedV3)) {
+      this.state = normalizePaneState(storedV3);
+      if (!Object.keys(this.state.panes).length) return this.persistDefault(context, 'created');
       if (!isUsableLayout(this.state.panes)) return this.persistDefault(context, 'rebuilt', 'invalid pane layout');
-      if (storedV1 !== undefined) await this.memento.update(LEGACY_PANE_STATE_KEY, undefined);
+      if (this.memento.get<unknown>(LEGACY_PANE_STATE_KEY) !== undefined) await this.memento.update(LEGACY_PANE_STATE_KEY, undefined);
+      if (this.memento.get<unknown>(LEGACY_V1_PANE_STATE_KEY) !== undefined) await this.memento.update(LEGACY_V1_PANE_STATE_KEY, undefined);
       return { kind: 'restored', enabled: Object.keys(this.state.panes).length };
     }
-    const legacySource = storedV1 ?? (isV1Document(storedV2) ? storedV2 : undefined);
-    if (legacySource === undefined) return this.persistDefault(context, 'created');
     try {
-      this.state = migrateV1ToV2(legacySource, context.spaces, context.showFilesDefault);
-      if (!isUsableLayout(this.state.panes)) throw new Error('migrated layout has invalid pane links');
-      await this.persist();
-      await this.memento.update(LEGACY_PANE_STATE_KEY, undefined);
-      return { kind: 'migrated', enabled: Object.keys(this.state.panes).length };
-    } catch (error) {
-      return this.persistDefault(context, 'rebuilt', String(error));
-    }
+      if (isV2Document(storedV2)) {
+        this.state = migrateV2ToV3(storedV2, context.followWorkspaceDirectoryDefault);
+        if (!isUsableLayout(this.state.panes)) throw new Error('migrated layout has invalid pane links');
+        await this.persist(); await this.memento.update(LEGACY_PANE_STATE_KEY, undefined);
+        return { kind: 'migrated', enabled: Object.keys(this.state.panes).length };
+      }
+      if (isV1Document(storedV1)) {
+        const v2 = migrateV1ToV2(storedV1, context.spaces, context.showFilesDefault);
+        this.state = migrateV2ToV3(v2, context.followWorkspaceDirectoryDefault);
+        if (!isUsableLayout(this.state.panes)) throw new Error('migrated layout has invalid pane links');
+        await this.persist(); await this.memento.update(LEGACY_V1_PANE_STATE_KEY, undefined);
+        return { kind: 'migrated', enabled: Object.keys(this.state.panes).length };
+      }
+      const hasInvalidStoredState = storedV3 !== undefined || storedV2 !== undefined || storedV1 !== undefined;
+      return this.persistDefault(context, hasInvalidStoredState ? 'rebuilt' : 'created', hasInvalidStoredState ? 'unrecognized pane state version' : undefined);
+    } catch (error) { return this.persistDefault(context, 'rebuilt', String(error)); }
   }
 
   /** Reset the layout to the default two-pane chain for `pane.resetLayout`. */
@@ -400,9 +483,10 @@ export class PaneStateStore {
   }
 
   private async persistDefault(context: PaneInitContext, kind: 'created' | 'rebuilt', reason?: string): Promise<PaneInitOutcome> {
-    this.state = buildDefaultLayout(context.spaces, context.configuredCount, context.showFilesDefault);
+    this.state = buildDefaultLayout(context.spaces, context.configuredCount, context.showFilesDefault, context.followWorkspaceDirectoryDefault);
     await this.persist();
     await this.memento.update(LEGACY_PANE_STATE_KEY, undefined);
+    await this.memento.update(LEGACY_V1_PANE_STATE_KEY, undefined);
     return kind === 'rebuilt' ? { kind, reason: reason ?? '' } : { kind: 'created', enabled: Object.keys(this.state.panes).length };
   }
 
@@ -428,7 +512,7 @@ export class PaneStateStore {
   /** Compat projection used by the cascade controller and stale checks. */
   getPaneLinks(): Record<string, PaneLinkState> {
     return Object.fromEntries(Object.entries(this.state.panes).map(([paneId, pane]) => [paneId, {
-      root: pane.root,
+      root: activeRoot(pane),
       parentPaneId: pane.parentPaneId,
       follow: pane.follow,
     }]));
@@ -446,7 +530,7 @@ export class PaneStateStore {
 
   /**
    * Disable a pane slot. Its children re-attach to its parent (S4R6-D62/D71,
-   * PD-U3); pane1 is never removable and is enforced by callers.
+   * PD-U3); any pane may be removed while one remains (enforced by callers, S4.1R3).
    */
   async disablePane(paneId: string): Promise<void> {
     if (!this.state.panes[paneId]) return;
@@ -455,27 +539,42 @@ export class PaneStateStore {
     await this.persist();
   }
 
-  /** Coarse root change: switching the root resets the drill stack (as in v1). */
-  async setPaneRoot(paneId: string, root: string | null): Promise<void> {
-    const pane = this.state.panes[paneId];
-    if (!pane) return;
-    pane.root = root ? path.normalize(root) : null;
-    pane.drillStack = [];
-    await this.persist();
-  }
-
-  /** Alias kept for command call sites that read as an explicit root switch. */
+  /** Replace roots with a single selected root, clearing drill navigation. */
   async switchRoot(paneId: string, root: string | null): Promise<void> {
-    await this.setPaneRoot(paneId, root);
+    const pane = this.state.panes[paneId]; if (!pane) return;
+    pane.roots = root ? [path.normalize(root)] : []; pane.drillRoot = null; pane.drillStack = []; await this.persist();
   }
 
-  /** Restore the chain root (bottom of the drill stack) and drop the stack. */
-  async resetRoot(paneId: string): Promise<void> {
-    const pane = this.state.panes[paneId];
-    if (!pane || pane.drillStack.length === 0) return;
-    pane.root = pane.drillStack[0].root;
-    pane.drillStack = [];
+  async addPaneRoot(paneId: string, root: string): Promise<boolean> {
+    const pane = this.state.panes[paneId]; if (!pane) return false;
+    const normalized = path.normalize(root); if (pane.roots.some(item => samePath(item, normalized))) return false;
+    pane.roots = [...pane.roots, normalized]; await this.persist(); return true;
+  }
+
+  async removePaneRoot(paneId: string, root: string): Promise<boolean> {
+    const pane = this.state.panes[paneId]; if (!pane) return false;
+    const normalized = path.normalize(root); const roots = pane.roots.filter(item => !samePath(item, normalized));
+    if (roots.length === pane.roots.length) return false;
+    pane.roots = roots;
+    if (!roots.length || (pane.drillRoot && (samePath(pane.drillRoot, normalized) || isPathWithin(pane.drillRoot, normalized)))) pane.drillRoot = null;
+    await this.persist(); return true;
+  }
+
+  async setPaneRoots(paneId: string, roots: string[]): Promise<void> {
+    const pane = this.state.panes[paneId]; if (!pane) return;
+    pane.roots = roots.map(root => path.normalize(root));
+    if (pane.drillRoot && !pane.roots.some(root => isPathWithin(pane.drillRoot!, root))) pane.drillRoot = null;
     await this.persist();
+  }
+
+  async setPaneFollowWorkspaceDirectory(paneId: string, enabled: boolean): Promise<void> {
+    const pane = this.state.panes[paneId]; if (!pane) return;
+    pane.followWorkspaceDirectory = enabled; await this.persist();
+  }
+
+  async resetRoot(paneId: string): Promise<void> {
+    const pane = this.state.panes[paneId]; if (!pane || pane.drillStack.length === 0) return;
+    pane.drillRoot = null; pane.drillStack = []; await this.persist();
   }
 
   async setPaneDisplay(paneId: string, patch: Partial<Pick<PaneState, 'name' | 'icon' | 'showFiles' | 'include' | 'exclude'>>): Promise<void> {
@@ -489,7 +588,7 @@ export class PaneStateStore {
   async setPaneParent(paneId: string, parentPaneId: string | null, follow: boolean): Promise<void> {
     const pane = this.state.panes[paneId];
     if (!pane) return;
-    const candidate: Record<string, PaneLinkState> = { ...this.getPaneLinks(), [paneId]: { root: pane.root, parentPaneId, follow } };
+    const candidate: Record<string, PaneLinkState> = { ...this.getPaneLinks(), [paneId]: { root: activeRoot(pane), parentPaneId, follow } };
     if (parentPaneId && wouldCreateCycle(candidate, parentPaneId, paneId)) {
       throw new Error('Pane links must be acyclic, ordered, and no deeper than eight panes.');
     }
@@ -498,12 +597,18 @@ export class PaneStateStore {
     await this.persist();
   }
 
-  async drillDown(paneId: string, root: string): Promise<void> {
+  /**
+   * S4.1R8（OP-12）：就地下鑽（In-place Drill-down）。
+   * 保存當前檢視狀態至歷史堆疊，下鑽後自動套用預設的子面板檢視預設集（Contents 扁平內容總覽，對齊 Obsidian 規格）。
+   * 點擊標題列「←」返回（drillUp）時無損還原。
+   */
+  async drillDown(paneId: string, root: string, childPreset: ViewPresetName = 'Contents'): Promise<void> {
     const pane = this.state.panes[paneId];
     if (!pane) return;
-    pane.drillStack = [...pane.drillStack, { root: pane.root as string, preset: pane.preset, filter: pane.filter, sort: { ...pane.sort } }];
-    pane.root = path.normalize(root);
-    pane.preset = DEFAULT_VIEW_PRESET;
+    pane.drillStack = [...pane.drillStack, { root: activeRoot(pane) ?? path.normalize(root), preset: pane.preset, ...(pane.view ? { view: { ...pane.view } } : {}), filter: pane.filter, sort: { ...pane.sort } }];
+    pane.drillRoot = path.normalize(root);
+    pane.preset = childPreset;
+    delete pane.view;
     await this.persist();
   }
 
@@ -513,8 +618,10 @@ export class PaneStateStore {
     const stack = [...pane.drillStack];
     const previous = stack.pop();
     if (!previous) return false;
-    pane.root = previous.root;
+    pane.drillRoot = stack.length === 0 ? null : previous.root;
     pane.preset = previous.preset;
+    if (previous.view) pane.view = { ...previous.view };
+    else delete pane.view;
     pane.filter = previous.filter;
     pane.sort = { ...previous.sort };
     pane.drillStack = stack;
@@ -526,6 +633,65 @@ export class PaneStateStore {
     const pane = this.state.panes[paneId];
     if (!pane) return;
     pane.preset = preset;
+    delete pane.view; // 預設集＝一鍵套用三個維度，清除自訂組合
+    await this.persist();
+  }
+
+  /** 單一維度變更（OP-14）：其餘兩維不動；結果恰為某預設集時回到該預設集，否則存為自訂組合。 */
+  /**
+   * S4.1R9（OP-13）：接龍自適應父面板模式。
+   * 當父面板擁有連動子面板時，自動備份當前檢視並切換為導覽預設集（純目錄瀏覽）；
+   * 當子面板解除或關閉時，自動無損還原。
+   */
+  async handleAdaptiveCascadeParent(
+    paneId: string,
+    hasFollowingChild: boolean,
+    cascadeParentPreset: ViewPresetName = 'Navigate'
+  ): Promise<boolean> {
+    const pane = this.state.panes[paneId];
+    if (!pane) return false;
+
+    if (hasFollowingChild) {
+      if (!pane.adaptiveParentBackup) {
+        // 備份當前獨立檢視
+        pane.adaptiveParentBackup = {
+          preset: pane.preset,
+          ...(pane.view ? { view: { ...pane.view } } : {}),
+        };
+        pane.preset = cascadeParentPreset;
+        delete pane.view;
+        await this.persist();
+        return true;
+      }
+    } else if (pane.adaptiveParentBackup) {
+      // 還原備份的獨立檢視
+      pane.preset = pane.adaptiveParentBackup.preset;
+      if (pane.adaptiveParentBackup.view) {
+        pane.view = { ...pane.adaptiveParentBackup.view };
+      } else {
+        delete pane.view;
+      }
+      pane.adaptiveParentBackup = null;
+      await this.persist();
+      return true;
+    }
+    return false;
+  }
+
+  async setViewAxis(paneId: string, change: ViewAxisChange): Promise<void> {
+    const pane = this.state.panes[paneId];
+    if (!pane) return;
+    const view = effectiveView(pane);
+    const next = change.axis === 'mode' ? applyViewAxis(view, 'mode', change.value)
+      : change.axis === 'level' ? applyViewAxis(view, 'level', change.value)
+      : applyViewAxis(view, 'content', change.value);
+    const matched = matchPresetName(next);
+    if (matched) {
+      pane.preset = matched;
+      delete pane.view;
+    } else {
+      pane.view = next;
+    }
     await this.persist();
   }
 
@@ -558,6 +724,10 @@ export class PaneStateStore {
   }
 }
 
+function isV3Document(value: unknown): boolean {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && (value as { version?: unknown }).version === 3);
+}
+
 function isV2Document(value: unknown): boolean {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value) && (value as { version?: unknown }).version === 2);
 }
@@ -571,7 +741,7 @@ function paneIndexOf(paneId: string): number {
   return match ? Number(match[1]) : MAX_PANE_COUNT + 1;
 }
 
-/** 審查 F-10：載入／遷移後的佈局必須鏈結合法且 pane1 存在（D71）。 */
+/** 審查 F-10：載入／遷移後的佈局必須鏈結合法且至少有一個窗格（S4.1R3 修訂 D71：不再要求 pane1 存在）。 */
 function isUsableLayout(panes: Record<string, PaneState>): boolean {
-  return Boolean(panes.pane1) && hasValidPaneLinks(panes);
+  return Object.keys(panes).length > 0 && hasValidPaneLinks(panes);
 }

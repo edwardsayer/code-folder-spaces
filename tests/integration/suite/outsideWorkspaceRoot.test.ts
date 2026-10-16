@@ -78,10 +78,8 @@ suite('工作區外空間根', () => {
       const { state } = createPaneStateHarness();
       await seedPaneFromRoot(store, state, 'pane1', tmpRoot);
       provider = createPaneProvider(store, state, 'pane1');
-      const roots = await provider.getChildren();
-      assert.equal(roots.length, 1);
-      assert.equal(normalizePath(roots[0].resourceUri?.fsPath ?? ''), normalizePath(tmpRoot));
-      const children = await provider.getChildren(roots[0]) as SpaceNode[];
+      const children = await provider.getChildren() as SpaceNode[];
+      assert.ok(children.every(node => node.contextValue !== 'codeFolderSpaces.spaceRoot'));
       assert.deepEqual(children.map((node) => node.label), ['sub', 'a.txt', 'B.txt']);
       assert.ok(!children.some((node) => node.label === 'skip.log'));
       const sub = children.find((node) => node.label === 'sub');
@@ -96,9 +94,7 @@ suite('工作區外空間根', () => {
       // pane 自行換根（仍是工作區外的任意資料夾）：不依賴 spaces 設定。
       await state.switchRoot('pane1', path.join(tmpRoot, 'sub'));
       syncPaneScope(store, state, provider, 'pane1');
-      const relocated = (await provider.getChildren())[0];
-      assert.equal(normalizePath(relocated.resourceUri?.fsPath ?? ''), normalizePath(path.join(tmpRoot, 'sub')));
-      assert.deepEqual((await provider.getChildren(relocated) as SpaceNode[]).map(node => node.label), ['deep.md']);
+      assert.deepEqual((await provider.getChildren() as SpaceNode[]).map(node => node.label), ['deep.md']);
     } finally {
       provider?.dispose();
       store.dispose();

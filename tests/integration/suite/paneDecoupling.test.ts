@@ -3,11 +3,12 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { SpaceRootNode, type SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
+import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
 import { PANE_STATE_KEY, type PaneStateDocument } from '../../../src/spaces/viewState';
 import type { SpaceDefinition } from '../../../src/types';
 import {
   assertFixtureWorkspace,
+  paneRootNode,
   clearGlobalSettings,
   createPaneStateHarness,
   createTempTree,
@@ -56,8 +57,8 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
           { paneId: 'pane2', root: loose, overrides: { exclude: ['**/*.log'] } },
         ],
         async ({ provider, state }) => {
-          const pane1Root = (await provider('pane1').getChildren())[0] as SpaceRootNode;
-          const pane2Root = (await provider('pane2').getChildren())[0] as SpaceRootNode;
+          const pane1Root = paneRootNode(provider('pane1'));
+          const pane2Root = paneRootNode(provider('pane2'));
 
           assert.equal(pane1Root.rootPath, alpha);
           assert.equal(pane1Root.paneId, 'pane1');
@@ -97,8 +98,8 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
     ],
     async ({ provider, state, sync }) => {
       // 根相同也必須是可共存的兩個節點：id 帶 paneId，TreeView 才不會把它們當作同一項。
-      const pane1Root = (await provider('pane1').getChildren())[0] as SpaceRootNode;
-      const pane2Root = (await provider('pane2').getChildren())[0] as SpaceRootNode;
+      const pane1Root = paneRootNode(provider('pane1'));
+      const pane2Root = paneRootNode(provider('pane2'));
       assert.equal(pane1Root.rootPath, pane2Root.rootPath);
       assert.notEqual(pane1Root.id, pane2Root.id);
       assert.equal(pane1Root.id, `codeFolderSpaces.pane1:root:${alpha}`);
@@ -108,14 +109,14 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
       await state.setPreset('pane1', 'Files');
       const pane1Flat = await provider('pane1').getChildren(pane1Root) as SpaceNode[];
       assert.ok(pane1Flat.every(node => node.contextValue === 'codeFolderSpaces.file'));
-      assert.ok(pane1Flat.some(node => node.description === 'nested/deep.md'));
+      assert.ok(pane1Flat.some(node => String(node.label) === 'nested/deep.md'));
       const pane2Tree = await provider('pane2').getChildren(pane2Root) as SpaceNode[];
       assert.deepEqual(pane2Tree.map(node => node.label), ['nested', 'a.txt', 'B.txt']);
       assert.equal(pane2Tree[0].contextValue, 'codeFolderSpaces.folder');
 
       // filter 只落 pane1。
       await state.setFilter('pane1', 'deep');
-      assert.deepEqual((await provider('pane1').getChildren(pane1Root) as SpaceNode[]).map(node => node.label), ['deep.md', 'two-level.md']);
+      assert.deepEqual((await provider('pane1').getChildren(pane1Root) as SpaceNode[]).map(node => node.label), ['nested/deep.md', 'nested/deeper/two-level.md']);
       assert.deepEqual((await provider('pane2').getChildren(pane2Root) as SpaceNode[]).map(node => node.label), ['nested', 'a.txt', 'B.txt']);
 
       // sort 只落 pane2（pane1 維持 name asc）。
@@ -126,10 +127,10 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
       // 下鑽只改 pane1 的 root；pane2 不受影響（v1 的 bySpace 共用是 F-S4R4-8 的根因）。
       await state.drillDown('pane1', alphaNested);
       sync('pane1');
-      assert.equal((await provider('pane1').getChildren())[0].rootPath, alphaNested);
+      assert.equal(state.get('pane1').drillRoot, alphaNested);
       assert.equal(state.get('pane1').drillStack.length, 1);
       assert.equal(state.get('pane2').drillStack.length, 0);
-      assert.equal((await provider('pane2').getChildren())[0].rootPath, alpha);
+      assert.deepEqual(state.get('pane2').roots, [alpha]);
       // pane2 仍能解析原根下的路徑；pane1 下鑽後該路徑不在其根內。
       assert.ok(await provider('pane2').findNodeByPath(path.join(alpha, 'a.txt')));
       assert.equal(await provider('pane1').findNodeByPath(path.join(alpha, 'a.txt')), undefined);
@@ -152,7 +153,7 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
       assert.equal(childId, 'pane3', 'pane2 已佔用時應分配 pane3');
       const source = state.get('pane1');
       await state.enablePane(childId, {
-        root: alphaNested,
+        roots: [alphaNested],
         parentPaneId: 'pane1',
         follow: true,
         showFiles: source.showFiles,
@@ -165,30 +166,30 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
       const child = state.get('pane3');
       assert.equal(child.parentPaneId, 'pane1');
       assert.equal(child.follow, true);
-      assert.equal(child.root, alphaNested);
+      assert.equal(child.roots[0] ?? null, alphaNested);
       assert.equal(child.showFiles, false, '顯示設定繼承來源 pane（D64）');
       assert.deepEqual(child.exclude, ['**/*.md']);
-      assert.equal(state.get('pane2').root, beta, '既有 pane2 不受影響');
+      assert.equal(state.get('pane2').roots[0] ?? null, beta, '既有 pane2 不受影響');
 
       // 新 pane 的 provider 正確列舉被點擊的資料夾（showFiles=false → 只列目錄）。
       const childProvider = provider('pane3');
       sync('pane3');
       attachCascade('pane3');
-      const root = (await childProvider.getChildren())[0] as SpaceRootNode;
+      const root = paneRootNode(childProvider);
       assert.equal(root.rootPath, alphaNested);
       assert.equal(root.id, `codeFolderSpaces.pane3:root:${alphaNested}`);
       assert.deepEqual((await childProvider.getChildren(root) as SpaceNode[]).map(node => node.label), ['deeper']);
 
       // 父焦點傳遞生效：pane1 選取 deeper → pane3 跟進，且 follow 維持 true。
       emit('pane1', { uri: vscode.Uri.file(alphaDeeper), isDirectory: true });
-      await waitFor(() => state.get('pane3').root === alphaDeeper);
+      await waitFor(() => (state.get('pane3').roots[0] ?? null) === alphaDeeper);
       assert.equal(runtimes.get('pane3')!.scope!.root, alphaDeeper);
       assert.equal(state.get('pane3').follow, true);
 
       // 持久化：同一 memento 重載後鏈結與 root 還在。
       const restored = reload().get('pane3');
       assert.equal(restored.parentPaneId, 'pane1');
-      assert.equal(restored.root, alphaDeeper);
+      assert.equal(restored.roots[0] ?? null, alphaDeeper);
     }
   ));
 
@@ -211,19 +212,19 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
       assert.equal(state.getPaneLinks().pane3, undefined);
       assert.equal(state.getPaneLinks().pane2.parentPaneId, 'pane1');
       // 其餘 pane 的 root 不受影響（v2 無共用 bySpace 狀態）。
-      assert.equal(state.get('pane2').root, alphaNested);
-      assert.equal(state.get('pane1').root, alpha);
+      assert.equal(state.get('pane2').roots[0] ?? null, alphaNested);
+      assert.equal(state.get('pane1').roots[0] ?? null, alpha);
 
       // 重載（新 PaneStateStore 讀同一份 memento）→ 完整還原，不含 pane3。
       const restoredStore = reload();
       assert.deepEqual(restoredStore.getEnabledPaneIds(), ['pane1', 'pane2', 'pane4']);
       const restored = restoredStore.get('pane4');
       assert.equal(restored.parentPaneId, 'pane2');
-      assert.equal(restored.root, path.join(beta, 'nested'));
+      assert.equal(restored.roots[0] ?? null, path.join(beta, 'nested'));
       assert.equal(restored.follow, true);
-      // panes.v2 文件級一致性：version 2、被關插槽已消失、無孤兒 parent 引用、無循環。
+      // panes.v3 文件級一致性：version 3、被關插槽已消失、無孤兒 parent 引用、無循環。
       const persisted = memento.get<PaneStateDocument>(PANE_STATE_KEY)!;
-      assert.equal(persisted.version, 2);
+      assert.equal(persisted.version, 3);
       assert.deepEqual(Object.keys(persisted.panes).sort(), ['pane1', 'pane2', 'pane4']);
       assert.equal(persisted.panes.pane3, undefined);
       const enabled = new Set(restoredStore.getEnabledPaneIds());
@@ -245,10 +246,10 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
       // 重掛後焦點傳遞仍然運作：pane2 選取 deeper → pane4 由另一空間跟進 pane2 的根內。
       sync('pane2');
       emit('pane2', { uri: vscode.Uri.file(alphaDeeper), isDirectory: true });
-      await waitFor(() => state.get('pane4').root === alphaDeeper);
+      await waitFor(() => (state.get('pane4').roots[0] ?? null) === alphaDeeper);
       assert.equal(state.get('pane4').parentPaneId, 'pane2');
       // 重掛後的子 pane 由新的父根列出內容（不再停留在原 pane3 的根）。
-      const pane4Root = (await provider('pane4').getChildren())[0] as SpaceRootNode;
+      const pane4Root = paneRootNode(provider('pane4'));
       assert.equal(pane4Root.rootPath, alphaDeeper);
       assert.deepEqual((await provider('pane4').getChildren(pane4Root) as SpaceNode[]).map(node => node.label), ['two-level.md']);
     }
@@ -263,14 +264,14 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
       exclude: [],
       sourceIndex: 0,
     });
-    const initContext = (spaces: SpaceDefinition[], configuredCount: number) => ({ spaces, showFilesDefault: true, configuredCount });
+    const initContext = (spaces: SpaceDefinition[], configuredCount: number) => ({ spaces, showFilesDefault: true, configuredCount, followWorkspaceDirectoryDefault: false });
 
     // 無任何 spaces：仍然啟用 count 個 pane（v1 會因 min(spaces) 而降為 0／1）。
     const noSpaces = createPaneStateHarness();
     const created = await noSpaces.state.initialize(initContext([], 2));
     assert.equal(created.kind, 'created');
     assert.deepEqual(noSpaces.state.getEnabledPaneIds(), ['pane1', 'pane2']);
-    assert.equal(noSpaces.state.get('pane1').root, null);
+    assert.deepEqual(noSpaces.state.get('pane1').roots, []);
     assert.equal(noSpaces.state.get('pane2').parentPaneId, 'pane1');
     assert.equal(noSpaces.state.get('pane2').follow, true);
 
@@ -278,8 +279,8 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
     const oneSpace = createPaneStateHarness();
     await oneSpace.state.initialize(initContext([space(alpha)], 3));
     assert.deepEqual(oneSpace.state.getEnabledPaneIds(), ['pane1', 'pane2', 'pane3']);
-    assert.equal(oneSpace.state.get('pane1').root, alpha);
-    assert.equal(oneSpace.state.get('pane2').root, null);
+    assert.deepEqual(oneSpace.state.get('pane1').roots, [alpha]);
+    assert.deepEqual(oneSpace.state.get('pane2').roots, []);
 
     // count 超過 8：以硬上限 8 截斷。
     const clamped = createPaneStateHarness();
@@ -289,7 +290,7 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
 
     // 無 root 的 pane：provider 不列舉任何節點（由 viewsWelcome 接管畫面）。
     await withPaneCascade([], [{ paneId: 'pane1', root: null }], async ({ state, provider, sync }) => {
-      assert.equal(state.get('pane1').root, null);
+      assert.deepEqual(state.get('pane1').roots, []);
       sync('pane1');
       assert.deepEqual(await provider('pane1').getChildren(), []);
     });
@@ -307,7 +308,7 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
     const loose = createTempTree({ 'only.md': 'only' });
     try {
       await withPaneProviders([], [{ paneId: 'pane1', root: loose }], async ({ provider }) => {
-        const root = (await provider('pane1').getChildren())[0] as SpaceRootNode;
+        const root = paneRootNode(provider('pane1'));
         assert.equal(root.rootPath, loose);
         assert.deepEqual((await provider('pane1').getChildren(root) as SpaceNode[]).map(node => node.label), ['only.md']);
       });
@@ -318,7 +319,7 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
 
   test('PD-I5 補充：來源 pane 不存在時 allocatePaneId 仍回最低空閒插槽（8 個用滿回 undefined）', async () => {
     const harness = createPaneStateHarness();
-    await harness.state.initialize({ spaces: [], showFilesDefault: true, configuredCount: 8 });
+    await harness.state.initialize({ spaces: [], showFilesDefault: true, configuredCount: 8, followWorkspaceDirectoryDefault: false });
     assert.equal(harness.state.allocatePaneId(), undefined, '八個插槽用滿時不得再分配');
     await harness.state.disablePane('pane5');
     assert.equal(harness.state.allocatePaneId(), 'pane5', '關閉中間 pane 後釋放其插槽');
@@ -350,7 +351,7 @@ suite('S4R6 命令接線（結構型節點驅動；審查 F-02／F-11）', () =>
     assert.equal(child.parentPaneId, 'pane1');
     assert.equal(child.follow, true);
     // Windows 的 Uri.file 會把磁碟機字母轉小寫，比對前先正規化大小寫（同 S4R4 的處置）。
-    assert.equal(path.normalize(String(child.root)).toLowerCase(), path.normalize(root).toLowerCase());
+    assert.equal(path.normalize(String(child.root ?? null)).toLowerCase(), path.normalize(root).toLowerCase());
 
     // 非資料夾節點 → 不新增窗格
     await vscode.commands.executeCommand('codeFolderSpaces.pane.addChild', { ...folderNode, isDirectory: false });
@@ -361,10 +362,16 @@ suite('S4R6 命令接線（結構型節點驅動；審查 F-02／F-11）', () =>
     assert.equal((await api()).getPanes().length, before.length);
   });
 
-  test('pane.remove 拒絕 pane1 與最後一個窗格（守門）', async () => {
+  test('pane.remove 可關閉 pane1（S4.1R3），但拒絕最後一個窗格', async () => {
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
     await vscode.commands.executeCommand('codeFolderSpaces.pane.remove', 'pane1');
-    assert.ok((await api()).getPanes().some((pane) => pane.id === 'pane1'), 'pane1 不可被關閉');
+    const afterFirst = (await api()).getPanes();
+    assert.ok(!afterFirst.some((pane) => pane.id === 'pane1'), 'pane1 應已關閉');
+    assert.equal(afterFirst.length, 1);
+    assert.equal(afterFirst[0].parentPaneId, null, '剩餘窗格重掛為頂層');
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.remove', afterFirst[0].id);
+    assert.equal((await api()).getPanes().length, 1, '最後一個窗格不可關閉');
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
   });
 
   test('PD-I6 成環操作被拒絕：反向／自我鏈結拋出且狀態不變（S4 DoD 補驗）', async () => {

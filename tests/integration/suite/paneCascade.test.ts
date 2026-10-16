@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { PaneCascadeStateAdapter } from '../../../src/spaces/paneCascade';
-import { SpaceEntryNode, type SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
+import { SpaceEntryNode, SpaceRootNode, type SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import { assertFixtureWorkspace, fixtureWorkspace, sameFixturePath, withPaneCascade } from './helpers';
 
 // S4R6（pane 解耦，spec §2.4）改寫說明：
@@ -36,8 +36,7 @@ suite('pane cascade controller integration', () => {
   }
 
   async function directoryNode(provider: SpaceTreeDataProvider, wantedPath: string): Promise<SpaceEntryNode> {
-    const root = (await provider.getChildren())[0];
-    const children = await provider.getChildren(root);
+    const children = await provider.getChildren();
     const node = children.find(child => child instanceof SpaceEntryNode && sameFixturePath(child.uri.fsPath, wantedPath));
     assert.ok(node instanceof SpaceEntryNode && node.isDirectory, `Expected directory node ${wantedPath}`);
     return node;
@@ -58,7 +57,7 @@ suite('pane cascade controller integration', () => {
       await waitFor(() => runtimes.get('pane2')!.scope!.root === nested);
       assert.equal(state.getPaneLinks().pane2.root, nested);
       assert.equal(state.get('pane2').follow, true);
-      assert.equal((await provider('pane2').getChildren())[0].label, path.basename(nested));
+      assert.deepEqual((await provider('pane2').getChildren()).map(node => node.label), ['deeper', 'deep.md']);
 
       const selectedDeeper = await directoryNode(provider('pane2'), deeper);
       emit('pane2', selectedDeeper);
@@ -66,7 +65,7 @@ suite('pane cascade controller integration', () => {
       assert.equal(state.getPaneLinks().pane3.root, deeper);
 
       // 檔案選取不連動。
-      const file = (await provider('pane1').getChildren((await provider('pane1').getChildren())[0]))
+      const file = (await provider('pane1').getChildren())
         .find(child => child instanceof SpaceEntryNode && !child.isDirectory) as SpaceEntryNode;
       const beforeFile = runtimes.get('pane2')!.scope!.root;
       emit('pane1', file);
@@ -88,8 +87,8 @@ suite('pane cascade controller integration', () => {
       await state.drillDown('pane1', nested);
       sync('pane1');
       assert.equal(state.get('pane1').drillStack.length, stackBefore + 1);
-      assert.equal(state.get('pane2').root, nested);
-      assert.equal(state.get('pane3').root, deeper);
+      assert.equal(state.get('pane2').roots[0], nested);
+      assert.equal(state.get('pane3').roots[0], deeper);
       await settle(160);
       assert.equal(runtimes.get('pane2')!.scope!.root, pane2RootBefore);
       assert.equal(runtimes.get('pane3')!.scope!.root, pane3RootBefore);
@@ -111,13 +110,13 @@ suite('pane cascade controller integration', () => {
       // 使用者在子 pane 手動換到「另一個 space 的資料夾」（v1 會在此之後拒絕連動）。
       await state.switchRoot('pane2', betaNested);
       sync('pane2');
-      assert.equal(state.get('pane2').root, betaNested);
+      assert.equal(state.get('pane2').roots[0], betaNested);
       assert.equal(state.get('pane2').follow, true, '手動換根不得關閉 follow（D61）');
 
       // 父 pane 下次選取不同資料夾 → 子 pane 再次跟隨父（父焦點事件為最終權威，D74）。
       emit('pane1', { uri: vscode.Uri.file(deeper), isDirectory: true });
       await waitFor(() => runtimes.get('pane2')!.scope!.root === deeper);
-      assert.equal(state.get('pane2').root, deeper);
+      assert.equal(state.get('pane2').roots[0], deeper);
       assert.equal(state.get('pane2').follow, true);
     }
   ));
@@ -132,7 +131,7 @@ suite('pane cascade controller integration', () => {
       emit('pane1', { uri: vscode.Uri.file(betaNested), isDirectory: true });
       await settle(200);
       assert.equal(runtimes.get('pane2')!.scope!.root, beta);
-      assert.equal(state.get('pane2').root, beta);
+      assert.equal(state.get('pane2').roots[0], beta);
       assert.equal(state.get('pane2').follow, true);
     }
   ));
@@ -174,6 +173,7 @@ suite('pane cascade controller integration', () => {
       let writeCount = 0;
       const writeRoots: Array<string | null> = [];
       const gatedAdapter: PaneCascadeStateAdapter = {
+        getPaneRoots: (paneId: string) => state.get(paneId).roots,
         getPaneLinks: () => {
           const result = adapter.getPaneLinks();
           if (secondStatComplete && !notifiedQueued) {
@@ -183,13 +183,13 @@ suite('pane cascade controller integration', () => {
           }
           return result;
         },
-        setPaneRoot: async (paneId, root) => {
+        switchRoot: async (paneId, root) => {
           writeRoots.push(root);
           if (writeCount++ === 0) {
             startedFirstWrite();
             await firstWriteGate;
           }
-          await adapter.setPaneRoot(paneId, root);
+          await adapter.switchRoot(paneId, root);
         },
       };
       const raceSafe = createController(gatedAdapter, {
@@ -238,7 +238,8 @@ suite('pane cascade controller integration', () => {
         // 用不帶 scope 同步的 adapter：若守門失效，延後寫入會真的落地並被下面斷言抓到。
         const delayed = createController({
           getPaneLinks: () => state.getPaneLinks(),
-          setPaneRoot: async (paneId, root) => await state.setPaneRoot(paneId, root),
+          switchRoot: async (paneId, root) => await state.switchRoot(paneId, root),
+          getPaneRoots: (paneId: string) => state.get(paneId).roots,
         }, {
           stat: async uri => {
             startedStat();
@@ -274,10 +275,11 @@ suite('pane cascade controller integration', () => {
       let controllerWrites = 0;
       const removable = createController({
         getPaneLinks: () => state.getPaneLinks(),
-        setPaneRoot: async (paneId, root) => {
+        switchRoot: async (paneId, root) => {
           controllerWrites++;
-          await state.setPaneRoot(paneId, root);
+          await state.switchRoot(paneId, root);
         },
+        getPaneRoots: (paneId: string) => state.get(paneId).roots,
       }, {
         stat: async uri => {
           startedStat();
@@ -299,6 +301,50 @@ suite('pane cascade controller integration', () => {
       assert.equal(removedScope.root, alpha);
       channel.dispose();
       removable.dispose();
+    }
+  ));
+
+  test('多 root 父 pane：選取任一根內的資料夾都會驅動子 pane（S4.1R11 §2.5.5；審查 P1-2 回歸）', async () => withPaneCascade(
+    [alpha, beta],
+    [
+      { paneId: 'pane1', root: alpha },
+      { paneId: 'pane2', root: alpha, parentPaneId: 'pane1', follow: true },
+    ],
+    async ({ state, provider, runtimes, emit, sync }) => {
+      // 父 pane 成為多 root（模擬 followWorkspaceDirectory 的 multi-root workspace）。
+      await state.addPaneRoot('pane1', beta);
+      sync('pane1');
+      assert.deepEqual(state.get('pane1').roots, [alpha, beta]);
+      // 守門不得只看 activeRoot（＝roots[0]＝alpha），否則選取 beta 內資料夾會被拒。
+      assert.equal(runtimes.get('pane1')!.scope!.root, alpha);
+
+      // 多 root 時首層為各根列（D3）；先進入 beta 根列再找目標資料夾。
+      const betaRootRow = (await provider('pane1').getChildren())
+        .find(child => child instanceof SpaceRootNode && sameFixturePath((child as SpaceRootNode).rootPath, beta)) as SpaceRootNode;
+      assert.ok(betaRootRow, 'expected a beta root row in the multi-root parent pane');
+      const selectedInBeta = (await provider('pane1').getChildren(betaRootRow))
+        .find(child => child instanceof SpaceEntryNode && sameFixturePath(child.uri.fsPath, betaNested)) as SpaceEntryNode;
+      assert.ok(selectedInBeta, `Expected directory node ${betaNested}`);
+      emit('pane1', selectedInBeta);
+      await waitFor(() => runtimes.get('pane2')!.scope!.root === betaNested);
+      assert.equal(state.getPaneLinks().pane2.root, betaNested);
+      assert.equal(state.get('pane2').follow, true);
+
+      // 另一個根（roots[0]）內的選取同樣必須能驅動。
+      const alphaRootRow = (await provider('pane1').getChildren())
+        .find(child => child instanceof SpaceRootNode && sameFixturePath((child as SpaceRootNode).rootPath, alpha)) as SpaceRootNode;
+      const selectedInAlpha = (await provider('pane1').getChildren(alphaRootRow))
+        .find(child => child instanceof SpaceEntryNode && sameFixturePath(child.uri.fsPath, nested)) as SpaceEntryNode;
+      assert.ok(selectedInAlpha, `Expected directory node ${nested}`);
+      emit('pane1', selectedInAlpha);
+      await waitFor(() => runtimes.get('pane2')!.scope!.root === nested);
+      assert.equal(state.getPaneLinks().pane2.root, nested);
+
+      // 根之外的資料夾仍應被守門拒絕（不得因改為多 root 而失去邊界）。
+      const before = runtimes.get('pane2')!.scope!.root;
+      emit('pane1', { uri: vscode.Uri.file(path.join(fixtureWorkspace, 'spaces', 'logs')), isDirectory: true });
+      await settle(200);
+      assert.equal(runtimes.get('pane2')!.scope!.root, before);
     }
   ));
 });

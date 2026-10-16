@@ -40,7 +40,7 @@ export function createTreeDragAndDropController(
     dropMimeTypes: [URI_LIST_MIME, treeMime],
     handleDrag: async (source, transfer) => {
       const uris = source
-        .filter((node): node is SpaceEntryNode => node instanceof SpaceEntryNode && node.uri.scheme === 'file')
+        .filter((node): node is SpaceEntryNode => node instanceof SpaceEntryNode && node.uri.scheme === 'file' && node.contextValue !== 'codeFolderSpaces.flatRootGroup')
         .map(node => node.uri);
       if (!uris.length) return;
       const serialized = uris.map(uri => uri.toString()).join('\r\n');

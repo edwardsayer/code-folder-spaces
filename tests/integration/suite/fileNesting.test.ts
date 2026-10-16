@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { SpaceEntryNode, SpaceRootNode } from '../../../src/spaces/spaceTreeDataProvider';
+import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
 import { assertFixtureWorkspace, clearGlobalSettings, fixtureWorkspace, withGlobalSettings, withPaneProviders } from './helpers';
 
@@ -13,6 +13,12 @@ import { assertFixtureWorkspace, clearGlobalSettings, fixtureWorkspace, withGlob
 // 故本檔的 patterns 一律明確覆寫 `*.js`（空值＝零子模式、等效停用），不依賴預設鍵序。
 
 type Node = SpaceNode;
+
+async function rootOf(provider: SpaceTreeDataProvider): Promise<SpaceRootNode> {
+  const scope = provider.scope;
+  assert.ok(scope?.definitions[0]);
+  return new SpaceRootNode(scope.definitions[0], scope.paneId);
+}
 
 interface ExplorerNestingValues {
   enabled?: boolean;
@@ -68,7 +74,7 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
     [{ paneId: 'pane1', root: nesting }],
     async ({ provider }) => withExplorerNesting({ enabled: true, patterns: TS_PATTERN }, async () => {
       const paneProvider = provider('pane1');
-      const root = (await paneProvider.getChildren())[0];
+      const root = await rootOf(paneProvider);
       const children = await paneProvider.getChildren(root) as Node[];
       // 巢狀子項不與同層平鋪；父列與無關檔案保留。
       assert.deepEqual(children.map(node => node.label), ['app.ts', 'notes.md', 'orphan.js']);
@@ -98,7 +104,7 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
     [{ paneId: 'pane1', root: nesting }],
     async ({ provider }) => withExplorerNesting({ enabled: false, patterns: TS_PATTERN }, async () => {
       const paneProvider = provider('pane1');
-      const root = (await paneProvider.getChildren())[0];
+      const root = await rootOf(paneProvider);
       const children = await paneProvider.getChildren(root) as Node[];
       assert.deepEqual(children.map(node => node.label), ['app.d.ts', 'app.js', 'app.js.map', 'app.ts', 'notes.md', 'orphan.js']);
       assert.ok(children.every(node => node.collapsibleState === vscode.TreeItemCollapsibleState.None));
@@ -111,7 +117,7 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
     [{ paneId: 'pane1', root: nesting }],
     async ({ provider }) => withExplorerNesting({ enabled: true, expand: false, patterns: TS_PATTERN }, async () => {
       const paneProvider = provider('pane1');
-      const root = (await paneProvider.getChildren())[0];
+      const root = await rootOf(paneProvider);
       const children = await paneProvider.getChildren(root) as Node[];
       const parent = children.find(node => node.label === 'app.ts')!;
       assert.equal(parent.collapsibleState, vscode.TreeItemCollapsibleState.Collapsed);
@@ -133,13 +139,13 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
       const parent = paneProvider.getParent(node);
       assert.ok(parent instanceof SpaceEntryNode && !parent.isDirectory);
       assert.equal(parent.label, 'app.ts');
-      assert.ok(parent.parent instanceof SpaceRootNode);
+      assert.equal(parent.parent, undefined);
       // reveal 需要能從父列列舉到子列（getChildren 對檔案列回傳 nestedChildren）。
       assert.ok((await paneProvider.getChildren(parent) as Node[]).some(child => child.id === node.id), 'reveal 父列必須能列舉出嵌套子列');
       // 非嵌套檔案維持原父鏈。
       const flat = await paneProvider.findNodeByPath(path.join(nesting, 'notes.md')) as Node | undefined;
       assert.ok(flat);
-      assert.ok(flat.parent instanceof SpaceRootNode);
+      assert.equal(flat.parent, undefined);
     })
   ));
 
@@ -157,7 +163,7 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
       const grandparent = paneProvider.getParent(parent);
       assert.ok(grandparent instanceof SpaceEntryNode && !grandparent.isDirectory);
       assert.equal(grandparent.label, 'app.ts');
-      assert.ok(grandparent.parent instanceof SpaceRootNode);
+      assert.equal(grandparent.parent, undefined);
       // 鏈上每一層都要能列舉出下一層，否則 reveal 展開中斷。
       assert.ok((await paneProvider.getChildren(grandparent) as Node[]).some(child => child.id === parent.id));
       assert.ok((await paneProvider.getChildren(parent) as Node[]).some(child => child.id === node.id));
@@ -169,7 +175,7 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
     [{ paneId: 'pane1', root: manifest }],
     async ({ provider }) => withExplorerNesting({ enabled: true, patterns: MANIFEST_PATTERN }, async () => {
       const paneProvider = provider('pane1');
-      const root = (await paneProvider.getChildren())[0];
+      const root = await rootOf(paneProvider);
       const children = await paneProvider.getChildren(root) as Node[];
       // `tsconfig.dev.alt.json` 不屬於 `${capture}.alt.json`（無捕獲 → 子模式略過），留在同層。
       assert.deepEqual(children.map(node => node.label), ['other.json', 'package.json', 'tsconfig.dev.alt.json', 'tsconfig.json']);
@@ -188,7 +194,7 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
       await state.setFilter('pane1', 'app');
       return withExplorerNesting({ enabled: true, patterns: TS_PATTERN }, async () => {
         const paneProvider = provider('pane1');
-        const root = (await paneProvider.getChildren())[0];
+        const root = await rootOf(paneProvider);
         const children = await paneProvider.getChildren(root) as Node[];
         // 若嵌套仍啟用，app.js 等不會出現在同層；此處應以平鋪方式通過過濾。
         assert.deepEqual(children.map(node => node.label), ['app.d.ts', 'app.js', 'app.js.map', 'app.ts']);
@@ -210,7 +216,7 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
         await withExplorerNesting({ enabled: true, patterns: TS_PATTERN }, async () => {
           await withPaneProviders([nesting], [{ paneId: 'pane1', root: nesting }], async ({ provider }) => {
             const paneProvider = provider('pane1');
-            const root = (await paneProvider.getChildren())[0];
+            const root = await rootOf(paneProvider);
             const before = await paneProvider.getChildren(root) as Node[];
             assert.deepEqual(before.map(node => node.label), ['app.ts', 'notes.md', 'orphan.js']);
 

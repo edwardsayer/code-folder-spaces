@@ -4,9 +4,9 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { SpaceConfigEntry } from '../../../src/types';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
-import { SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
+import { SpaceRootNode, SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { PaneProviderScope } from '../../../src/spaces/spaceTreeDataProvider';
-import { PaneStateStore, resolvePaneDefinition } from '../../../src/spaces/viewState';
+import { activeRoot, PaneStateStore, resolvePaneDefinitions } from '../../../src/spaces/viewState';
 import type { MementoLike, PaneState } from '../../../src/spaces/viewState';
 import { PaneCascadeController } from '../../../src/spaces/paneCascade';
 import type { PaneCascadeRuntime, PaneCascadeSelection, PaneCascadeStateAdapter } from '../../../src/spaces/paneCascade';
@@ -88,7 +88,13 @@ export function createPaneStateHarness(initial?: Record<string, unknown>): PaneS
 
 /** 啟用 pane 並寫入初始狀態（v2 唯一的建立路徑）。 */
 export function seedPane(state: PaneStateStore, paneId: string, pane: Partial<PaneState>): Promise<void> {
-  return state.enablePane(paneId, pane);
+  const legacyRoot = (pane as { root?: unknown }).root;
+  const normalized = pane.roots === undefined && typeof legacyRoot === 'string'
+    ? { ...pane, roots: [legacyRoot] }
+    : pane.roots === undefined && legacyRoot === null
+      ? { ...pane, roots: [] }
+      : pane;
+  return state.enablePane(paneId, normalized);
 }
 
 /**
@@ -105,7 +111,7 @@ export async function seedPaneFromRoot(
   const hit = store.getDefinitions().find(definition => sameFixturePath(definition.basePath, root));
   const showFilesDefault = vscode.workspace.getConfiguration('codeFolderSpaces').get<boolean>('view.showFiles', true);
   await state.enablePane(paneId, {
-    root,
+    roots: [root],
     showFiles: hit?.showFiles ?? showFilesDefault,
     include: hit?.include ?? [],
     exclude: hit?.exclude ?? [],
@@ -115,11 +121,17 @@ export async function seedPaneFromRoot(
 
 /** 由目前 pane 狀態解析 provider scope；pane 沒有 root 時為 undefined（viewsWelcome 情境）。 */
 export function paneScopeFor(store: SpaceStore, state: PaneStateStore, paneId: string): PaneProviderScope | undefined {
-  const definition = resolvePaneDefinition(state.get(paneId), store.getDefinitions());
-  return definition ? { paneId, definition } : undefined;
+  const definitions = resolvePaneDefinitions(state.get(paneId), store.getDefinitions());
+  return definitions.length ? { paneId, definitions } : undefined;
 }
 
 /** 建立綁定單一 pane 的 provider（v2 未帶 scope 的 provider 不列舉任何節點）。 */
+export function paneRootNode(provider: SpaceTreeDataProvider): SpaceRootNode {
+  const scope = provider.scope;
+  if (!scope?.definitions[0]) throw new Error(`pane ${scope?.paneId ?? 'unknown'} has no root definition`);
+  return new SpaceRootNode(scope.definitions[0], scope.paneId);
+}
+
 export function createPaneProvider(store: SpaceStore, state: PaneStateStore, paneId: string): SpaceTreeDataProvider {
   const scope = paneScopeFor(store, state, paneId);
   if (!scope) throw new Error(`pane ${paneId} 沒有 root，無法建立 provider scope`);
@@ -270,7 +282,7 @@ export async function withPaneCascade<T>(
       const pane = state.get(paneId);
       runtimes.set(paneId, {
         id: paneId,
-        scope: pane.root ? { paneId, root: pane.root } : undefined,
+        scope: activeRoot(pane) ? { paneId, root: activeRoot(pane) } : undefined,
         provider,
         treeView: { message: '' },
       });
@@ -286,22 +298,24 @@ export async function withPaneCascade<T>(
       const provider = providerMap.get(paneId);
       if (!runtime || !provider) return;
       const pane = state.get(paneId);
-      runtime.scope = pane.root ? { paneId, root: pane.root } : undefined;
+      runtime.scope = activeRoot(pane) ? { paneId, root: activeRoot(pane) } : undefined;
       provider.setScope(paneScopeFor(store, state, paneId));
     };
 
     const adapter: PaneCascadeStateAdapter = {
       getPaneLinks: () => state.getPaneLinks(),
-      setPaneRoot: async (paneId: string, root: string) => {
-        await state.setPaneRoot(paneId, root);
+      switchRoot: async (paneId: string, root: string) => {
+        await state.switchRoot(paneId, root);
         sync(paneId);
       },
+      // S4.1R11-D6：守門以父 pane 的所有 root 判定（多 root cascade）。
+      getPaneRoots: (paneId: string) => state.get(paneId).roots,
     };
 
     const createController = (override?: PaneCascadeStateAdapter, options?: PaneCascadeControllerOverrides): PaneCascadeController => new PaneCascadeController({
       state: override ?? adapter,
       getRuntime: paneId => runtimes.get(paneId),
-      isAllowedRoot: isAllowedSpaceRoot,
+      isAllowedRoot: (paneRoots, candidate) => paneRoots.some(root => isAllowedSpaceRoot(root, candidate)),
       stat: options?.stat ?? (async uri => await vscode.workspace.fs.stat(uri)),
       directoryType: vscode.FileType.Directory,
       ...(options?.onError ? { onError: options.onError } : {}),
@@ -317,7 +331,7 @@ export async function withPaneCascade<T>(
     try {
       for (const seed of seeds) {
         await state.enablePane(seed.paneId, {
-          root: seed.root,
+          roots: seed.root ? [seed.root] : [],
           parentPaneId: seed.parentPaneId ?? null,
           follow: seed.follow ?? false,
           ...seed.overrides,

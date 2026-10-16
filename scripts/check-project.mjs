@@ -34,7 +34,7 @@ const decodeStringLiteral = (literal) => {
   return JSON.parse(`"${body.replace(/\\/g, '\\\\').replace(/\\\\'/g, "'").replace(/"/g, '\\"')}"`);
 };
 
-// Parse a static string or a chain of adjacent string literals; dynamic expressions are intentionally unsupported.
+// 解析靜態字串或相鄰字面值串接；刻意不支援動態運算式。
 const parseLiteralConcatenation = (expression) => {
   const tokenPattern = /\s*(?:\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|[()+]))/gy;
   const meaningful = [];
@@ -157,6 +157,65 @@ if (!pkg) {
   }
 
   const contributedCommands = new Set((pkg.contributes?.commands ?? []).map(({ command }) => command));
+  // S4.1R4：每個 pane（1..8）的 title bar／「…」選單契約——命令齊備、Command Palette 隱藏、view/title 項目一致。
+  // 僅在 manifest 採用 per-pane 命令時啟用（避免誤判其他專案／測試 fixture）。
+  if ([...contributedCommands].some((id) => id.startsWith('codeFolderSpaces.pane1.'))) {
+    const paneActions = [
+      'filter', 'clearFilter', 'drillUp', 'followOn', 'followOff', 'toggleFollow', 'mode', 'switchRoot', 'addChild', 'close', 'refresh',
+      'collapseAll', 'expandAll', 'root.add', 'root.remove',
+      ...['Explorer', 'Navigate', 'Columns', 'Context', 'Contents', 'Files', 'List'].map((name) => `preset.${name}`),
+      ...['1', '2', 'all'].map((level) => `level.${level}`),
+      ...['all', 'folders', 'files'].map((content) => `content.${content}`),
+      ...['name', 'mtime', 'ctime'].flatMap((key) => ['asc', 'desc'].map((direction) => `sort.${key}.${direction}`)),
+    ];
+    const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
+    const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
+    for (let pane = 1; pane <= 8; pane++) {
+      for (const action of paneActions) {
+        const id = `codeFolderSpaces.pane${pane}.${action}`;
+        if (!contributedCommands.has(id)) errors.push(`缺少 pane 命令：${id}`);
+        if (!palette.has(id)) errors.push(`pane 命令未在 Command Palette 隱藏：${id}`);
+      }
+      const view = `view == codeFolderSpaces.pane${pane}`;
+      const inTitle = titleItems.filter((item) => typeof item.when === 'string' && item.when.startsWith(view)).map((item) => item.command.replace(`pane${pane}.`, 'paneN.'));
+      const expected = ['filter', 'clearFilter', 'drillUp', 'followOn', 'followOff', 'collapseAll', 'expandAll', 'mode', 'switchRoot', 'addChild', 'refresh', 'close', 'root.add', 'root.remove'].map((action) => `codeFolderSpaces.paneN.${action}`);
+      for (const command of expected) if (!inTitle.includes(command)) errors.push(`pane${pane} 的 view/title 缺少 ${command}`);
+    }
+
+    // D47（S4.1R11b 回歸防線）：選單項目（view/title 與 view/item/context）不提供可靠的 view id。
+    // 真正的風險有兩種：
+    //  (1) 命令 id **內嵌特定 paneN** 但 when 涵蓋多個 pane → handler 閉包綁定該 pane，
+    //      使其他 pane 的操作错路由（審查 P1-1）。此類項目應改用 pane 無關的全域命令（由節點解析）。
+    //  (2) view/title（**不傳節點**）的 pane-scoped 操作必須用**該 pane**的專屬命令 id。
+    // `pane.add`／`pane.resetLayout` 為整體操作，不依賴發起窗格，列為例外。
+    const globallyScoped = new Set([
+      'codeFolderSpaces.pane.add',
+      'codeFolderSpaces.pane.resetLayout',
+    ]);
+    const explicitPanesOf = (when) => [...new Set([...when.matchAll(/view == codeFolderSpaces\.(pane[1-8])/g)].map((match) => match[1]))];
+    const coversAllPanes = (when) => /view =~ \/\^codeFolderSpaces\.pane\[1-8\]\$\//.test(when);
+    const embeddedPaneOf = (command) => (/codeFolderSpaces\.(pane[1-8])\./.exec(command) ?? [])[1];
+    const checkPaneScoped = (items, where, hasNode) => {
+      for (const item of items ?? []) {
+        const when = typeof item.when === 'string' ? item.when : '';
+        const command = String(item.command ?? '');
+        if (globallyScoped.has(command)) continue;
+        const embedded = embeddedPaneOf(command);
+        if (!embedded) continue; // 全域 id：由節點解析 paneId，正確。
+        const panes = explicitPanesOf(when);
+        if (coversAllPanes(when) || panes.length > 1) {
+          errors.push(`${where} 的項目涵蓋多個 pane，不得使用內嵌特定 pane 的命令 id（D47）：${command}`);
+          continue;
+        }
+        if (!hasNode && panes.length === 1 && panes[0] !== embedded) {
+          errors.push(`${where} 的 pane 專屬項目必須使用該 pane 的命令 id（D47）：${panes[0]} → ${command}`);
+        }
+      }
+    };
+    checkPaneScoped(titleItems, 'view/title', false);
+    checkPaneScoped(pkg.contributes?.menus?.['view/item/context'], 'view/item/context', true);
+  }
+
   for (const binding of pkg.contributes?.keybindings ?? []) {
     if (!contributedCommands.has(binding.command)) errors.push(`keybinding 指向未貢獻的 command：${binding.command}`);
   }
@@ -178,6 +237,9 @@ if (!pkg) {
 
   const nls = readJson('package.nls.json') ?? {};
   const nlsZh = readJson('package.nls.zh-tw.json') ?? {};
+  for (const match of JSON.stringify(pkg).matchAll(/%([\w.-]+)%/g)) {
+    if (!(match[1] in nls)) errors.push(`package.nls.json 缺少 manifest 引用 key：${match[1]}`);
+  }
   const missing = Object.keys(nls).filter((key) => !(key in nlsZh));
   const extra = Object.keys(nlsZh).filter((key) => !(key in nls));
   if (missing.length) {
@@ -190,8 +252,27 @@ if (!pkg) {
   const bundle = readJson('l10n/bundle.l10n.json') ?? {};
   const bundleZh = readJson('l10n/bundle.l10n.zh-tw.json') ?? {};
   const bundleMissing = Object.keys(bundle).filter((key) => !(key in bundleZh));
+  const bundleExtra = Object.keys(bundleZh).filter((key) => !(key in bundle));
   if (bundleMissing.length) {
     errors.push(`l10n/bundle.l10n.zh-tw.json 缺少 ${bundleMissing.length} 個訊息`);
+  }
+  if (bundleExtra.length) {
+    errors.push(`l10n/bundle.l10n.zh-tw.json 有 ${bundleExtra.length} 個多餘訊息`);
+  }
+
+  // 只比較 placeholder 集合，允許翻譯調整參數順序或重複引用。
+  const placeholders = value => [...new Set(value.match(/\{\d+\}/g) ?? [])].sort().join(',');
+  for (const [file, source, translated] of [
+    ['package.nls.zh-tw.json', nls, nlsZh],
+    ['l10n/bundle.l10n.zh-tw.json', bundle, bundleZh],
+  ]) {
+    for (const [key, value] of Object.entries(source)) {
+      if (typeof value !== 'string' || typeof translated[key] !== 'string' || !translated[key].trim()) {
+        errors.push(`${file} 訊息必須是非空字串：${key}`);
+      } else if (placeholders(value) !== placeholders(translated[key])) {
+        errors.push(`${file} placeholder 不一致：${key}`);
+      }
+    }
   }
 
   for (const file of listTypeScriptFiles(path.join(root, 'src'))) {
