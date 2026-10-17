@@ -20,7 +20,7 @@ import {
 } from './helpers';
 
 // S4R6「pane 解耦」驗收矩陣 PD-I1～PD-I5（spec §2.4.5）。
-// 這些案例斷言 v2 的核心產品語意：pane 是獨立 Folder Space（root 可為任意資料夾）、
+// 這些案例斷言 v3 的核心產品語意：pane 是獨立 Folder Space（root 可為任意資料夾）、
 // 檢視狀態以 paneId 為歸宿、pane 之間以父子鏈結傳遞焦點、插槽上限 8、啟用數不再受 spaces 數量限制。
 
 suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
@@ -193,7 +193,7 @@ suite('pane 解耦（S4R6 PD-I1～PD-I5）', () => {
     }
   ));
 
-  test('PD-I4 關閉中間 pane：子 pane 重掛到其父、v2 一致且重載後還原', async () => withPaneCascade(
+  test('PD-I4 關閉中間 pane：子 pane 重掛到其父、v3 一致且重載後還原', async () => withPaneCascade(
     [alpha, beta],
     [
       { paneId: 'pane1', root: alpha },

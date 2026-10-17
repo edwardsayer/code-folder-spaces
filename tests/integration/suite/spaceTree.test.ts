@@ -56,7 +56,7 @@ suite('空間樹 provider', () => {
     }
   ));
 
-  test('未帶 scope 的 provider 不列舉任何節點（v2：pane 是唯一列舉單位）', async () => withGlobalSettings({ spaces: [alpha, beta] }, async () => {
+  test('未帶 scope 的 provider 不列舉任何節點（v3：pane 是唯一列舉單位）', async () => withGlobalSettings({ spaces: [alpha, beta] }, async () => {
     const store = new SpaceStore();
     const { state } = createPaneStateHarness();
     const provider = new SpaceTreeDataProvider(store, state);
@@ -99,7 +99,7 @@ suite('空間樹 provider', () => {
       assert.ok(initial.every(node => node.contextValue !== 'codeFolderSpaces.spaceRoot'));
       assert.equal((await scoped.findNodeByPath(path.join(alpha, 'a.txt')))?.label, 'a.txt');
 
-      // 就地下鑽：v2 直接改寫 pane.root（不再有鏈結根與下鑽根的雙軌），provider 需同步 scope。
+      // 就地下鑽：v3 以 drillRoot 記錄下鑽位置，provider 需同步 scope。
       await state.drillDown('pane1', drillRoot);
       sync('pane1');
       const drilled = await scoped.getChildren();
@@ -120,7 +120,7 @@ suite('空間樹 provider', () => {
     }
   ));
 
-  test('pane 的 root 是列舉的唯一權威：resolvePaneDefinition 依 paneId 解析（v2 取代 v1 resolveActiveRoot）', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
+  test('pane 的 root 是列舉的唯一權威：resolvePaneDefinition 依 paneId 解析（v3 取代舊 resolveActiveRoot）', async () => withGlobalSettings({ spaces: [alpha] }, async () => {
     const store = new SpaceStore();
     const { state } = createPaneStateHarness();
     try {
@@ -130,7 +130,7 @@ suite('空間樹 provider', () => {
       assert.equal(resolvePaneDefinition(state.get('pane1'), store.getDefinitions())?.basePath, alpha);
       assert.equal(resolvePaneDefinition(state.get('pane1'), store.getDefinitions())?.name, space.name);
 
-      // 下鑽後 pane.root 即為新權威（v1 需要 chainRoot 與 drillStack 妥協，v2 不需要）。
+      // 下鑽後由 pane.drillRoot 記錄目前有效根（v3 不再以 legacy root 欄位作持久狀態）。
       const drillRoot = path.join(alpha, 'nested');
       await state.drillDown('pane1', drillRoot);
       const drilled = resolvePaneDefinition(state.get('pane1'), store.getDefinitions());
@@ -152,7 +152,6 @@ suite('空間樹 provider', () => {
       const paneProvider = provider('pane1');
       await state.setPreset('pane1', 'Files');
       await state.setFilter('pane1', 'deep');
-      const root = await rootOf(paneProvider);
       await state.drillDown('pane1', path.join(alpha, 'nested'));
       sync('pane1');
       const drilled = await paneProvider.getChildren() as Node[];
@@ -161,8 +160,9 @@ suite('空間樹 provider', () => {
       assert.equal(await state.drillUp('pane1'), true);
       sync('pane1');
       const returned = await rootOf(paneProvider) as SpaceRootNode;
-      assert.equal(returned.uri.fsPath, (root as SpaceRootNode).uri.fsPath);
-      // 下鑽返回只還原 root，同時還原進入堆疊時的 preset／filter（v2 snapshot 語意）。
+      assert.equal(returned.rootPath, alpha, '返回後根列應以 pane 的原始 root 為路徑');
+      assert.equal(returned.id, `codeFolderSpaces.pane1:root:${alpha}`, 'root row id 應含 pane id 與 root 路徑');
+      // 下鑽返回只還原 root，同時還原進入堆疊時的 preset／filter（v3 snapshot 語意）。
       assert.deepEqual(
         { preset: state.get('pane1').preset, filter: state.get('pane1').filter, sort: state.get('pane1').sort, roots: state.get('pane1').roots, drillRoot: state.get('pane1').drillRoot, drillStack: state.get('pane1').drillStack },
         { preset: 'Files', filter: 'deep', sort: { key: 'name', direction: 'asc' }, roots: [alpha], drillRoot: null, drillStack: [] }
@@ -203,6 +203,29 @@ suite('空間樹 provider', () => {
       await config.update('spaces', previous, vscode.ConfigurationTarget.Workspace);
     }
   });
+
+  test('MR-UI3 與 root metadata：單 root 不渲染根列，多 root 根列 id 唯一且名稱採 D70 fallback', async () => withPaneProviders(
+    [{ path: alpha, name: 'Alpha space' }],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state, sync }) => {
+      const singleProvider = provider('pane1');
+      const singleRootNode = await singleProvider.getTreeItem(await rootOf(singleProvider));
+      assert.equal((await singleProvider.getChildren()).some(node => node.contextValue === 'codeFolderSpaces.spaceRoot'), false,
+        '單 root 模式應展平內容，不渲染根目錄列');
+      assert.equal(singleRootNode.label, 'Alpha space', '命中 space 時使用 space name');
+      assert.equal(singleRootNode.id, `codeFolderSpaces.pane1:root:${alpha}`);
+
+      const fallbackRoot = path.join(path.dirname(alpha), 'unconfigured-fallback');
+      await state.addPaneRoot('pane1', fallbackRoot);
+      sync('pane1');
+      const multiRoots = await provider('pane1').getChildren() as SpaceRootNode[];
+      assert.equal(multiRoots.length, 2, '多 root 模式應渲染每個根列');
+      assert.equal(new Set(multiRoots.map(node => node.id)).size, 2, '根列 id 必須唯一');
+      assert.deepEqual(multiRoots.map(node => String(node.label)), ['Alpha space', 'unconfigured-fallback'],
+        'D70 label 為命中 space.name，未命中時 fallback 至 root basename');
+      assert.deepEqual(multiRoots.map(node => node.rootPath), [alpha, fallbackRoot]);
+    }
+  ));
 
   test('兩個單 root pane 各自平鋪呈現自己的根內容', async () => withPaneProviders(
     [alpha, { path: beta, name: '自訂空間' }],
@@ -463,18 +486,17 @@ suite('空間樹 provider', () => {
     }
   ));
 
-  test('pane 名稱預設依 space／basename，並可由 pane 自身 name 覆寫', async () => withPaneProviders(
+  test('pane root label 命中 space name，未命中時 fallback 至 basename（S4R6-D70）', async () => withPaneProviders(
     [alpha, { path: beta, name: '設定名稱' }],
     [
       { paneId: 'pane1', root: alpha },
       { paneId: 'pane2', root: beta },
-      { paneId: 'pane3', root: beta, overrides: { name: '自訂空間' } },
+      { paneId: 'pane3', root: path.join(path.dirname(alpha), 'unconfigured-fallback') },
     ],
     async ({ provider }) => {
       assert.equal((await rootOf(provider('pane1'))).label, 'alpha');
       assert.equal((await rootOf(provider('pane2'))).label, '設定名稱');
-      // pane 自訂 name 永遠勝過 space 設定（S4R6-D70：pane 值為權威）。
-      assert.equal(provider('pane3').scope?.definitions[0].name, '自訂空間');
+      assert.equal((await rootOf(provider('pane3'))).label, 'unconfigured-fallback');
     }
   ));
 });

@@ -2,7 +2,7 @@
 
 **Folder-scoped file explorer spaces for Visual Studio Code.** Pin any folder as its own focused explorer space and browse it without the noise of the whole workspace.
 
-> **Status: early development (v0.0.1).** Folder Spaces provides a dedicated activity-bar view with up to eight **independent folder spaces** (each folder space has its own root, preset, filter, sort and drill-down stack) that can be chained parent → child, plus view presets, drill-down, file nesting, drag & drop and file operations. See Known limitations below.
+> **Status: early development (v0.0.1).** Folder Spaces provides a dedicated activity-bar view with up to eight **independent folder spaces** (each folder space has its own roots — one or more folders — plus its own preset, filter, sort and drill-down stack) that can be chained parent → child, plus view presets, drill-down, file nesting, drag & drop and file operations. See Known limitations below.
 
 ## Why
 
@@ -13,11 +13,11 @@ This project is the VS Code counterpart of the Obsidian plugin [Folder Spaces](h
 ## Features (current)
 
 - **Folder spaces**: configure any number of folders, each shown as its own root in a dedicated activity-bar view.
-- **Independent folder spaces**: up to eight folder spaces stack in the Folder Spaces view. **Every folder space has its own state** — its own roots (one or more folders, not only the configured spaces), view preset, path filter, sort, drill-down stack, name/icon and include/exclude rules. `Folder Spaces: Activate Child Space` creates a child folder space rooted at the selected folder and links it to its parent folder space.
+- **Independent folder spaces**: up to eight folder spaces stack in the Folder Spaces view. **Every folder space has its own state** — its own roots (one or more folders, not only the configured spaces), view preset, path filter, sort, drill-down stack, icon and include/exclude rules. `Folder Spaces: Activate Child Space` creates a child folder space rooted at the selected folder and links it to its parent folder space.
 - **Multiple folders per folder space**: a folder space can hold **several roots** (like a multi-root workspace). `Add Folder to Space...` appends a folder to the current folder space, and each root row has an inline ✕ to `Remove Folder from Space` (it removes that folder only — it never closes the folder space). Roots are shared by the folder space's preset, filter and sort; drilling down affects one root at a time.
 - **Built-in Explorer alignment**: with a **single** root the root row is hidden and the first level of the folder is listed directly — exactly like VS Code's built-in Explorer. With **multiple** roots each root is shown as an expandable row.
 - **Click behavior alignment (opt-in)**: `Align Click Behavior` changes the window-level tree setting to double-click expansion after confirmation. It affects every tree in the window, including the built-in File Explorer; `Reset Click Behavior` restores the previous value.
-- **Follow workspace folder**: the first folder space follows the active workspace/project folders by default (`codeFolderSpaces.followWorkspaceDirectory`). Opening a multi-root workspace makes that folder space show every workspace folder as a root. Turn it off to manage the folder space's roots yourself.
+- **Follow workspace folder**: every enabled folder space follows the active workspace/project folders by default (`codeFolderSpaces.followWorkspaceDirectory`). Opening a multi-root workspace makes those folder spaces show every workspace folder as a root. Turn it off to manage the folder space's roots yourself; folder spaces that have a parent and are following it are excluded from synchronization.
 - **Linked folder spaces (cascading chain)**: a child folder space with follow enabled tracks the folder selected in its parent folder space. Turning follow off makes the folder space fully independent; switching a child folder space's root manually is allowed and lasts until the parent selects a different folder again.
 - **View presets**: seven named presets (Explorer, Navigate, Columns, Context, Contents, Files, List) covering tree/flat modes, depth levels and folder/file content filters.
   - Flat presets: **Files** / **List** show a single-level list whose item names are the full relative path from the folder space root; **Contents** shows folders on the first level (named by relative path, `.` for files directly under the root) and their files, by file name only, on the second level.

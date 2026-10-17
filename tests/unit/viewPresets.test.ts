@@ -22,8 +22,8 @@ describe('view presets and state', () => {
     expect(normalizePaneState({ version: 2, panes: { pane1: { preset: 'bogus' }, pane2: { preset: 'Files' } } })).toEqual({ version: 3, panes: {} });
     expect(normalizePaneState({ version: 3, panes: { pane1: { preset: 'bogus' }, pane2: { preset: 'Files' } } })).toEqual({
       version: 3, panes: {
-        pane1: { roots: [], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: true, preset: 'Explorer', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [], name: null, icon: null, showFiles: true, include: [], exclude: [] },
-        pane2: { roots: [], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: false, preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [], name: null, icon: null, showFiles: true, include: [], exclude: [] },
+        pane1: { roots: [], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: true, preset: 'Explorer', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [], icon: null, showFiles: true, include: [], exclude: [] },
+        pane2: { roots: [], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: false, preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [], icon: null, showFiles: true, include: [], exclude: [] },
       },
     });
   });

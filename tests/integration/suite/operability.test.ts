@@ -29,11 +29,14 @@ suite('可操作性（S4.1R5）', () => {
       const before = api.getPanes();
       await vscode.commands.executeCommand('codeFolderSpaces.addSpace', tree);
       const after = api.getPanes();
-      assert.ok(after.some(pane => normalize(pane.root) === normalize(tree)), '新增的資料夾應成為某窗格的 root');
-      const opened = after.length - before.length;
+      // P2-10：原 `opened = after.length - before.length; assert(opened > 0)` 近乎恆真；
+      // 改為直接斷言「新增的 pane」— 它必須是啟用中的 pane，且 root 指向該資料夾。
+      const openedPanes = after.filter(pane => !before.some(prior => prior.id === pane.id));
+      assert.ok(openedPanes.length > 0, '新增尚未存在的空間應開啟至少一個 pane');
+      assert.ok(openedPanes.every(pane => normalize(pane.root) === normalize(tree)),
+        `新增的 pane 必須以該資料夾為 root：${JSON.stringify(openedPanes)}`);
       await vscode.commands.executeCommand('codeFolderSpaces.addSpace', tree);
       assert.equal(api.getPanes().length, after.length, '重複新增不應再開窗格');
-      assert.ok(opened >= 0);
       for (const pane of api.getPanes()) {
         if (normalize(pane.root) === normalize(tree) && api.getPanes().length > 1) {
           await vscode.commands.executeCommand('codeFolderSpaces.pane.remove', pane.id);

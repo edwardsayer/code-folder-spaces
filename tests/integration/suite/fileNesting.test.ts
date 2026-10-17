@@ -68,7 +68,7 @@ suite('檔案嵌套 provider 驗證（F-42）', () => {
     await clearGlobalSettings();
   });
 
-  // FN-I2／FN-I3 不需要 pane 狀態覆寫，但仍必須帶 scope（v2：未帶 scope 不列舉）。
+  // FN-I2／FN-I3 不需要 pane 狀態覆寫，但仍必須帶 scope（v3：未帶 scope 不列舉）。
   test('FN-I1 啟用後父列可折疊、子項自同層移除、展開後出現', async () => withPaneProviders(
     [nesting],
     [{ paneId: 'pane1', root: nesting }],

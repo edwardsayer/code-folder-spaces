@@ -63,7 +63,7 @@ export async function withGlobalSettings<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Pane 狀態 harness（S4R6：panes.v2 一律以 paneId 為 key）
+// Pane 狀態 harness（S4R6 起以 paneId 為 key；S4.1R11 起持久化為 panes.v3）
 // ---------------------------------------------------------------------------
 
 export interface PaneStateHarness {
@@ -86,7 +86,7 @@ export function createPaneStateHarness(initial?: Record<string, unknown>): PaneS
   return { state: new PaneStateStore(memento), memento, reload: () => new PaneStateStore(memento) };
 }
 
-/** 啟用 pane 並寫入初始狀態（v2 唯一的建立路徑）。 */
+/** 啟用 pane 並寫入初始狀態（唯一的建立路徑，S4.1R11 起寫入 panes.v3）。 */
 export function seedPane(state: PaneStateStore, paneId: string, pane: Partial<PaneState>): Promise<void> {
   const legacyRoot = (pane as { root?: unknown }).root;
   const normalized = pane.roots === undefined && typeof legacyRoot === 'string'
@@ -125,7 +125,7 @@ export function paneScopeFor(store: SpaceStore, state: PaneStateStore, paneId: s
   return definitions.length ? { paneId, definitions } : undefined;
 }
 
-/** 建立綁定單一 pane 的 provider（v2 未帶 scope 的 provider 不列舉任何節點）。 */
+/** 建立綁定單一 pane 的 provider（未帶 scope 的 provider 不列舉任何節點）。 */
 export function paneRootNode(provider: SpaceTreeDataProvider): SpaceRootNode {
   const scope = provider.scope;
   if (!scope?.definitions[0]) throw new Error(`pane ${scope?.paneId ?? 'unknown'} has no root definition`);
@@ -220,7 +220,7 @@ export interface PaneCascadeHarness {
   state: PaneStateStore;
   /** 以同一份 memento 重載 store（PD-I4：驗證持久化後可還原）。 */
   reload: () => PaneStateStore;
-  /** 底層 memento：可直接讀取 `panes.v2` 原始文件做一致性斷言。 */
+  /** 底層 memento：可直接讀取 `panes.v3` 原始文件做一致性斷言。 */
   memento: MementoLike;
   store: SpaceStore;
   /** 預設接線的 controller（已 attach 所有種子 pane 的 selection emitter）。 */

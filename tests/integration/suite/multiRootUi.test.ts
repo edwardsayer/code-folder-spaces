@@ -8,7 +8,6 @@ import {
   PaneStateStore,
   type MementoLike,
 } from '../../../src/spaces/viewState';
-import { shouldSyncWorkspaceRoots } from '../../../src/spaces/paneLinks';
 
 /**
  * S4.1R11b 專屬整合測試：UI 入口與 root 列語意的**可驗證核心**。
@@ -107,6 +106,35 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
   });
 
+  test('OP-20 manifest：root inline remove gate 與 command id 符合契約', async () => {
+    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    assert.ok(extension);
+    const manifest = extension.packageJSON as { contributes?: { menus?: { 'view/item/context'?: Array<{ command?: string; when?: string; group?: string }> } } };
+    const entries = manifest.contributes?.menus?.['view/item/context'] ?? [];
+    const rootRemove = entries.filter(item => item.command === 'codeFolderSpaces.root.remove');
+    assert.ok(rootRemove.length > 0, 'manifest 應註冊 root.remove inline action');
+    assert.ok(rootRemove.every(item => /viewItem == codeFolderSpaces\.(spaceRoot|folder)/.test(item.when ?? '')),
+      `inline when 必須限制在 root/folder context：${JSON.stringify(rootRemove)}`);
+    assert.ok(rootRemove.every(item => !/pane[1-8]/.test(item.command ?? '')),
+      'root.remove command id 不得內嵌 pane slot');
+
+    // P2-3：鎖住本輪 OP-20 真正的 manifest 改動（原本只驗 root.remove，未驗下鑽／加子）。
+    const drillInline = entries.filter(item => item.command === 'codeFolderSpaces.drillDown' && item.group === 'inline@2');
+    assert.equal(drillInline.length, 1, '下鑽應恰好一個 inline@2 項目');
+    assert.match(drillInline[0].when ?? '', /viewItem == codeFolderSpaces\.spaceRoot/,
+      '下鑽 inline when 必須涵蓋根目錄列（OP-20）');
+    assert.match(drillInline[0].when ?? '', /viewItem == codeFolderSpaces\.folder/, '下鑽 inline when 仍須涵蓋資料夾列');
+    assert.ok(!/codeFolderSpaces\.file/.test(drillInline[0].when ?? ''), '下鑽不得出現在檔案列');
+
+    const addChildInline = entries.filter(item => item.command === 'codeFolderSpaces.pane.addChild');
+    assert.equal(addChildInline.length, 1, '加子窗格應恰好一個項目（不得在根列重複貢獻）');
+    assert.equal(addChildInline[0].group, 'inline@3', '加子窗格排在移除與下鑽之後');
+    assert.match(addChildInline[0].when ?? '', /viewItem == codeFolderSpaces\.spaceRoot/,
+      '加子窗格 when 必須涵蓋根目錄列（OP-20）');
+    assert.ok(!/codeFolderSpaces\.file/.test(addChildInline[0].when ?? ''), '加子窗格不得出現在檔案列');
+    assert.ok(!/pane[1-8]/.test(addChildInline[0].command ?? ''), 'D47：command id 不得內嵌 pane slot');
+  });
+
   test('canRemoveRoot 條件＝roots.length > 1，與選單 gate 一致', async () => {
     const a = norm(path.join(tempRoot, 'a'));
     const b = norm(path.join(tempRoot, 'b'));
@@ -136,28 +164,30 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     assert.deepEqual(store.get('pane1').roots, [a, b], 'roots 必須保序且無重複');
   });
 
-  test('P1-4：followWorkspaceDirectory 設定寫入每個啟用 pane 後，關閉即不再跟隨', async () => {
-    const a = norm(path.join(tempRoot, 'a'));
-    const b = norm(path.join(tempRoot, 'b'));
-    const store = storeWith({
-      pane1: { roots: [a], drillRoot: null, parentPaneId: null, follow: false, followWorkspaceDirectory: true },
-      pane2: { roots: [b], drillRoot: null, parentPaneId: 'pane1', follow: true, followWorkspaceDirectory: true },
-    });
-
-    // 模擬設定變更事件：把新值寫入每個啟用 pane（R11b 的 P1-4 修復行為）。
-    for (const paneId of store.getEnabledPaneIds()) {
-      await store.setPaneFollowWorkspaceDirectory(paneId, false);
-    }
-    assert.equal(store.get('pane1').followWorkspaceDirectory, false);
-    assert.equal(store.get('pane2').followWorkspaceDirectory, false);
-
-    // 呼叫端（syncWorkspaceDirectory）以 flag 過濾：兩個 pane 都不再參與同步。
-    // 註：`shouldSyncWorkspaceRoots` 只判斷 roots 差異，**不管** follow flag，
-    // 故這裡必須同時驗證「flag 已關」＋「呼叫端會跳過」兩件事。
-    for (const paneId of store.getEnabledPaneIds()) {
-      const pane = store.get(paneId);
-      const wouldSync = pane.followWorkspaceDirectory && shouldSyncWorkspaceRoots(pane.roots, [a, b], (left: string, right: string) => left === right);
-      assert.equal(wouldSync, false, `${paneId} 關閉 follow 後不應再被工作區同步`);
+  test('P1-4：真實 configuration 變更事件更新所有啟用 pane 的跟隨旗標', async () => {
+    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    assert.ok(extension);
+    await extension.activate();
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+    const api = await extension.activate() as { getPanes(): Array<{ id: string; followWorkspaceDirectory: boolean }> };
+    const config = vscode.workspace.getConfiguration('codeFolderSpaces');
+    const before = config.inspect<boolean>('followWorkspaceDirectory')?.globalValue;
+    try {
+      const enabledIds = api.getPanes().map(pane => pane.id);
+      assert.ok(enabledIds.length > 0, '前置：至少有一個啟用 pane');
+      await config.update('followWorkspaceDirectory', false, vscode.ConfigurationTarget.Global);
+      // P2-9：以輪詢取代固定 100ms 等待（CI 冷啟動下事件可能更慢）。
+      const deadline = Date.now() + 2000;
+      while (Date.now() < deadline) {
+        if (api.getPanes().every(pane => pane.followWorkspaceDirectory === false)) break;
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      assert.deepEqual(api.getPanes().map(pane => [pane.id, pane.followWorkspaceDirectory]), enabledIds.map(id => [id, false]),
+        'onDidChangeConfiguration 訂閱端應把新旗標寫入每個啟用 pane');
+      // P2-9：原第三個斷言只是重述 paneLinks 已覆蓋的純函式，對本 seam 無鑑別力，已移除。
+    } finally {
+      await config.update('followWorkspaceDirectory', before, vscode.ConfigurationTarget.Global);
+      await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
     }
   });
 

@@ -61,8 +61,6 @@ export interface PaneState {
     preset: ViewPresetName;
     view?: ViewSettings;
   } | null;
-  /** null = D70 fallback: a configured space hit wins, otherwise the root basename. */
-  name: string | null;
   /** null = D70 fallback: a configured space hit wins, otherwise the default folder icon. */
   icon: string | null;
   showFiles: boolean;
@@ -135,7 +133,6 @@ export function defaultPaneState(options: DefaultPaneOptions = {}): PaneState {
     filter: '',
     sort: { key: 'name', direction: 'asc' },
     drillStack: [],
-    name: null,
     icon: null,
     showFiles: options.showFiles ?? true,
     include: options.include ?? [],
@@ -198,7 +195,7 @@ export function normalizePane(value: unknown, fallbackShowFiles = true, isPrimar
     followWorkspaceDirectory: typeof source.followWorkspaceDirectory === 'boolean' ? source.followWorkspaceDirectory : isPrimary,
     preset: isViewPresetName(source.preset) ? source.preset : DEFAULT_VIEW_PRESET,
     filter: typeof source.filter === 'string' ? source.filter : '', sort: normalizeSort(source.sort),
-    drillStack: normalizeDrillStack(source.drillStack), name: normalizeOptionalString(source.name), icon: normalizeOptionalString(source.icon),
+    drillStack: normalizeDrillStack(source.drillStack), icon: normalizeOptionalString(source.icon),
     showFiles: typeof source.showFiles === 'boolean' ? source.showFiles : fallbackShowFiles,
     include: normalizeStringArray(source.include), exclude: normalizeStringArray(source.exclude),
   };
@@ -211,6 +208,7 @@ export function normalizePane(value: unknown, fallbackShowFiles = true, isPrimar
     else delete pane.adaptiveParentBackup;
   } else delete pane.adaptiveParentBackup;
   delete (pane as Record<string, unknown>).root;
+  delete (pane as Record<string, unknown>).name;
   return pane;
 }
 
@@ -301,7 +299,6 @@ export function migrateV1ToV2(value: unknown, spaces: SpaceDefinition[], showFil
       root,
       parentPaneId: link.parentPaneId,
       follow: link.follow,
-      name: null,
       icon: null,
       showFiles: space?.showFiles ?? showFilesDefault,
       include: space?.include ?? [],
@@ -315,7 +312,7 @@ export function migrateV1ToV2(value: unknown, spaces: SpaceDefinition[], showFil
 export function resolvePaneDefinitions(pane: PaneState, spaces: SpaceDefinition[]): SpaceDefinition[] {
   return pane.roots.map(root => {
     const hit = spaces.find(space => samePath(space.basePath, root));
-    return { basePath: root, name: pane.name ?? hit?.name ?? path.basename(root), icon: pane.icon ?? hit?.icon,
+    return { basePath: root, name: hit?.name ?? path.basename(root), icon: pane.icon ?? hit?.icon,
       showFiles: pane.showFiles, include: pane.include, exclude: pane.exclude, sourceIndex: hit?.sourceIndex ?? -1 };
   });
 }
@@ -339,6 +336,7 @@ export function rewritePaneDocumentRoots(document: PaneStateDocument, oldPath: s
       drillRoot: pane.drillRoot ? rewrite(pane.drillRoot) : null,
       drillStack: pane.drillStack.map(snapshot => ({ ...snapshot, root: rewrite(snapshot.root) })),
     };
+    delete (rewritten[paneId] as Record<string, unknown>).name;
   }
   return { ...document, panes: rewritten };
 }
@@ -599,7 +597,7 @@ export class PaneStateStore {
     pane.drillRoot = null; pane.drillStack = []; await this.persist();
   }
 
-  async setPaneDisplay(paneId: string, patch: Partial<Pick<PaneState, 'name' | 'icon' | 'showFiles' | 'include' | 'exclude'>>): Promise<void> {
+  async setPaneDisplay(paneId: string, patch: Partial<Pick<PaneState, 'icon' | 'showFiles' | 'include' | 'exclude'>>): Promise<void> {
     const pane = this.state.panes[paneId];
     if (!pane) return;
     Object.assign(pane, patch);

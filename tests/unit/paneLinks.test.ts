@@ -308,6 +308,18 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     expect(shouldSyncWorkspaceDirectory({ followWorkspaceDirectory: false, parentPaneId: null, follow: false })).toBe(false);
   });
 
+  it('MR-UI4：pane1 跟隨工作區目錄，其他 pane 保留自己的根', () => {
+    const panes = {
+      pane1: { roots: ['/old'], parentPaneId: null, follow: false, followWorkspaceDirectory: true },
+      pane2: { roots: ['/private'], parentPaneId: null, follow: false, followWorkspaceDirectory: false },
+      pane3: { roots: ['/child'], parentPaneId: 'pane1', follow: true, followWorkspaceDirectory: true },
+    };
+    const same = (a: string, b: string) => a === b;
+    const selected = Object.keys(panes).filter(id => shouldSyncWorkspaceDirectory(panes[id as keyof typeof panes]));
+    expect(selected).toEqual(['pane1']);
+    expect(panesToSyncWorkspaceRoots(panes, ['/workspace'], same)).toEqual(['pane1']);
+  });
+
   it('syncs follow pane roots when a multi-folder workspace gains another folder (S4.1R11 OP-16)', () => {
     const same = (a: string, b: string) => a === b;
     // 加入第二個專案資料夾是 OP-16 的核心用例，不可因首項相同而早退。

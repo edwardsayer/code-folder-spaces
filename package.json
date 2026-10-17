@@ -3852,18 +3852,18 @@
       "view/item/context": [
         {
           "command": "codeFolderSpaces.drillDown",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && viewItem == codeFolderSpaces.folder",
-          "group": "inline@1"
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)",
+          "group": "inline@2"
         },
         {
           "command": "codeFolderSpaces.drillDown",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && viewItem == codeFolderSpaces.folder",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)",
           "group": "1_modification@0"
         },
         {
           "command": "codeFolderSpaces.pane.addChild",
-          "when": "(view == codeFolderSpaces.pane1 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane1.hasChild) || view == codeFolderSpaces.pane2 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane2.hasChild) || view == codeFolderSpaces.pane3 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane3.hasChild) || view == codeFolderSpaces.pane4 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane4.hasChild) || view == codeFolderSpaces.pane5 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane5.hasChild) || view == codeFolderSpaces.pane6 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane6.hasChild) || view == codeFolderSpaces.pane7 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane7.hasChild) || view == codeFolderSpaces.pane8 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane8.hasChild)) && viewItem == codeFolderSpaces.folder",
-          "group": "inline@2"
+          "when": "(view == codeFolderSpaces.pane1 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane1.hasChild) || view == codeFolderSpaces.pane2 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane2.hasChild) || view == codeFolderSpaces.pane3 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane3.hasChild) || view == codeFolderSpaces.pane4 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane4.hasChild) || view == codeFolderSpaces.pane5 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane5.hasChild) || view == codeFolderSpaces.pane6 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane6.hasChild) || view == codeFolderSpaces.pane7 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane7.hasChild) || view == codeFolderSpaces.pane8 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane8.hasChild)) && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)",
+          "group": "inline@3"
         },
         {
           "command": "codeFolderSpaces.root.remove",

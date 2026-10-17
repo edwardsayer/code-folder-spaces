@@ -10,6 +10,7 @@ import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefau
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
 import { canClosePane, isPaneRootDirectory, nextChildPaneId, panesToSyncWorkspaceRoots } from './spaces/paneLinks';
 import { PaneCascadeController } from './spaces/paneCascade';
+import { diffWatchers, planWatchers } from './spaces/watcherPlan';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
 import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
@@ -33,7 +34,7 @@ const DIRECTORY_SNAPSHOT_KEY = 'codeFolderSpaces.directorySnapshot.v1';
 export interface FolderSpacesApi {
   readonly version: string;
   getSpaces(): Array<{ name: string; basePath: string }>;
-  /** 目前啟用的窗格，供自動化驗證命令接線：id／root(s)／父窗格／follow／工作區目錄跟隨／預設集。 */
+  /** 目前啟用的窗格，供自動化驗證命令接線：id／root／roots／父窗格／follow／工作區目錄跟隨／預設集。 */
   getPanes(): Array<{ id: string; root: string | null; roots: string[]; parentPaneId: string | null; follow: boolean; followWorkspaceDirectory: boolean; preset: string }>;
 }
 
@@ -446,21 +447,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     scheduleRefresh();
   };
   const rebuildWatchers = (): void => {
-    const desired = new Map<string, string>();
-    for (const runtime of paneRuntime.values()) {
-      for (const definition of runtime.provider.scope?.definitions ?? []) {
-        const root = definition.basePath;
-        desired.set(normalizeSpaceKey(root), root);
-      }
+    // MR-I5：去重與建立／dispose 的決策抽至純函式 watcherPlan，使行為可單元測試（本函式只負責接線 VS Code API）。
+    const desired = planWatchers([...paneRuntime.values()].map(runtime => ({
+      paneId: runtime.id,
+      roots: (runtime.provider.scope?.definitions ?? []).map(definition => definition.basePath),
+    })));
+    const plan = diffWatchers(watchers.keys(), desired);
+    for (const key of plan.dispose) {
+      watchers.get(key)?.dispose();
+      watchers.delete(key);
     }
-    for (const [key, watcher] of watchers) {
-      if (!desired.has(key)) {
-        watcher.dispose();
-        watchers.delete(key);
-      }
-    }
+    const createKeys = new Set(plan.create.map(root => normalizeSpaceKey(root)));
     for (const [key, root] of desired) {
-      if (watchers.has(key)) continue;
+      if (!createKeys.has(key) || watchers.has(key)) continue;
       const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(vscode.Uri.file(root), '**/*'));
       watcher.onDidCreate(invalidateCacheAndRefresh);
       watcher.onDidDelete(invalidateCacheAndRefresh);
@@ -1351,6 +1350,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (!info?.isDirectory || !info.paneId) return;
       // D67：下鑽以該 pane 自己的 root 為界（節點本質上在 pane root 內）。
       if (!isAllowedSpaceRoot(info.definition.basePath, info.uri.fsPath)) return;
+      // 根列對自身下鑽為 no-op，避免幽靈歷史。
+      if (isSamePath(activeRoot(viewState.get(info.paneId)) ?? '', info.uri.fsPath)) return;
       const childPreset = resolveConfiguredDefaultChildPreset(settings().get<string>('defaultChildPreset'));
       await viewState.drillDown(info.paneId, info.uri.fsPath, childPreset);
       await paneChanged(info.paneId);

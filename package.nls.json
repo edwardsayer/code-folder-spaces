@@ -122,7 +122,7 @@
   "configuration.defaultChildPreset.description": "Preset applied to new child folder spaces opened from a parent folder space.",
   "configuration.adaptiveCascadeParent.description": "When child folder spaces are actively following, automatically switch parent folder spaces to the cascade parent preset.",
   "configuration.cascadeParentPreset.description": "Preset applied to parent folder spaces while an actively following child exists.",
-  "configuration.followWorkspaceDirectory.description": "When enabled, the primary folder space (the lowest-numbered enabled view slot) follows workspace folders. Changing this setting applies to every enabled folder space; panes with a parent that are following it are excluded from synchronization.",
+  "configuration.followWorkspaceDirectory.description": "When enabled, every enabled folder space follows workspace folders. Changing this setting applies to every enabled folder space and overrides the individual value of each folder space; folder spaces with a parent that are following it are excluded from synchronization.",
   "command.root.remove.title": "Remove Folder from Space",
   "command.paneAction.toggleFollow.title": "Toggle Parent Follow",
   "command.alignClickBehavior.title": "Align Click Behavior",
