@@ -56,9 +56,20 @@
   "Descending": "Descending",
   "Folder Space {0}": "Folder Space {0}",
   "Choose a folder for this folder space": "Choose a folder for this folder space",
+  "Choose a folder inside this folder space first.": "Choose a folder inside this folder space first.",
   "Invalid folder space link: {0}": "Invalid folder space link: {0}",
   "Folder space folder is stale: {0}. Select a folder in its parent folder space or reset the layout.": "Folder space folder is stale: {0}. Select a folder in its parent folder space or reset the layout.",
   "Folder Spaces supports at most 8 folder space slots.": "Folder Spaces supports at most 8 folder space slots.",
   "Folder is already in this folder space.": "Folder is already in this folder space.",
-  "A folder space needs at least one folder. Use Close Folder Space instead.": "A folder space needs at least one folder. Use Close Folder Space instead."
+  "A folder space needs at least one folder. Use Close Folder Space instead.": "A folder space needs at least one folder. Use Close Folder Space instead.",
+  "Align Click Behavior": "Align Click Behavior",
+  "This is a window-level setting and affects all trees in this window, including the built-in File Explorer.": "This is a window-level setting and affects all trees in this window, including the built-in File Explorer.",
+  "Click behavior was not changed.": "Click behavior was not changed.",
+  "Click behavior aligned to double-click. Use Reset Click Behavior to restore the previous setting.": "Click behavior aligned to double-click. Use Reset Click Behavior to restore the previous setting.",
+  "No click behavior override was recorded; no setting was changed.": "No click behavior override was recorded; no setting was changed.",
+  "The previous click behavior setting was restored.": "The previous click behavior setting was restored.",
+  "Select a folder from the root rows to remove it.": "Select a folder from the root rows to remove it.",
+  "Click behavior is already set to double-click; no reset value was recorded.": "Click behavior is already set to double-click; no reset value was recorded.",
+  "Click behavior records from other workspaces were skipped.": "Click behavior records from other workspaces were skipped.",
+  "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.": "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped."
 }

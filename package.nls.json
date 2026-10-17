@@ -13,7 +13,7 @@
   "command.pane.add.title": "Add Pane...",
   "command.pane.remove.title": "Remove Pane",
   "command.pane.resetLayout.title": "Reset Pane Layout",
-  "command.pane.addChild.title": "Open Child Folder Space Here",
+  "command.pane.addChild.title": "Activate Child Space",
   "command.pane.setRoot.title": "Set Folder Space Root",
   "command.pane.toggleFollow.title": "Toggle Parent Follow",
   "configuration.panes.count.description": "Number of folder space view slots to enable initially (1–8). Each folder space can use its own roots.",
@@ -89,7 +89,7 @@
   "command.paneAction.switchRoot.title": "Switch Root...",
   "command.paneAction.root.add.title": "Add Folder to Space...",
   "command.paneAction.root.remove.title": "Remove Folder from Space",
-  "command.paneAction.addChild.title": "Open Child Folder Space",
+  "command.paneAction.addChild.title": "Activate Child Space",
   "command.paneAction.close.title": "Close Pane",
   "command.paneAction.refresh.title": "Refresh",
   "category.folderSpaces": "Folder Spaces",
@@ -122,7 +122,9 @@
   "configuration.defaultChildPreset.description": "Preset applied to new child folder spaces opened from a parent folder space.",
   "configuration.adaptiveCascadeParent.description": "When child folder spaces are actively following, automatically switch parent folder spaces to the cascade parent preset.",
   "configuration.cascadeParentPreset.description": "Preset applied to parent folder spaces while an actively following child exists.",
-  "configuration.followWorkspaceDirectory.description": "When enabled, the primary folder space (the lowest-numbered enabled view slot) follows workspace folders. Changing this setting applies to every enabled folder space.",
+  "configuration.followWorkspaceDirectory.description": "When enabled, the primary folder space (the lowest-numbered enabled view slot) follows workspace folders. Changing this setting applies to every enabled folder space; panes with a parent that are following it are excluded from synchronization.",
   "command.root.remove.title": "Remove Folder from Space",
-  "command.paneAction.toggleFollow.title": "Toggle Parent Follow"
+  "command.paneAction.toggleFollow.title": "Toggle Parent Follow",
+  "command.alignClickBehavior.title": "Align Click Behavior",
+  "command.resetClickBehavior.title": "Reset Click Behavior"
 }

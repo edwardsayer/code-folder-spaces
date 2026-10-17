@@ -229,17 +229,17 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     return this._scope;
   }
 
-  private _definitions(): SpaceDefinition[] {
+  effectiveDefinitions(): SpaceDefinition[] {
     const definitions = this._scope?.definitions ?? [];
     const drillRoot = this._paneState()?.drillRoot;
     if (!drillRoot) return definitions;
     const root = rootForUri(definitions.map(definition => definition.basePath), drillRoot);
     const definition = definitions.find(item => root !== null && samePath(item.basePath, root));
-    return definition ? [{ ...definition, basePath: drillRoot }] : [];
+    return definition ? [{ ...definition, basePath: drillRoot }] : definitions;
   }
 
   private rootForPath(fsPath: string): SpaceDefinition | undefined {
-    const definitions = this._definitions();
+    const definitions = this.effectiveDefinitions();
     if (definitions.length === 1) return definitions[0];
     const root = rootForUri(definitions.map(definition => definition.basePath), fsPath);
     return definitions.find(definition => root !== null && samePath(definition.basePath, root));
@@ -306,7 +306,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
 
   async getChildren(element?: SpaceNode): Promise<SpaceNode[]> {
     if (!element) {
-      const definitions = this._definitions();
+      const definitions = this.effectiveDefinitions();
       if (definitions.length === 0) return [];
       if (definitions.length === 1) return this._listChildren(new SpaceRootNode(definitions[0], this._scope!.paneId, this.expandRoot));
       return definitions.map(definition => new SpaceRootNode(definition, this._scope!.paneId, this.expandRoot));
@@ -334,7 +334,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     }
     const viewState = this._paneState();
     if (samePath(activeRoot, normalized)) {
-      return this._definitions().length === 1 ? undefined : new SpaceRootNode(definition, scope.paneId, this.expandRoot);
+      return this.effectiveDefinitions().length === 1 ? undefined : new SpaceRootNode(definition, scope.paneId, this.expandRoot);
     }
     const settings = (viewState?.view ?? DEFAULT_VIEW);
     const segments = path
@@ -376,7 +376,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
           return nestingNode;
         }
       }
-      current = new SpaceEntryNode(uri, isDirectory, definition, current, isDirectory, this._definitions().length === 1 && current instanceof SpaceRootNode);
+      current = new SpaceEntryNode(uri, isDirectory, definition, current, isDirectory, this.effectiveDefinitions().length === 1 && current instanceof SpaceRootNode);
     }
     return current;
   }
@@ -409,10 +409,10 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const root = new SpaceRootNode(definition, paneId, this.expandRoot);
     if (content !== 'all') {
       if (filter && !matchesPathFilter(relativePath, filter)) return undefined;
-      return new SpaceEntryNode(vscode.Uri.file(target), isDirectory, definition, root, false, this._definitions().length === 1);
+      return new SpaceEntryNode(vscode.Uri.file(target), isDirectory, definition, root, false, this.effectiveDefinitions().length === 1);
     }
     const groupUri = isDirectory ? vscode.Uri.file(target) : vscode.Uri.file(path.dirname(target));
-    const group = new SpaceEntryNode(groupUri, true, definition, root, true, this._definitions().length === 1);
+    const group = new SpaceEntryNode(groupUri, true, definition, root, true, this.effectiveDefinitions().length === 1);
     const groupRelative = path.relative(definition.basePath, groupUri.fsPath).split(path.sep).join('/') || '.';
     if (isDirectory) {
       // 目錄目標也須符合群組保留條件（資料夾路徑符合；直屬檔案是否符合需讀取，故只檢查路徑或無過濾）。
@@ -472,7 +472,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       if (!parentUri) {
         return undefined;
       }
-      const parentNode = new SpaceEntryNode(parentUri, false, space, cursorNode, false, this._definitions().length === 1);
+      const parentNode = new SpaceEntryNode(parentUri, false, space, cursorNode, false, this.effectiveDefinitions().length === 1);
       if (fabricated.length > 0) {
         fabricated[fabricated.length - 1].nestedChildren.push(parentNode);
       }
@@ -591,7 +591,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const directoryNodes = await mapWithConcurrency(directories, DIRECTORY_CHILD_CHECK_CONCURRENCY, async (directory) => {
       const atLevelLimit = settings.level !== 'all' && elementDepth + 1 >= settings.level;
       const hasChildren = !atLevelLimit && await this._directoryHasVisibleChildren(directory.uri, space, directory.relativePath, settings);
-      return new SpaceEntryNode(directory.uri, true, space, element, hasChildren, this._definitions().length === 1 && element instanceof SpaceRootNode);
+      return new SpaceEntryNode(directory.uri, true, space, element, hasChildren, this.effectiveDefinitions().length === 1 && element instanceof SpaceRootNode);
     });
     if (this._isStale(generation)) {
       return [];
@@ -604,7 +604,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       const byName = new Map(fileCandidates.map(file => [file.name, file]));
       const buildSubtree = async (name: string, parentNode: SpaceRootNode | SpaceEntryNode, ancestors: ReadonlySet<string>): Promise<SpaceEntryNode> => {
         const candidate = byName.get(name)!;
-        const node = new SpaceEntryNode(candidate.uri, false, space, parentNode, false, this._definitions().length === 1 && parentNode instanceof SpaceRootNode);
+        const node = new SpaceEntryNode(candidate.uri, false, space, parentNode, false, this.effectiveDefinitions().length === 1 && parentNode instanceof SpaceRootNode);
         const childNames = (assignment.childrenOf.get(name) ?? []).filter(child => child !== name && !ancestors.has(child) && byName.has(child));
         if (childNames.length > 0) {
           const nextAncestors = new Set(ancestors);
@@ -624,7 +624,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         files.push(await buildSubtree(candidate.name, element, new Set()));
       }
     } else {
-      files = fileCandidates.map(candidate => new SpaceEntryNode(candidate.uri, false, space, element, false, this._definitions().length === 1 && element instanceof SpaceRootNode));
+      files = fileCandidates.map(candidate => new SpaceEntryNode(candidate.uri, false, space, element, false, this.effectiveDefinitions().length === 1 && element instanceof SpaceRootNode));
     }
     const candidates = [...directoryNodes, ...files];
     const sorted = await this._sortNodes(candidates, generation);
@@ -681,7 +681,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       const groups: SpaceEntryNode[] = [];
       const makeGroup = (uri: vscode.Uri, label: string): SpaceEntryNode => {
         const files = filesByDir.get(uri.fsPath) ?? [];
-        const node = new SpaceEntryNode(uri, true, space, root, files.length > 0, this._definitions().length === 1);
+        const node = new SpaceEntryNode(uri, true, space, root, files.length > 0, this.effectiveDefinitions().length === 1);
         node.label = label;
         node.flatFileRelPaths = files;
         return node;
@@ -703,7 +703,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     const nodes = listing
       .filter(({ isDirectory }) => content === 'folders' ? isDirectory : !isDirectory)
       .map(({ value: uri, isDirectory }) => {
-        const node = new SpaceEntryNode(uri, isDirectory, space, root, false, this._definitions().length === 1);
+        const node = new SpaceEntryNode(uri, isDirectory, space, root, false, this.effectiveDefinitions().length === 1);
         node.label = relativeOf(uri);
         return node;
       });

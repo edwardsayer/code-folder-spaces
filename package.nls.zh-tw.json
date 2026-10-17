@@ -13,7 +13,7 @@
   "command.pane.add.title": "新增窗格...",
   "command.pane.remove.title": "移除窗格",
   "command.pane.resetLayout.title": "重設窗格配置",
-  "command.pane.addChild.title": "在此開啟子資料夾空間",
+  "command.pane.addChild.title": "啟用子資料夾空間",
   "command.pane.setRoot.title": "設定資料夾空間根目錄",
   "command.pane.toggleFollow.title": "切換跟隨父窗格",
   "configuration.panes.count.description": "初始啟用的資料夾空間插槽數量（1–8）。每個資料夾空間都可獨立設定根目錄。",
@@ -89,7 +89,7 @@
   "command.paneAction.switchRoot.title": "切換根目錄...",
   "command.paneAction.root.add.title": "新增資料夾到資料夾空間...",
   "command.paneAction.root.remove.title": "從資料夾空間移除資料夾",
-  "command.paneAction.addChild.title": "開啟子資料夾空間",
+  "command.paneAction.addChild.title": "啟用子資料夾空間",
   "command.paneAction.close.title": "關閉窗格",
   "command.paneAction.refresh.title": "重新整理",
   "category.folderSpaces": "Folder Spaces",
@@ -122,7 +122,9 @@
   "configuration.defaultChildPreset.description": "由父資料夾空間開啟新子資料夾空間時套用的預設集。",
   "configuration.adaptiveCascadeParent.description": "當子資料夾空間正在跟隨時，自動將父資料夾空間切換為接龍父層預設集。",
   "configuration.cascadeParentPreset.description": "有正在跟隨的子資料夾空間時，套用於父資料夾空間的預設集。",
-  "configuration.followWorkspaceDirectory.description": "啟用時，主資料夾空間（最低編號的啟用窗格）會跟隨工作區資料夾；設定變更會套用至所有啟用的資料夾空間。",
+  "configuration.followWorkspaceDirectory.description": "啟用時，主資料夾空間（最低編號的啟用窗格）會跟隨工作區資料夾；設定變更會套用至所有啟用的資料夾空間；有父窗格且正在跟隨的窗格不參與同步。",
   "command.root.remove.title": "從資料夾空間移除資料夾",
-  "command.paneAction.toggleFollow.title": "切換跟隨父資料夾空間"
+  "command.paneAction.toggleFollow.title": "切換跟隨父資料夾空間",
+  "command.alignClickBehavior.title": "對齊點擊行為",
+  "command.resetClickBehavior.title": "重設點擊行為"
 }

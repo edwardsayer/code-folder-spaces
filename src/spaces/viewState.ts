@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import type { SpaceDefinition } from '../types';
 import type { ViewAxisChange, ViewPresetName, ViewSettings } from './viewPresets';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, applyViewAxis, isViewPresetName, isViewSettings, matchPresetName } from './viewPresets';
-import { hasValidPaneLinks, reattachChildren, wouldCreateCycle } from './paneLinks';
+import { detachChildrenOf, hasValidPaneLinks, normalizePaneChains, reattachChildren, wouldCreateCycle } from './paneLinks';
 
 /** Current workspaceState key (S4R6-D63: per-pane view state, no more `bySpace`). */
 export const PANE_STATE_KEY = 'codeFolderSpaces.panes.v3';
@@ -194,7 +194,7 @@ export function normalizePane(value: unknown, fallbackShowFiles = true, isPrimar
   const pane: PaneState = {
     ...source, roots, drillRoot: typeof source.drillRoot === 'string' ? path.normalize(source.drillRoot) : null,
     parentPaneId: typeof source.parentPaneId === 'string' && PANE_ID_PATTERN.test(source.parentPaneId) ? source.parentPaneId : null,
-    follow: source.follow === true,
+    follow: source.follow === true && (source.parentPaneId === undefined || source.parentPaneId === null || (typeof source.parentPaneId === 'string' && PANE_ID_PATTERN.test(source.parentPaneId))),
     followWorkspaceDirectory: typeof source.followWorkspaceDirectory === 'boolean' ? source.followWorkspaceDirectory : isPrimary,
     preset: isViewPresetName(source.preset) ? source.preset : DEFAULT_VIEW_PRESET,
     filter: typeof source.filter === 'string' ? source.filter : '', sort: normalizeSort(source.sort),
@@ -227,7 +227,7 @@ export function normalizePaneState(value: unknown): PaneStateDocument {
   const primary = lowestPaneId(Object.keys(paneValues));
   const panes: Record<string, PaneState> = {};
   for (const [paneId, raw] of Object.entries(paneValues)) if (PANE_ID_PATTERN.test(paneId)) panes[paneId] = normalizePane(raw, true, paneId === primary);
-  return { ...source, version: 3, panes };
+  return { ...source, version: 3, panes: normalizePaneChains(panes) };
 }
 
 export function activeRoot(pane: PaneState): string | null { return pane.drillRoot ?? pane.roots[0] ?? null; }
@@ -251,12 +251,16 @@ export function migrateV2ToV3(value: unknown, followWorkspaceDirectoryDefault: b
   for (const [id, raw] of Object.entries(rawPanes)) {
     if (!PANE_ID_PATTERN.test(id)) continue;
     const old = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
-    const oldRoot = typeof old.root === 'string' ? path.normalize(old.root) : null;
-    const stack = normalizeDrillStack(old.drillStack);
-    panes[id] = normalizePane({ ...old, roots: stack.length ? [stack[0].root] : oldRoot ? [oldRoot] : [],
-      drillRoot: stack.length ? oldRoot : null, followWorkspaceDirectory: id === primary ? followWorkspaceDirectoryDefault : false }, true, id === primary);
+    const oldStack = Array.isArray(old.drillStack) ? old.drillStack as unknown[] : [];
+    const hasStack = oldStack.length > 0;
+    const firstStackRoot = hasStack ? (oldStack[0] as Record<string, unknown> | undefined)?.root : undefined;
+    const chainRoot = typeof firstStackRoot === 'string' && firstStackRoot ? path.normalize(firstStackRoot) : null;
+    const oldRoot = typeof old.root === 'string' && old.root ? path.normalize(old.root) : null;
+    const roots = hasStack ? (chainRoot ? [chainRoot] : []) : oldRoot ? [oldRoot] : [];
+    panes[id] = normalizePane({ ...old, roots, drillRoot: chainRoot ? oldRoot : null,
+      followWorkspaceDirectory: id === primary ? followWorkspaceDirectoryDefault : false }, true, id === primary);
   }
-  return { ...source, version: 3, panes };
+  return { ...source, version: 3, panes: normalizePaneChains(panes) };
 }
 
 /** Initial layout for a new workspace (spec §2.2.2 with S4R6 semantics). */
@@ -438,12 +442,12 @@ export class PaneStateStore {
     /**
    * 檢查是否可自舊版 workspaceState 轉移至 globalState。
    */
-  async migrateFromWorkspaceStateIfEmpty(workspaceMemento?: MementoLike): Promise<void> {
+  async migrateFromWorkspaceStateIfEmpty(workspaceMemento: MementoLike | undefined, followWorkspaceDirectoryDefault: boolean): Promise<void> {
     if (!workspaceMemento || this.memento.get<unknown>(PANE_STATE_KEY)) return;
     const globalV3 = workspaceMemento.get<unknown>(PANE_STATE_KEY);
     if (isV3Document(globalV3)) { this.state = normalizePaneState(globalV3); await this.persist(); return; }
     const wsV2 = workspaceMemento.get<unknown>(LEGACY_PANE_STATE_KEY);
-    if (isV2Document(wsV2)) { this.state = migrateV2ToV3(wsV2, false); await this.persist(); }
+    if (isV2Document(wsV2)) { this.state = migrateV2ToV3(wsV2, followWorkspaceDirectoryDefault); await this.persist(); }
   }
 
   async initialize(context: PaneInitContext): Promise<PaneInitOutcome> {
@@ -522,8 +526,9 @@ export class PaneStateStore {
     if (!PANE_ID_PATTERN.test(paneId)) throw new Error(`Invalid pane id: ${paneId}`);
     if (this.state.panes[paneId]) throw new Error(`Pane already enabled: ${paneId}`);
     const merged = normalizePane({ ...defaultPaneState(), ...state });
-    const candidate = { ...this.state.panes, [paneId]: merged };
-    if (!hasValidPaneLinks(candidate)) throw new Error('Pane links must be acyclic, ordered, and no deeper than eight panes.');
+    const current = merged.parentPaneId ? detachChildrenOf(this.state.panes, merged.parentPaneId, paneId) : this.state.panes;
+    const candidate = { ...current, [paneId]: merged };
+    if (!hasValidPaneLinks(candidate)) throw new Error('Pane links must be acyclic and no deeper than eight panes.');
     this.state = { ...this.state, panes: candidate };
     await this.persist();
   }
@@ -539,10 +544,24 @@ export class PaneStateStore {
     await this.persist();
   }
 
+  /** 清除下鑽並還原首次下鑽前的基準檢視。 */
+  private clearDrillState(pane: PaneState): void {
+    const base = pane.drillStack[0];
+    if (base) {
+      pane.preset = base.preset;
+      if (base.view) pane.view = { ...base.view };
+      else delete pane.view;
+      pane.filter = base.filter;
+      pane.sort = { ...base.sort };
+    }
+    pane.drillRoot = null;
+    pane.drillStack = [];
+  }
+
   /** Replace roots with a single selected root, clearing drill navigation. */
   async switchRoot(paneId: string, root: string | null): Promise<void> {
     const pane = this.state.panes[paneId]; if (!pane) return;
-    pane.roots = root ? [path.normalize(root)] : []; pane.drillRoot = null; pane.drillStack = []; await this.persist();
+    pane.roots = root ? [path.normalize(root)] : []; this.clearDrillState(pane); await this.persist();
   }
 
   async addPaneRoot(paneId: string, root: string): Promise<boolean> {
@@ -556,14 +575,17 @@ export class PaneStateStore {
     const normalized = path.normalize(root); const roots = pane.roots.filter(item => !samePath(item, normalized));
     if (roots.length === pane.roots.length) return false;
     pane.roots = roots;
-    if (!roots.length || (pane.drillRoot && (samePath(pane.drillRoot, normalized) || isPathWithin(pane.drillRoot, normalized)))) pane.drillRoot = null;
+    this.clearDrillState(pane);
     await this.persist(); return true;
   }
 
   async setPaneRoots(paneId: string, roots: string[]): Promise<void> {
     const pane = this.state.panes[paneId]; if (!pane) return;
-    pane.roots = roots.map(root => path.normalize(root));
-    if (pane.drillRoot && !pane.roots.some(root => isPathWithin(pane.drillRoot!, root))) pane.drillRoot = null;
+    const normalized = roots.map(root => path.normalize(root));
+    if (normalized.length !== pane.roots.length || normalized.some((root, index) => !samePath(root, pane.roots[index]))) {
+      pane.roots = normalized;
+      this.clearDrillState(pane);
+    }
     await this.persist();
   }
 
@@ -588,10 +610,12 @@ export class PaneStateStore {
   async setPaneParent(paneId: string, parentPaneId: string | null, follow: boolean): Promise<void> {
     const pane = this.state.panes[paneId];
     if (!pane) return;
-    const candidate: Record<string, PaneLinkState> = { ...this.getPaneLinks(), [paneId]: { root: activeRoot(pane), parentPaneId, follow } };
+    const current = parentPaneId ? detachChildrenOf(this.state.panes, parentPaneId, paneId) : this.state.panes;
+    const candidate: Record<string, PaneLinkState> = { ...Object.fromEntries(Object.entries(current).map(([id, item]) => [id, { root: activeRoot(item), parentPaneId: item.parentPaneId, follow: item.follow }])), [paneId]: { root: activeRoot(pane), parentPaneId, follow } };
     if (parentPaneId && wouldCreateCycle(candidate, parentPaneId, paneId)) {
-      throw new Error('Pane links must be acyclic, ordered, and no deeper than eight panes.');
+      throw new Error('Pane links must be acyclic and no deeper than eight panes.');
     }
+    this.state = { ...this.state, panes: current };
     pane.parentPaneId = parentPaneId && PANE_ID_PATTERN.test(parentPaneId) ? parentPaneId : null;
     pane.follow = pane.parentPaneId ? follow : false;
     await this.persist();

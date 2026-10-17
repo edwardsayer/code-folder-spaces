@@ -69,6 +69,23 @@ suite('空間樹 provider', () => {
     }
   }));
 
+  test('失效下鑽根 fallback 至既有 roots 並公開有效 definitions', async () => withPaneProviders(
+    [alpha],
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider, state, sync }) => {
+      const scoped = provider('pane1');
+      await state.drillDown('pane1', path.join(fixtureWorkspace, 'spaces/not-a-root'));
+      // drillDown 會一併切換為 Contents（扁平）預設集；本案例要驗的是「無效下鑽根 → fallback 回 pane 既有 roots」，
+      // 故先回復樹狀預設集（Explorer），否則扁平呈現（第一層僅資料夾群組）會被誤判為 fallback 失敗。
+      await state.setPreset('pane1', 'Explorer');
+      sync('pane1');
+      assert.deepEqual(scoped.effectiveDefinitions().map(definition => definition.basePath), [alpha]);
+      const children = await scoped.getChildren();
+      assert.ok(children.some(node => node.label === 'nested'));
+      assert.ok(children.some(node => node.label === 'a.txt'));
+    }
+  ));
+
   test('已下鑽的 pane 顯示下鑽根，返回後回復下鑽前根（spec §2.4.2）', async () => withPaneProviders(
     [alpha],
     [{ paneId: 'pane1', root: alpha }],

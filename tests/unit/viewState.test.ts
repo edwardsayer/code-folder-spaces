@@ -10,6 +10,7 @@ import {
   LEGACY_PANE_STATE_KEY,
   LEGACY_V1_PANE_STATE_KEY,
   migrateV1ToV2,
+  migrateV2ToV3,
   MAX_PANE_COUNT,
   normalizePane,
   normalizePaneState,
@@ -74,6 +75,18 @@ describe('pane view state v2 schema (S4R6-D60/D63)', () => {
   it('stores per-pane state under the v2 key and keeps v1 as a legacy source key only', () => {
     expect(PANE_STATE_KEY).toBe('codeFolderSpaces.panes.v3');
     expect(LEGACY_PANE_STATE_KEY).toBe('codeFolderSpaces.panes.v2');
+  });
+
+  it('normalizes pane chains by detaching dangling parents and all but the lowest-id child', () => {
+    const normalized = normalizePaneState({ version: 3, panes: {
+      pane1: { parentPaneId: null },
+      pane2: { parentPaneId: 'pane1', follow: true },
+      pane3: { parentPaneId: 'pane1', follow: true },
+      pane4: { parentPaneId: 'pane8', follow: true },
+    } });
+    expect(normalized.panes.pane2.parentPaneId).toBe('pane1');
+    expect(normalized.panes.pane3).toMatchObject({ parentPaneId: null, follow: false });
+    expect(normalized.panes.pane4).toMatchObject({ parentPaneId: null, follow: false });
   });
 
   it('normalizes a v2 document and preserves unknown document and pane fields', () => {
@@ -143,6 +156,18 @@ describe('pane view state v2 schema (S4R6-D60/D63)', () => {
       roots: [P('alpha')], drillRoot: null, followWorkspaceDirectory: false, parentPaneId: 'pane1', follow: true, preset: 'List', filter: '', sort: { key: 'name', direction: 'asc' },
       drillStack: [], name: null, icon: null, showFiles: false, include: ['a'], exclude: ['b'],
     });
+  });
+});
+
+describe('v2 → v3 migration (S4.1R12)', () => {
+  it('rejects empty or non-string first drill roots without creating a dot root', () => {
+    for (const first of [{ root: '' }, { root: 7 }]) {
+      const migrated = migrateV2ToV3({ version: 2, panes: { pane1: { root: P('legacy'), drillStack: [first] } } }, true);
+      expect(migrated.panes.pane1.roots).toEqual([]);
+      expect(migrated.panes.pane1.drillRoot).toBeNull();
+    }
+    const valid = migrateV2ToV3({ version: 2, panes: { pane1: { root: P('legacy'), drillStack: [{ root: P('outer'), preset: 'Explorer', filter: '', sort: { key: 'name', direction: 'asc' } }] } } }, true);
+    expect(valid.panes.pane1.roots).toEqual([path.normalize(P('outer'))]);
   });
 });
 
@@ -310,16 +335,16 @@ describe('PaneStateStore lifecycle', () => {
     expect(Object.keys(doc(memento.read()).panes)).toEqual(['pane1', 'pane2']);
   });
 
-  it('rebuilds when the stored layout has invalid pane links or no pane1 (F-10)', async () => {
-    // 反向鏈（pane1 掛在 pane2 之下）→ 佈局不合法
+  it('restores reverse slot order and rebuilds cyclic links or layouts without pane1 (F-10)', async () => {
+    // pane1 掛在 pane2 之下仍是合法鏈，插槽編號不再限定父子順序。
     const reversed = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: {
       pane1: { root: P('alpha'), parentPaneId: 'pane2', follow: true },
       pane2: { root: P('beta') },
     } } });
     const reversedStore = new PaneStateStore(reversed);
     const reversedOutcome = await reversedStore.initialize({ spaces: [space(P('alpha')), space(P('beta'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false });
-    expect(reversedOutcome.kind).toBe('rebuilt');
-    expect(reversedStore.get('pane1').parentPaneId).toBeNull();
+    expect(reversedOutcome.kind).toBe('restored');
+    expect(reversedStore.get('pane1').parentPaneId).toBe('pane2');
 
     // 循環（pane2 ↔ pane3）
     const cyclic = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: {
@@ -328,7 +353,9 @@ describe('PaneStateStore lifecycle', () => {
       pane3: { root: P('gamma'), parentPaneId: 'pane2', follow: true },
     } } });
     const cyclicStore = new PaneStateStore(cyclic);
-    await expect(cyclicStore.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false })).resolves.toMatchObject({ kind: 'rebuilt' });
+    await expect(cyclicStore.initialize({ spaces: [space(P('alpha'))], showFilesDefault: true, configuredCount: 2, followWorkspaceDirectoryDefault: false })).resolves.toMatchObject({ kind: 'restored' });
+    expect(cyclicStore.get('pane2')).toMatchObject({ parentPaneId: null, follow: false });
+    expect(cyclicStore.get('pane3').parentPaneId).toBe('pane2');
 
     // 缺 pane1（D71 要求 pane1 恆存在）
     const noPane1 = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane3: { root: P('gamma') } } } });
@@ -404,6 +431,13 @@ describe('slot allocation (PD-U2, S4R6-D62)', () => {
     expect(store.getEnabledPaneIds()).toEqual(['pane1', 'pane2', 'pane3']);
   });
 
+  it('enabling a child under an occupied parent detaches its former child', async () => {
+    const store = loaded(['pane1', 'pane2']);
+    await store.enablePane('pane3', { parentPaneId: 'pane1', follow: true });
+    expect(store.get('pane3').parentPaneId).toBe('pane1');
+    expect(store.get('pane2')).toMatchObject({ parentPaneId: null, follow: false });
+  });
+
   it('rejects an already-enabled or malformed slot id, and a link that would form a cycle', async () => {
     const store = loaded(['pane1', 'pane2']);
     await expect(store.enablePane('pane1')).rejects.toThrow(/already enabled/);
@@ -412,11 +446,13 @@ describe('slot allocation (PD-U2, S4R6-D62)', () => {
     expect(store.getEnabledPaneIds()).toEqual(['pane1', 'pane2']);
   });
 
-  it('re-links a pane and refuses backwards parents; removing the parent clears follow', async () => {
+  it('re-links a pane without slot ordering and keeps the parent at one child; removing a parent clears follow', async () => {
     const store = loaded(['pane1', 'pane2', 'pane3']);
     await store.setPaneParent('pane3', 'pane1', true);
     expect(store.get('pane3')).toMatchObject({ parentPaneId: 'pane1', follow: true });
-    await expect(store.setPaneParent('pane1', 'pane2', true)).rejects.toThrow(/acyclic/);
+    expect(store.get('pane2')).toMatchObject({ parentPaneId: null, follow: false });
+    await store.setPaneParent('pane1', 'pane2', true);
+    expect(store.get('pane1').parentPaneId).toBe('pane2');
     await store.setPaneParent('pane2', null, true);
     expect(store.get('pane2')).toMatchObject({ parentPaneId: null, follow: false });
   });
@@ -467,7 +503,7 @@ describe('per-pane view state is keyed by paneId (S4R6-D63)', () => {
     await store.drillDown('pane1', path.join(P('alpha'), 'nested'));
     await store.setPreset('pane2', 'Contents');
     await store.switchRoot('pane1', P('other'));
-    expect(store.get('pane1')).toMatchObject({ roots: [path.normalize(P('other'))], preset: 'Contents', drillStack: [] });
+    expect(store.get('pane1')).toMatchObject({ roots: [path.normalize(P('other'))], preset: 'Files', drillStack: [], drillRoot: null });
     expect(store.get('pane2')).toMatchObject({ roots: [path.normalize(P('beta'))], preset: 'Contents' });
   });
 

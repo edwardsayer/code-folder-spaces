@@ -41,6 +41,22 @@ suite('擴充套件啟用', () => {
     }
   });
 
+  test('workbench 點擊行為設定可依目標寫入並還原', async () => {
+    const target = vscode.workspace.workspaceFolders?.length ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+    const configuration = vscode.workspace.getConfiguration('workbench');
+    const inspected = configuration.inspect<unknown>('tree.expandMode');
+    const previous = target === vscode.ConfigurationTarget.Workspace ? inspected?.workspaceValue : inspected?.globalValue;
+    const targetName = target === vscode.ConfigurationTarget.Workspace ? 'workspaceValue' : 'globalValue';
+    try {
+      await configuration.update('tree.expandMode', 'doubleClick', target);
+      assert.equal(configuration.inspect('tree.expandMode')?.[targetName], 'doubleClick');
+      await configuration.update('tree.expandMode', previous, target);
+      assert.deepEqual(configuration.inspect('tree.expandMode')?.[targetName], previous);
+    } finally {
+      await configuration.update('tree.expandMode', previous, target);
+    }
+  });
+
   test('contributes 文字 placeholder 均存在於兩份語系檔', () => {
     const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
     assert.ok(extension);

@@ -204,13 +204,13 @@
       {
         "command": "codeFolderSpaces.drillDown",
         "title": "%command.drillDown.title%",
-        "icon": "$(arrow-right)",
+        "icon": "$(debug-step-into)",
         "category": "%category.folderSpaces%"
       },
       {
         "command": "codeFolderSpaces.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -319,7 +319,7 @@
       {
         "command": "codeFolderSpaces.pane.addChild",
         "title": "%command.pane.addChild.title%",
-        "icon": "$(add)",
+        "icon": "$(symbol-interface)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1430,7 +1430,7 @@
       {
         "command": "codeFolderSpaces.pane1.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1448,7 +1448,7 @@
       {
         "command": "codeFolderSpaces.pane2.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1466,7 +1466,7 @@
       {
         "command": "codeFolderSpaces.pane3.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1484,7 +1484,7 @@
       {
         "command": "codeFolderSpaces.pane4.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1502,7 +1502,7 @@
       {
         "command": "codeFolderSpaces.pane5.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1520,7 +1520,7 @@
       {
         "command": "codeFolderSpaces.pane6.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1538,7 +1538,7 @@
       {
         "command": "codeFolderSpaces.pane7.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1556,7 +1556,7 @@
       {
         "command": "codeFolderSpaces.pane8.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(arrow-left)",
+        "icon": "$(debug-step-out)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -1688,6 +1688,16 @@
         "command": "codeFolderSpaces.pane8.followOff",
         "title": "%command.pane.toggleFollow.title%",
         "icon": "$(debug-disconnect)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.alignClickBehavior",
+        "title": "%command.alignClickBehavior.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.resetClickBehavior",
+        "title": "%command.resetClickBehavior.title%",
         "category": "%category.folderSpaces%"
       }
     ],
@@ -3852,7 +3862,7 @@
         },
         {
           "command": "codeFolderSpaces.pane.addChild",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && codeFolderSpaces.canAddPane && viewItem == codeFolderSpaces.folder",
+          "when": "(view == codeFolderSpaces.pane1 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane1.hasChild) || view == codeFolderSpaces.pane2 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane2.hasChild) || view == codeFolderSpaces.pane3 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane3.hasChild) || view == codeFolderSpaces.pane4 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane4.hasChild) || view == codeFolderSpaces.pane5 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane5.hasChild) || view == codeFolderSpaces.pane6 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane6.hasChild) || view == codeFolderSpaces.pane7 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane7.hasChild) || view == codeFolderSpaces.pane8 && (codeFolderSpaces.canAddPane || codeFolderSpaces.pane8.hasChild)) && viewItem == codeFolderSpaces.folder",
           "group": "inline@2"
         },
         {

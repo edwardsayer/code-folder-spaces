@@ -3,11 +3,15 @@ import {
   canClosePane,
   getFollowingChildPaneIds,
   hasValidPaneLinks,
+  detachChildrenOf,
+  normalizePaneChains,
   isPaneRootDirectory,
   nextChildPaneId,
+  panesToSyncWorkspaceRoots,
   reattachChildren,
   shouldCascadeSelection,
   shouldSyncWorkspaceRoots,
+  shouldSyncWorkspaceDirectory,
   wouldCreateCycle,
 } from '../../src/spaces/paneLinks';
 import type { PaneLinkState } from '../../src/spaces/viewState';
@@ -16,23 +20,62 @@ const chain = (count: number): Record<string, PaneLinkState> => Object.fromEntri
   root: `/space/${index + 1}`, parentPaneId: index ? `pane${index}` : null, follow: index > 0,
 }]));
 
-/** Every remaining parent edge must point at an existing, lower-numbered pane (S4R6-D71 invariant). */
-function assertNoOrphansAndOrdered(panes: Record<string, { parentPaneId: string | null }>): void {
+/** Every parent edge exists, is not self-referential, and reaches a finite acyclic chain. */
+function assertNoOrphansAndChains(panes: Record<string, { parentPaneId: string | null }>): void {
   for (const [paneId, pane] of Object.entries(panes)) {
     if (!pane.parentPaneId) continue;
     expect(panes[pane.parentPaneId], `${paneId} points at a missing parent ${pane.parentPaneId}`).toBeDefined();
-    expect(Number(pane.parentPaneId.replace('pane', '')), `${paneId} parent is not lower-numbered`).toBeLessThan(Number(paneId.replace('pane', '')));
+    expect(pane.parentPaneId).not.toBe(paneId);
+    const visited = new Set([paneId]);
+    let current: string | null = pane.parentPaneId;
+    while (current) {
+      expect(visited.has(current), `${paneId} chain contains a cycle`).toBe(false);
+      visited.add(current);
+      current = panes[current]?.parentPaneId ?? null;
+    }
   }
 }
 
 describe('pane links', () => {
-  it('rejects backwards links, cycles, and chains deeper than eight panes', () => {
-    const links = chain(8);
-    expect(wouldCreateCycle(links, 'pane3', 'pane2')).toBe(true);
-    expect(wouldCreateCycle(links, 'pane3', 'pane1')).toBe(true);
-    expect(hasValidPaneLinks(links)).toBe(true);
-    const tooDeep = { ...links, pane8: { ...links.pane8, parentPaneId: 'pane7' }, pane9: { root: '/ninth', parentPaneId: 'pane8', follow: true } };
-    expect(hasValidPaneLinks(tooDeep)).toBe(false);
+  it('selects only panes whose workspace roots need synchronization in pane order', () => {
+    const pane = (roots: string[], options: Partial<{ followWorkspaceDirectory: boolean; parentPaneId: string | null; follow: boolean }> = {}) => ({
+      roots,
+      followWorkspaceDirectory: options.followWorkspaceDirectory ?? true,
+      parentPaneId: options.parentPaneId ?? null,
+      follow: options.follow ?? false,
+    });
+    const panes = {
+      pane3: pane(['/old', '/b']),
+      pane1: pane(['/a']),
+      pane2: pane(['/b', '/a']),
+      pane4: pane(['/old'], { parentPaneId: 'pane1', follow: true }),
+      pane5: pane(['/old'], { followWorkspaceDirectory: false }),
+    };
+    const samePath = (left: string, right: string) => left === right;
+    expect(panesToSyncWorkspaceRoots(panes, ['/a'], samePath)).toEqual(['pane2', 'pane3']);
+    expect(panesToSyncWorkspaceRoots({ pane1: pane(['/a']) }, ['/a'], samePath)).toEqual([]);
+    expect(panesToSyncWorkspaceRoots({ pane1: pane(['/a']) }, ['/a', '/b'], samePath)).toEqual(['pane1']);
+    expect(panesToSyncWorkspaceRoots({ pane1: pane(['/a', '/b']) }, ['/a'], samePath)).toEqual(['pane1']);
+    expect(panesToSyncWorkspaceRoots({ pane1: pane(['/a', '/b']) }, ['/b', '/a'], samePath)).toEqual(['pane1']);
+    expect(panesToSyncWorkspaceRoots({ pane1: pane(['/a']) }, [], samePath)).toEqual(['pane1']);
+    expect(panesToSyncWorkspaceRoots({ pane1: pane([]) }, [], samePath)).toEqual([]);
+    expect(panesToSyncWorkspaceRoots({ pane1: panes.pane4, pane2: panes.pane5 }, ['/new'], samePath)).toEqual([]);
+  });
+  it('accepts reverse slot order while rejecting real cycles, invalid ids, and excessive depth', () => {
+    const links: Record<string, PaneLinkState> = {
+      pane1: { root: '/a', parentPaneId: null, follow: false },
+      pane2: { root: '/b', parentPaneId: null, follow: false },
+      pane3: { root: '/c', parentPaneId: null, follow: false },
+    };
+    expect(wouldCreateCycle(links, 'pane3', 'pane2')).toBe(false);
+    expect(wouldCreateCycle(links, 'pane3', 'pane1')).toBe(false);
+    expect(wouldCreateCycle({ ...links, pane1: { ...links.pane1, parentPaneId: 'pane2' } }, 'pane1', 'pane2')).toBe(true);
+    expect(wouldCreateCycle(links, 'pane9', 'pane3')).toBe(true);
+    expect(wouldCreateCycle(links, 'pane3', 'pane3')).toBe(true);
+    const tooDeep = chain(8);
+    expect(hasValidPaneLinks(tooDeep)).toBe(true);
+    const overDepth = { ...tooDeep, pane9: { root: '/ninth', parentPaneId: 'pane8', follow: true } };
+    expect(hasValidPaneLinks(overDepth)).toBe(false);
   });
 
   it('accepts a one-way link to a higher-numbered pane and rejects self-parenting', () => {
@@ -63,6 +106,92 @@ describe('pane links', () => {
   });
 });
 
+describe('pane chain normalization helpers', () => {
+  it('detaches children to their grandparent and disables follow for newly top-level panes', () => {
+    const panes = {
+      pane1: { parentPaneId: null, follow: false },
+      pane2: { parentPaneId: 'pane1', follow: true },
+      pane3: { parentPaneId: 'pane2', follow: true },
+      pane4: { parentPaneId: 'pane2', follow: true },
+      pane5: { parentPaneId: null, follow: false },
+    };
+    expect(detachChildrenOf(panes, 'pane2', 'pane3')).toEqual({
+      ...panes, pane4: { parentPaneId: 'pane1', follow: true },
+    });
+    expect(detachChildrenOf(panes, 'pane1').pane2).toEqual({ parentPaneId: null, follow: false });
+    expect(panes.pane4.parentPaneId).toBe('pane2');
+  });
+
+  it('breaks two- and three-pane cycles without changing a valid long chain', () => {
+    const threeCycle = normalizePaneChains({
+      pane1: { parentPaneId: 'pane3', follow: true },
+      pane2: { parentPaneId: 'pane1', follow: true },
+      pane3: { parentPaneId: 'pane2', follow: true },
+    });
+    assertNoOrphansAndChains(threeCycle);
+    expect(Object.values(threeCycle).filter(pane => pane.parentPaneId === null)).toHaveLength(1);
+
+    const twoCycle = normalizePaneChains({
+      pane1: { parentPaneId: 'pane2', follow: true },
+      pane2: { parentPaneId: 'pane1', follow: true },
+    });
+    assertNoOrphansAndChains(twoCycle);
+    expect(Object.values(twoCycle).filter(pane => pane.parentPaneId === null)).toHaveLength(1);
+
+    const mixed = normalizePaneChains({
+      pane1: { parentPaneId: 'pane2', follow: true },
+      pane2: { parentPaneId: 'pane1', follow: true },
+      pane3: { parentPaneId: 'pane1', follow: true },
+    });
+    assertNoOrphansAndChains(mixed);
+    expect(mixed.pane2.parentPaneId).toBe('pane1');
+    expect(mixed.pane3).toEqual({ parentPaneId: null, follow: false });
+
+    const valid = { pane1: { parentPaneId: null, follow: false }, pane2: { parentPaneId: 'pane1', follow: true }, pane3: { parentPaneId: 'pane2', follow: true } };
+    expect(normalizePaneChains(valid)).toEqual(valid);
+  });
+
+  it('preserves the valid tail entering a cycle and cuts the repeated cycle node', () => {
+    const normalized = normalizePaneChains({
+      pane1: { parentPaneId: 'pane2', follow: true },
+      pane2: { parentPaneId: 'pane3', follow: true },
+      pane3: { parentPaneId: 'pane2', follow: true },
+    });
+    expect(normalized.pane1.parentPaneId).toBe('pane2');
+    expect(normalized.pane2).toEqual({ parentPaneId: null, follow: false });
+    expect(normalized.pane3).toEqual({ parentPaneId: null, follow: false });
+    assertNoOrphansAndChains(normalized);
+  });
+
+  it('filters invalid pane keys before retaining the lowest-numbered child', () => {
+    const normalized = normalizePaneChains({
+      pane1: { parentPaneId: null, follow: false },
+      pane2: { parentPaneId: 'pane1', follow: true },
+      pane3: { parentPaneId: 'pane1', follow: true },
+      pane0: { parentPaneId: 'pane1', follow: true },
+    });
+    expect(Object.keys(normalized)).toEqual(['pane1', 'pane2', 'pane3']);
+    expect(normalized.pane2.parentPaneId).toBe('pane1');
+    expect(normalized.pane3).toEqual({ parentPaneId: null, follow: false });
+  });
+
+  it('normalizes missing, invalid, self parents and keeps only the lowest-id child', () => {
+    const normalized = normalizePaneChains({
+      pane1: { parentPaneId: null, follow: false },
+      pane2: { parentPaneId: 'pane1', follow: true },
+      pane3: { parentPaneId: 'pane1', follow: true },
+      pane4: { parentPaneId: 'pane9', follow: true },
+      pane5: { parentPaneId: 'pane5', follow: true },
+      pane6: { parentPaneId: 'pane8', follow: true },
+    });
+    expect(normalized.pane2.parentPaneId).toBe('pane1');
+    expect(normalized.pane3).toEqual({ parentPaneId: null, follow: false });
+    expect(normalized.pane4).toEqual({ parentPaneId: null, follow: false });
+    expect(normalized.pane5).toEqual({ parentPaneId: null, follow: false });
+    expect(normalized.pane6).toEqual({ parentPaneId: null, follow: false });
+  });
+});
+
 describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
   it('re-attaches the children of a closed middle pane to its parent', () => {
     const panes = chain(4);
@@ -71,7 +200,7 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     expect(next.pane3).toEqual({ root: '/space/3', parentPaneId: 'pane1', follow: true });
     // Deeper descendants keep their (unchanged) parent edge.
     expect(next.pane4.parentPaneId).toBe('pane3');
-    assertNoOrphansAndOrdered(next);
+    assertNoOrphansAndChains(next);
     expect(hasValidPaneLinks(next)).toBe(true);
   });
 
@@ -84,10 +213,11 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     const next = reattachChildren(panes, 'pane1');
     expect(next.pane2).toEqual({ root: '/b', parentPaneId: null, follow: false });
     expect(next.pane3).toEqual({ root: '/c', parentPaneId: null, follow: false });
-    assertNoOrphansAndOrdered(next);
+    assertNoOrphansAndChains(next);
     expect(hasValidPaneLinks(next)).toBe(true);
   });
 
+  // 任意 map 的純函式仍需保留多子處理能力；1:1 約束由 store 層強制。
   it('re-attaches several siblings at once and preserves their own settings', () => {
     const panes: Record<string, PaneLinkState> = {
       pane1: { root: '/a', parentPaneId: null, follow: false },
@@ -100,7 +230,7 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     expect(next.pane3).toEqual({ root: '/c', parentPaneId: 'pane1', follow: true });
     expect(next.pane4).toEqual({ root: '/d', parentPaneId: 'pane1', follow: false });
     expect(next.pane5).toEqual({ root: '/e', parentPaneId: 'pane1', follow: true });
-    assertNoOrphansAndOrdered(next);
+    assertNoOrphansAndChains(next);
     expect(hasValidPaneLinks(next)).toBe(true);
     // The cascade target after the close is the re-attached follower set of pane1.
     expect(getFollowingChildPaneIds(next, 'pane1')).toEqual(['pane3', 'pane5']);
@@ -117,7 +247,7 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
       pane1: { root: '/a', parentPaneId: null, follow: false },
       pane7: { root: '/g', parentPaneId: 'pane1', follow: true },
     });
-    assertNoOrphansAndOrdered(next);
+    assertNoOrphansAndChains(next);
   });
 
   it('is a no-op for an unknown pane id and does not mutate the input document', () => {
@@ -134,7 +264,7 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     let panes: Record<string, PaneLinkState> = chain(8);
     for (const removed of ['pane4', 'pane2', 'pane6', 'pane3']) {
       panes = reattachChildren(panes, removed);
-      assertNoOrphansAndOrdered(panes);
+      assertNoOrphansAndChains(panes);
       expect(hasValidPaneLinks(panes)).toBe(true);
     }
     expect(panes.pane1).toEqual({ root: '/space/1', parentPaneId: null, follow: false });
@@ -153,14 +283,14 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     expect(next.pane1).toBe(panes.pane1);
   });
 
-  it('allocates the lowest free slot above the source pane so parentIndex < childIndex holds (F-11)', () => {
+  it('allocates the lowest free slot after the source, then wraps to the lowest free slot (F-11)', () => {
     expect(nextChildPaneId('pane1', ['pane1', 'pane2'])).toBe('pane3');
     expect(nextChildPaneId('pane1', ['pane1', 'pane3'])).toBe('pane2');
     expect(nextChildPaneId('pane2', ['pane1', 'pane2'])).toBe('pane3');
     // 池已滿 → undefined
     expect(nextChildPaneId('pane1', ['pane1', 'pane2', 'pane3', 'pane4', 'pane5', 'pane6', 'pane7', 'pane8'])).toBeUndefined();
-    // 來源已是最後一個插槽 → 沒有合法子插槽
-    expect(nextChildPaneId('pane8', ['pane1', 'pane8'])).toBeUndefined();
+    // 來源已是最後一個插槽 → 回繞至全域最低空閒插槽。
+    expect(nextChildPaneId('pane8', ['pane1', 'pane8'])).toBe('pane2');
   });
 
   it('closes any enabled pane (including pane1) while at least one pane stays (F-11, S4.1R3 revises D71)', () => {
@@ -169,6 +299,13 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     expect(canClosePane('pane1', ['pane1'])).toBe(false);
     expect(canClosePane('pane2', ['pane2'])).toBe(false);
     expect(canClosePane('pane3', ['pane1', 'pane2'])).toBe(false);
+  });
+
+  it('skips following child panes during workspace directory synchronization', () => {
+    expect(shouldSyncWorkspaceDirectory({ followWorkspaceDirectory: true, parentPaneId: 'pane1', follow: true })).toBe(false);
+    expect(shouldSyncWorkspaceDirectory({ followWorkspaceDirectory: true, parentPaneId: 'pane1', follow: false })).toBe(true);
+    expect(shouldSyncWorkspaceDirectory({ followWorkspaceDirectory: true, parentPaneId: null, follow: true })).toBe(true);
+    expect(shouldSyncWorkspaceDirectory({ followWorkspaceDirectory: false, parentPaneId: null, follow: false })).toBe(false);
   });
 
   it('syncs follow pane roots when a multi-folder workspace gains another folder (S4.1R11 OP-16)', () => {

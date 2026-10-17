@@ -70,6 +70,34 @@ describe('S4.1R11a multi-root pane state', () => {
     expect(await store.removePaneRoot('pane1', a)).toBe(false);
   });
 
+  it('addPaneRoot preserves drill navigation while changed roots restore the base view', async () => {
+    const root = P('root'); const extra = P('extra'); const deep = P('root', 'deep');
+    const baseView = { mode: 'tree', level: 2, content: 'folders' } as const;
+    const store = new PaneStateStore(new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane1: { roots: [root], preset: 'Files', view: baseView, filter: 'base', sort } } } }));
+    await store.drillDown('pane1', P('root', 'one'));
+    await store.drillDown('pane1', deep);
+    expect(await store.addPaneRoot('pane1', extra)).toBe(true);
+    expect(store.get('pane1').drillRoot).toBe(path.normalize(deep));
+    expect(store.get('pane1').drillStack).toHaveLength(2);
+    await store.setPaneRoots('pane1', [root, extra, P('third')]);
+    expect(store.get('pane1')).toMatchObject({ drillRoot: null, drillStack: [], preset: 'Files', view: baseView, filter: 'base', sort });
+    await store.drillDown('pane1', P('root', 'one'));
+    await store.drillDown('pane1', deep);
+    expect(await store.removePaneRoot('pane1', extra)).toBe(true);
+    expect(store.get('pane1')).toMatchObject({ drillRoot: null, drillStack: [], preset: 'Files', view: baseView, filter: 'base', sort });
+  });
+
+  it('root changes with no drill stack clear only drillRoot, and unchanged roots do nothing', async () => {
+    const root = P('root');
+    const store = new PaneStateStore(new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane1: { roots: [root], preset: 'Files', filter: 'keep', sort } } } }));
+    store.get('pane1').drillRoot = P('stale');
+    await store.setPaneRoots('pane1', [root, P('other')]);
+    expect(store.get('pane1')).toMatchObject({ drillRoot: null, preset: 'Files', filter: 'keep', sort });
+    store.get('pane1').drillRoot = P('stale');
+    await store.setPaneRoots('pane1', [root, P('other')]);
+    expect(store.get('pane1')).toMatchObject({ drillRoot: path.normalize(P('stale')), preset: 'Files', filter: 'keep', sort });
+  });
+
   it('clears drillRoot when its ancestor root is removed (regression: direction of containment)', async () => {
     const outer = P('a'); const inner = P('a', 'b'); const deep = P('a', 'b', 'c');
     const memento = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane1: { roots: [outer, inner] } } } });
@@ -82,15 +110,16 @@ describe('S4.1R11a multi-root pane state', () => {
     expect(activeRoot(store.get('pane1'))).toBe(path.normalize(inner));
   });
 
-  it('clears drillRoot when the root containing it is removed, but keeps it otherwise', async () => {
+  it('clears drillRoot when any root is removed, even if the active drill remains within another root', async () => {
     const a = P('a'); const b = P('b'); const underB = P('b', 'sub');
     const memento = new MemoryMemento({ [PANE_STATE_KEY]: { version: 3, panes: { pane1: { roots: [a, b] } } } });
     const store = new PaneStateStore(memento);
     await store.drillDown('pane1', underB);
-    // 移除不相關的 root：drillRoot 保留（仍位於 b 之內）。
+    // 不相關 root 移除亦會清空下鑽與返回堆疊，避免 stale navigation。
     expect(await store.removePaneRoot('pane1', a)).toBe(true);
-    expect(store.get('pane1').drillRoot).toBe(path.normalize(underB));
-    // 移除包含 drillRoot 的 root：清空。
+    expect(store.get('pane1').drillRoot).toBeNull();
+    expect(store.get('pane1').drillStack).toEqual([]);
+    await store.drillDown('pane1', underB);
     expect(await store.removePaneRoot('pane1', b)).toBe(true);
     expect(store.get('pane1').drillRoot).toBeNull();
     expect(activeRoot(store.get('pane1'))).toBeNull();

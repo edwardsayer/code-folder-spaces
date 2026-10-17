@@ -333,8 +333,9 @@ suite('S4R6 命令接線（結構型節點驅動；審查 F-02／F-11）', () =>
     return await extension.activate() as never;
   };
 
-  test('pane.addChild 以結構型資料夾節點建立子窗格；非資料夾節點 no-op', async () => {
+  test('pane.addChild 建立子窗格並在已有子窗格時重用它；非資料夾目標回退至 pane 根', async () => {
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.remove', 'pane2');
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'folder-spaces-addchild-'));
     const before = (await api()).getPanes();
     // 結構型節點：與 SpaceEntryNode 同形（不再依賴 instanceof，見 F-02）。
@@ -353,7 +354,15 @@ suite('S4R6 命令接線（結構型節點驅動；審查 F-02／F-11）', () =>
     // Windows 的 Uri.file 會把磁碟機字母轉小寫，比對前先正規化大小寫（同 S4R4 的處置）。
     assert.equal(path.normalize(String(child.root ?? null)).toLowerCase(), path.normalize(root).toLowerCase());
 
-    // 非資料夾節點 → 不新增窗格
+    // 再按 + 時重用既有子窗格，切換其根且保持 follow／插槽數不變。
+    const secondRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'folder-spaces-addchild-second-'));
+    await vscode.commands.executeCommand('codeFolderSpaces.pane.addChild', { ...folderNode, uri: vscode.Uri.file(secondRoot) });
+    const reused = (await api()).getPanes();
+    assert.equal(reused.length, after.length);
+    assert.equal(reused.find(pane => pane.id === child.id)?.follow, true);
+    assert.equal(path.normalize(String(reused.find(pane => pane.id === child.id)?.root ?? null)).toLowerCase(), path.normalize(secondRoot).toLowerCase());
+
+    // 非資料夾節點退回 pane1 的有效根，仍重用同一子窗格。
     await vscode.commands.executeCommand('codeFolderSpaces.pane.addChild', { ...folderNode, isDirectory: false });
     assert.equal((await api()).getPanes().length, after.length);
 

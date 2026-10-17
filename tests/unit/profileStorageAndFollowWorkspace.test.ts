@@ -1,6 +1,7 @@
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LEGACY_PANE_STATE_KEY, PaneStateStore, PANE_STATE_KEY } from '../../src/spaces/viewState';
+import { panesToSyncWorkspaceRoots } from '../../src/spaces/paneLinks';
 
 describe('OP-15 Global/Profile 級別儲存與工作區目錄跟隨 (Profile Storage & Follow Workspace Directory)', () => {
   it('若 globalState 為空，可安全從 workspaceState 平滑轉移 v2 窗格配置', async () => {
@@ -26,7 +27,7 @@ describe('OP-15 Global/Profile 級別儲存與工作區目錄跟隨 (Profile Sto
     wsMap.set(LEGACY_PANE_STATE_KEY, oldV2);
 
     const store = new PaneStateStore(globalMemento);
-    await store.migrateFromWorkspaceStateIfEmpty(wsMemento);
+    await store.migrateFromWorkspaceStateIfEmpty(wsMemento, true);
 
     // globalState 應順利繼承該配置
     expect(store.get('pane1').roots).toEqual([path.normalize('/old/project')]);
@@ -34,7 +35,7 @@ describe('OP-15 Global/Profile 級別儲存與工作區目錄跟隨 (Profile Sto
     expect(globalMap.get(PANE_STATE_KEY)).toBeDefined();
   });
 
-  it('跟隨工作區同步 roots 時，下鑽狀態無損保留（R10 P1 修復的真正 store 層驗證）', async () => {
+  it('工作區 roots 真正變動時清空下鑽；完全同步早退時保留狀態', async () => {
     const root = path.normalize('/workspace/project');
     const sub = path.normalize('/workspace/project/sub');
     const values = new Map<string, unknown>();
@@ -44,16 +45,42 @@ describe('OP-15 Global/Profile 級別儲存與工作區目錄跟隨 (Profile Sto
     });
     const store = new PaneStateStore({ get: (k: string) => values.get(k) as never, update: async (k: string, v: unknown) => { values.set(k, v); } });
 
-    // 工作區仍為單一資料夾且等於鏈根：同步後下鑽狀態必須完整保留（否則 S2 F-18／S4.1R8 無損返回失效）。
-    await store.setPaneRoots('pane1', [root]);
+    await store.drillDown('pane1', sub);
+    const setPaneRoots = vi.spyOn(store, 'setPaneRoots');
+    const panes = Object.fromEntries(['pane1'].map(paneId => [paneId, store.get(paneId)]));
+    for (const paneId of panesToSyncWorkspaceRoots(panes, [root], (a, b) => a === b)) {
+      await store.setPaneRoots(paneId, [root]);
+    }
+    // 呼叫端以純函式結果驅動寫入；完全同步時清單為空，確實未呼叫 setPaneRoots。
+    expect(setPaneRoots).not.toHaveBeenCalled();
     expect(store.get('pane1').drillRoot).toBe(sub);
-    expect(store.get('pane1').roots).toEqual([root]);
+    expect(store.get('pane1').drillStack).toHaveLength(1);
+    setPaneRoots.mockRestore();
 
-    // 下鑽根不再落在任何 root 內（多根收回單根）：必須清空 drillRoot，避免顯示已不存在的路徑。
+    // roots 真正變動時不論下鑽是否仍位於 root 內，都必須全歸零。
+    await store.drillDown('pane1', sub);
+    await store.setPaneRoots('pane1', [root, path.normalize('/workspace/extra')]);
+    expect(store.get('pane1').drillRoot).toBeNull();
+    expect(store.get('pane1').drillStack).toEqual([]);
+
     const other = path.normalize('/workspace/other');
+    await store.drillDown('pane1', sub);
     await store.setPaneRoots('pane1', [other]);
     expect(store.get('pane1').drillRoot).toBeNull();
+    expect(store.get('pane1').drillStack).toEqual([]);
     expect(store.get('pane1').roots).toEqual([other]);
+  });
+
+  it('uses the same follow-workspace default when migrating workspace state and initializing', async () => {
+    const workspace = new Map<string, unknown>([[LEGACY_PANE_STATE_KEY, { version: 2, panes: { pane1: { root: '/legacy' } } }]]);
+    const global = new Map<string, unknown>();
+    const store = new PaneStateStore({ get: key => global.get(key) as never, update: async (key, value) => { global.set(key, value); } });
+    await store.migrateFromWorkspaceStateIfEmpty({ get: key => workspace.get(key) as never, update: async (key, value) => { workspace.set(key, value); } }, true);
+    expect(store.get('pane1').followWorkspaceDirectory).toBe(true);
+
+    const initialized = new PaneStateStore({ get: () => undefined, update: async () => {} });
+    await initialized.initialize({ spaces: [], showFilesDefault: true, configuredCount: 1, followWorkspaceDirectoryDefault: true });
+    expect(initialized.get('pane1').followWorkspaceDirectory).toBe(store.get('pane1').followWorkspaceDirectory);
   });
 });
 
