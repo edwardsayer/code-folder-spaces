@@ -12,6 +12,14 @@ export function resolveExpandModeTarget(hasWorkspace: boolean): ExpandModeTarget
   return hasWorkspace ? 'workspace' : 'global';
 }
 
+export function resolveWorkspaceIdentity(workspaceFileUri: string | null | undefined, firstFolderUri: string | null | undefined): string | null {
+  return workspaceFileUri ?? firstFolderUri ?? null;
+}
+
+export function shouldWriteExpandModeRestore(currentValue: unknown, restoreValue: unknown): boolean {
+  return currentValue !== restoreValue;
+}
+
 export function shouldRecordProvenance(targetValueBefore: unknown): boolean {
   return targetValueBefore !== 'doubleClick';
 }

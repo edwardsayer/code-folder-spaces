@@ -6,12 +6,30 @@ import {
   shouldRecordProvenance,
   belongsToWorkspace,
   resolveAlignedProvenance,
+  resolveWorkspaceIdentity,
+  shouldWriteExpandModeRestore,
 } from '../../src/spaces/clickBehavior';
 
 describe('expandMode click behavior', () => {
   it('chooses workspace or global target from workspace presence', () => {
     expect(resolveExpandModeTarget(true)).toBe('workspace');
     expect(resolveExpandModeTarget(false)).toBe('global');
+  });
+
+  it('identifies a workspace by workspace file before its first folder', () => {
+    const workspaceFile = 'file:///work/project.code-workspace';
+    const firstFolder = 'file:///work/alpha';
+    expect(resolveWorkspaceIdentity(workspaceFile, firstFolder)).toBe(workspaceFile);
+    expect(resolveWorkspaceIdentity(undefined, firstFolder)).toBe(firstFolder);
+    expect(resolveWorkspaceIdentity(null, undefined)).toBeNull();
+    expect(resolveWorkspaceIdentity(workspaceFile, firstFolder)).not.toBe(firstFolder);
+  });
+
+  it('writes a restore only when the current target value differs', () => {
+    expect(shouldWriteExpandModeRestore(undefined, undefined)).toBe(false);
+    expect(shouldWriteExpandModeRestore('singleClick', 'singleClick')).toBe(false);
+    expect(shouldWriteExpandModeRestore('doubleClick', 'singleClick')).toBe(true);
+    expect(shouldWriteExpandModeRestore(undefined, 'singleClick')).toBe(true);
   });
 
   it.each([

@@ -15,7 +15,7 @@ import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntr
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 import { selectedQuickPickId, stableQuickPickItems } from './ui/stableQuickPick';
-import { belongsToWorkspace, normalizeExpandModeProvenance, resolveAlignedProvenance, resolveExpandModeRestore, resolveExpandModeTarget, type ExpandModeProvenance } from './spaces/clickBehavior';
+import { belongsToWorkspace, normalizeExpandModeProvenance, resolveAlignedProvenance, resolveExpandModeRestore, resolveExpandModeTarget, resolveWorkspaceIdentity, shouldWriteExpandModeRestore, type ExpandModeProvenance } from './spaces/clickBehavior';
 
 const MAX_PANE_INDEX = 8;
 const REFRESH_DEBOUNCE_MS = 200;
@@ -1198,7 +1198,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const previous = targetName === 'workspace' ? inspected?.workspaceValue : inspected?.globalValue;
       const provenanceKey = 'codeFolderSpaces.expandModeOverride';
       const provenance = normalizeExpandModeProvenance(context.globalState.get(provenanceKey));
-      const workspaceKey = vscode.workspace.workspaceFolders?.[0]?.uri.toString() ?? null;
+      const workspaceKey = resolveWorkspaceIdentity(vscode.workspace.workspaceFile?.toString(), vscode.workspace.workspaceFolders?.[0]?.uri.toString());
       const aligned = resolveAlignedProvenance(provenance[targetName], previous, workspaceKey);
       if (aligned) {
         provenance[targetName] = aligned;
@@ -1214,7 +1214,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.resetClickBehavior', async () => {
       const key = 'codeFolderSpaces.expandModeOverride';
       const provenance: ExpandModeProvenance = normalizeExpandModeProvenance(context.globalState.get(key));
-      const workspaceKey = vscode.workspace.workspaceFolders?.[0]?.uri.toString() ?? null;
+      const workspaceKey = resolveWorkspaceIdentity(vscode.workspace.workspaceFile?.toString(), vscode.workspace.workspaceFolders?.[0]?.uri.toString());
       const entries = (['workspace', 'global'] as const).filter(target => provenance[target] !== undefined);
       const restorable = entries.filter(target => belongsToWorkspace(provenance[target]!, workspaceKey));
       const skipped = entries.filter(target => !belongsToWorkspace(provenance[target]!, workspaceKey));
@@ -1230,7 +1230,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       for (const targetName of restorable) {
         const restore = resolveExpandModeRestore({ target: targetName, previous: provenance[targetName]!.previous });
         const target = restore.target === 'workspace' ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
-        await configuration.update('tree.expandMode', restore.value, target);
+        const current = configuration.inspect<unknown>('tree.expandMode');
+        const currentValue = targetName === 'workspace' ? current?.workspaceValue : current?.globalValue;
+        if (shouldWriteExpandModeRestore(currentValue, restore.value)) {
+          await configuration.update('tree.expandMode', restore.value, target);
+        }
         delete provenance[targetName];
       }
       await context.globalState.update(key, Object.keys(provenance).length ? provenance : undefined);
