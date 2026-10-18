@@ -8,7 +8,7 @@ import type { DirectoryEntry } from './directoryCache';
 import { isVisibleDirectory, isVisibleFile } from './spaceConfig';
 import { assignNestedChildren, parseNestingPatterns } from './fileNesting';
 import type { FileNestingRule } from './fileNesting';
-import { buildFlatListing } from './flatListing';
+import { buildFlatListing, DEFAULT_FLAT_MAX_DEPTH } from './flatListing';
 import { VIEW_PRESETS, type ViewPreset, type ViewSettings } from './viewPresets';
 
 const DEFAULT_VIEW: ViewSettings = VIEW_PRESETS.Explorer;
@@ -210,6 +210,8 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   private _generation = 0;
   private _disposed = false;
   private _paneLinkMarkerProvider?: PaneLinkMarkerProvider;
+  /** S4.1R17：扁平列舉最大遞歸深度（設定 `codeFolderSpaces.maxDepth`，預設 10）。 */
+  maxDepth = DEFAULT_FLAT_MAX_DEPTH;
   filterMessage = '';
 
   /**
@@ -686,7 +688,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         }
       }
       return result;
-    }, undefined, level);
+    }, this.maxDepth, level);
     if (this._isStale(generation)) {
       return [];
     }

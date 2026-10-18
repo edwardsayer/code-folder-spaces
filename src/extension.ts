@@ -10,6 +10,7 @@ import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefau
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
 import { canClosePane, describePaneLinkChain, isPaneRootDirectory, linkedChildPaneNumber, nextChildPaneId, panesToSyncWorkspaceRoots } from './spaces/paneLinks';
 import { createLinkStatusSummary, LinkStatusBar } from './spaces/linkStatusBar';
+import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { PaneCascadeController } from './spaces/paneCascade';
 import { diffWatchers, planWatchers } from './spaces/watcherPlan';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
@@ -82,6 +83,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     log.warn(`Rebuilt default pane layout: ${layout.reason}`);
   } else {
     log.info(`Pane layout ${layout.kind}; ${'enabled' in layout ? layout.enabled : 0} pane(s)`);
+  }
+  // S4.1R17（OP-6）：首次安裝且無已配置 space 時，以**工作區根**作為主窗格預設根，
+  // 使上方窗格內容與內建 File Explorer 一致。
+  // 只寫入 pane 狀態（globalState），**不**寫入使用者設定；且僅在「該窗格 root 為空且無已配置 space」時套用。
+  if (layout.kind === 'created' || layout.kind === 'rebuilt') {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const primaryId = viewState.getEnabledPaneIds()[0];
+    if (workspaceRoot && primaryId && viewState.get(primaryId).roots.length === 0 && store.getDefinitions().length === 0) {
+      await viewState.switchRoot(primaryId, workspaceRoot);
+      log.info(`Seeded primary pane root from workspace folder: ${workspaceRoot}`);
+    }
   }
 
   // 所有 pane 與命令共用 session-only undo；回呼延後取用後方建立的服務。
@@ -156,6 +168,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   }));
 
   const paneRuntime = new Map<string, PaneRuntime>();
+
+  /** S4.1R17：讀取並夾限 `codeFolderSpaces.maxDepth`（1–100，預設 10）。
+   *  非法值（非整數／NaN／越界）一律回退到預設，不讓設定值弄壞列舉。 */
+  const readMaxDepth = (): number => {
+    const raw = settings().get<number>('maxDepth', DEFAULT_FLAT_MAX_DEPTH);
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) return DEFAULT_FLAT_MAX_DEPTH;
+    const rounded = Math.floor(raw);
+    if (rounded < 1) return 1;
+    // 硬上限 100：與 min/max 宣告一致，亦避免遞迴爆棧。
+    return Math.min(100, rounded);
+  };
 
   /** S4.1R13：只重繪指定的 pane（避免全樹重繪）；重複 id 去重、null／undefined 忽略。
    *  宣告提前至 cascadeController 之前，供其 switchRoot callback（延遲執行）安全引用。 */
@@ -294,6 +317,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       showCollapseAll: false, // S4.1R4：改用自訂「收合全部／展開」切換按鈕（paneN.collapseAll／expandAll）
       dragAndDropController: createPaneDragAndDrop(paneId),
     });
+    // S4.1R17：把 `codeFolderSpaces.maxDepth` 注入 provider（建構後設定，避免改動既有建構子簽名）。
+    provider.maxDepth = readMaxDepth();
     const runtime: PaneRuntime = { id: paneId, provider, treeView, disposables: [] };
     runtime.disposables.push(
       provider,
@@ -573,6 +598,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }, FOLLOW_DEBOUNCE_MS);
   };
   const followConfiguration = vscode.workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration('codeFolderSpaces.maxDepth')) {
+      // S4.1R17：設定變更後套用到所有 provider 並重繪（扁平列舉深度由 provider 持有）。
+      const depth = readMaxDepth();
+      for (const runtime of paneRuntime.values()) {
+        runtime.provider.maxDepth = depth;
+        runtime.provider.refresh();
+      }
+    }
     if (event.affectsConfiguration('codeFolderSpaces.followActiveFile')) {
       void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', settings().get<boolean>('followActiveFile', true));
       scheduleFollow();
@@ -1439,6 +1472,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }),
     vscode.commands.registerCommand('codeFolderSpaces.setSort', (key?: unknown, direction?: unknown) => setSortForPane(primaryPaneId(), key, direction)),
     vscode.commands.registerCommand('codeFolderSpaces.toggleMode', () => toggleModeForPane(primaryPaneId())),
+    // S4.1R17（F-46）：從 Explorer 右鍵「Open in Folder Spaces」——只開新頂層 pane，**不寫入 spaces 設定**。
+    // 與 addSpace 的差異：addSpace 會把資料夾加入 `codeFolderSpaces.spaces`；本命令僅建立 pane。
+    vscode.commands.registerCommand('codeFolderSpaces.openInFolderSpaces', async (target?: unknown) => {
+      const uri = target instanceof vscode.Uri ? target
+        : typeof target === 'string' ? vscode.Uri.file(target)
+        : !Array.isArray(target) && (target as { resourceUri?: vscode.Uri } | undefined)?.resourceUri instanceof vscode.Uri
+          ? (target as { resourceUri: vscode.Uri }).resourceUri
+          : undefined;
+      if (!uri) return;
+      // 未經原生對話框，先確認是既有資料夾（不寫磁碟、不需 trust gating）。
+      try {
+        const stat = await vscode.workspace.fs.stat(uri);
+        if (!(stat.type & vscode.FileType.Directory)) return;
+      } catch {
+        return;
+      }
+      await addPane(uri.fsPath);
+    }),
     // 可選參數（資料夾路徑字串或 Uri）供自動化／其他命令略過原生對話框。
     vscode.commands.registerCommand('codeFolderSpaces.addSpace', async (target?: unknown) => {
       const given = typeof target === 'string' ? vscode.Uri.file(target) : target instanceof vscode.Uri ? target : undefined;

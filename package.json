@@ -306,6 +306,11 @@
         "category": "%category.folderSpaces%"
       },
       {
+        "command": "codeFolderSpaces.openInFolderSpaces",
+        "title": "%command.openInFolderSpaces.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
         "command": "codeFolderSpaces.pane.remove",
         "title": "%command.pane.remove.title%",
         "icon": "$(remove)",
@@ -4819,6 +4824,13 @@
           "when": "view == codeFolderSpaces.pane8",
           "group": "1_sort@6"
         }
+      ],
+      "explorer/context": [
+        {
+          "command": "codeFolderSpaces.openInFolderSpaces",
+          "when": "resourceScheme == file && !explorerResourceIsRoot && explorerResourceIsFolder && !listMultiSelection",
+          "group": "navigation@100"
+        }
       ]
     },
     "configuration": {
@@ -4903,6 +4915,13 @@
           "minimum": 1,
           "maximum": 8,
           "description": "%configuration.panes.count.description%"
+        },
+        "codeFolderSpaces.maxDepth": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "%configuration.maxDepth.description%"
         },
         "codeFolderSpaces.defaultPreset": {
           "type": "string",
