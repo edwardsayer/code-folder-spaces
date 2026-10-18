@@ -14,13 +14,15 @@ import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { PaneCascadeController } from './spaces/paneCascade';
 import { diffWatchers, planWatchers } from './spaces/watcherPlan';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
-import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, resolveOpenBeside, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack } from './spaces/spaceActions';
+import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 import { selectedQuickPickId, stableQuickPickItems } from './ui/stableQuickPick';
 import { belongsToWorkspace, normalizeExpandModeProvenance, resolveAlignedProvenance, resolveExpandModeRestore, resolveExpandModeTarget, resolveWorkspaceIdentity, shouldWriteExpandModeRestore, type ExpandModeProvenance } from './spaces/clickBehavior';
 
 const MAX_PANE_INDEX = 8;
+/** S4.1R19：固定預設 2 個窗格（原 `codeFolderSpaces.panes.count` 設定已移除）。 */
+const DEFAULT_PANE_COUNT = 2;
 const REFRESH_DEBOUNCE_MS = 200;
 const FOLLOW_DEBOUNCE_MS = 250;
 // S4R7-D85 啟動事件合併與 S4R7-D81 快照持久化的時間常數。
@@ -68,15 +70,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   log.info('Activating Folder Spaces');
 
   const store = new SpaceStore();
-  const viewState = new PaneStateStore(context.globalState);
+  // S4.1R19（使用者要求：全部 per-workspace）：
+  // pane 狀態（layout／preset／filter／root）**存在 workspaceState**（每個資料夾／專案各自保留）；
+  // 無工作區（開啟單一檔案或空視窗）時才退回 globalState，避免狀態無處可存。
+  const hasWorkspace = Boolean(vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length);
+  const viewState = new PaneStateStore(hasWorkspace ? context.workspaceState : context.globalState);
   const settings = () => vscode.workspace.getConfiguration('codeFolderSpaces');
-  // OP-15：升級至 Global/Profile 級別儲存；若 globalState 尚無資料，嘗試自 workspaceState 平滑轉移
-  await viewState.migrateFromWorkspaceStateIfEmpty(context.workspaceState, settings().get<boolean>('followWorkspaceDirectory', true));
+  // 平滑迁移：若本 workspace 尚無 v3 資料，嘗試從 globalState 取一次（只搬一次，不覆寫已存在的 workspace 狀態）。
+  await viewState.migrateFromGlobalStateIfEmpty(context.globalState, settings().get<boolean>('followWorkspaceDirectory', true));
   const paneInitContext = () => ({
     spaces: store.getDefinitions(),
     showFilesDefault: settings().get<boolean>('view.showFiles', true),
-    configuredCount: settings().get<number>('panes.count', 2),
+    // S4.1R19（使用者）：移除 `panes.count` 設定；固定 2 個窗格（不滿意可由程式面自行調整）。
+    configuredCount: DEFAULT_PANE_COUNT,
     followWorkspaceDirectoryDefault: settings().get<boolean>('followWorkspaceDirectory', true),
+    // S4.1R19（使用者）：全新 workspace 的兩個 space 各依 Default Preset／Default Child Preset 呈現。
+    presets: {
+      primary: resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset')),
+      child: resolveConfiguredDefaultChildPreset(settings().get<string>('defaultChildPreset')),
+    },
   });
   const layout = await viewState.initialize(paneInitContext());
   if (layout.kind === 'rebuilt') {
@@ -215,6 +227,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     stat: async uri => await vscode.workspace.fs.stat(uri),
     directoryType: vscode.FileType.Directory,
     onError: error => { void vscode.window.showErrorMessage(vscode.l10n.t('Invalid folder space link: {0}', String(error))); },
+    // S4.1R19（Bug C）：子窗格還沒設根時提示一次，而不是讓使用者「點了以為壞了」。
+    onEmptyChild: childPaneId => {
+      void vscode.window.showInformationMessage(
+        vscode.l10n.t('Folder Space {0} has no folder yet: use Switch Root to pick one.', paneIndexOf(childPaneId)),
+      );
+    },
   });
   context.subscriptions.push(cascadeController);
 
@@ -413,10 +431,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const enabledIds = viewState.getEnabledPaneIds();
 
     for (const paneId of enabledIds) {
-      // 判定是否有子 pane 且其 parent 為當前 paneId 且正在 follow
+      // S4.1R19（Bug A 修正）：判定「有連動子」必須要求子窗格**實際有 root**（可顯示內容）；
+      // 否在全新 workspace 下 pane2 的 `roots` 為空但 `follow:true`，會誤把 pane1 切成 Navigate。
       const hasFollowingChild = enabledIds.some(childId => {
         const link = links[childId];
-        return link && link.parentPaneId === paneId && link.follow;
+        return link && link.parentPaneId === paneId && link.follow && viewState.get(childId).roots.length > 0;
       });
       // 當設定關閉時，hasFollowingChild 視為 false，促使父面板自動還原並清除 backup
       const shouldBeAdaptive = adaptiveEnabled && hasFollowingChild;
@@ -1360,8 +1379,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.openEntry', async (node?: unknown) => {
       const uri = node instanceof vscode.Uri ? node : selectedUri(node);
       if (!uri) return;
-      const beside = resolveOpenBeside(settings().get<string>('openFilesIn', 'current'));
-      await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: beside ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active });
+      // S4.1R19：移除 `openFilesIn` 設定（使用者：對 VS Code 不適用）；一律在**當前編輯器群組**開啟。
+      await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Active });
     }),
     vscode.commands.registerCommand('codeFolderSpaces.copyEntry', (node?: unknown) => { const targetNode = selectionTarget(node); const entry = getEntry(targetNode); if (entry && !(targetNode instanceof SpaceRootNode)) clipboard.set([entry.uri.toString()], 'copy'); }),
     vscode.commands.registerCommand('codeFolderSpaces.cutEntry', (node?: unknown) => { const targetNode = selectionTarget(node); const entry = getEntry(targetNode); if (entry && !(targetNode instanceof SpaceRootNode) && !isSamePath(entry.uri.fsPath, entry.basePath)) clipboard.set([entry.uri.toString()], 'cut'); }),

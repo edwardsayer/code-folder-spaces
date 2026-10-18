@@ -262,16 +262,27 @@ export function migrateV2ToV3(value: unknown, followWorkspaceDirectoryDefault: b
 }
 
 /** Initial layout for a new workspace (spec §2.2.2 with S4R6 semantics). */
-export function buildDefaultLayout(spaces: SpaceDefinition[], configuredCount: number, showFilesDefault: boolean, followWorkspaceDirectoryDefault = false): PaneStateDocument {
+export function buildDefaultLayout(
+  spaces: SpaceDefinition[],
+  configuredCount: number,
+  showFilesDefault: boolean,
+  followWorkspaceDirectoryDefault = false,
+  /** S4.1R19：新建 layout 的檢視預設集。pane1＝defaultPreset；pane2 起＝defaultChildPreset。 */
+  presets: { primary?: ViewPresetName; child?: ViewPresetName } = {},
+): PaneStateDocument {
   const count = getEnabledPaneCount(configuredCount);
   const panes: Record<string, PaneState> = {};
   for (let index = 1; index <= count; index++) {
     const space = spaces[index - 1];
+    // S4.1R19（使用者）：全新 workspace 的兩個 space 各依 Default Preset / Default Child Preset 呈現。
+    // 父 pane（pane1）在有連動子時另由 adaptiveCascadeParent 依 cascadeParentPreset 切換，兩者不衝突。
+    const preset = index === 1 ? presets.primary : presets.child;
     panes[`pane${index}`] = normalizePane({
       roots: space ? [space.basePath] : [],
       followWorkspaceDirectory: index === 1 ? followWorkspaceDirectoryDefault : false,
       parentPaneId: index > 1 ? `pane${index - 1}` : null,
       follow: index > 1,
+      ...(preset ? { preset } : {}),
       showFiles: space?.showFiles ?? showFilesDefault,
       include: space?.include ?? [],
       exclude: space?.exclude ?? [],
@@ -414,6 +425,8 @@ export interface PaneInitContext {
   showFilesDefault: boolean;
   configuredCount: number;
   followWorkspaceDirectoryDefault: boolean;
+  /** S4.1R19：新建 layout 的預設檢視（pane1／pane2+）。缺省則用 `normalizePane` 的預設值。 */
+  presets?: { primary?: ViewPresetName; child?: ViewPresetName };
 }
 
 export type PaneInitOutcome =
@@ -440,12 +453,17 @@ export class PaneStateStore {
     /**
    * 檢查是否可自舊版 workspaceState 轉移至 globalState。
    */
-  async migrateFromWorkspaceStateIfEmpty(workspaceMemento: MementoLike | undefined, followWorkspaceDirectoryDefault: boolean): Promise<void> {
-    if (!workspaceMemento || this.memento.get<unknown>(PANE_STATE_KEY)) return;
-    const globalV3 = workspaceMemento.get<unknown>(PANE_STATE_KEY);
-    if (isV3Document(globalV3)) { this.state = normalizePaneState(globalV3); await this.persist(); return; }
-    const wsV2 = workspaceMemento.get<unknown>(LEGACY_PANE_STATE_KEY);
-    if (isV2Document(wsV2)) { this.state = migrateV2ToV3(wsV2, followWorkspaceDirectoryDefault); await this.persist(); }
+  /**
+   * S4.1R19：反向平滑迁移——pane 狀態已從 globalState 改存 workspaceState。
+   * 若**本 workspace** 尚無 v3 資料、而 globalState 曾有（舊版或無工作區時期），就搬一次進來；
+   * 已有 workspace 狀態則絕不覆寫（每個專案各自保留 layout）。
+   */
+  async migrateFromGlobalStateIfEmpty(globalMemento: MementoLike | undefined, followWorkspaceDirectoryDefault: boolean): Promise<void> {
+    if (!globalMemento || this.memento.get<unknown>(PANE_STATE_KEY)) return;
+    const previousV3 = globalMemento.get<unknown>(PANE_STATE_KEY);
+    if (isV3Document(previousV3)) { this.state = normalizePaneState(previousV3); await this.persist(); return; }
+    const previousV2 = globalMemento.get<unknown>(LEGACY_PANE_STATE_KEY);
+    if (isV2Document(previousV2)) { this.state = migrateV2ToV3(previousV2, followWorkspaceDirectoryDefault); await this.persist(); }
   }
 
   async initialize(context: PaneInitContext): Promise<PaneInitOutcome> {
@@ -485,7 +503,7 @@ export class PaneStateStore {
   }
 
   private async persistDefault(context: PaneInitContext, kind: 'created' | 'rebuilt', reason?: string): Promise<PaneInitOutcome> {
-    this.state = buildDefaultLayout(context.spaces, context.configuredCount, context.showFilesDefault, context.followWorkspaceDirectoryDefault);
+    this.state = buildDefaultLayout(context.spaces, context.configuredCount, context.showFilesDefault, context.followWorkspaceDirectoryDefault, context.presets);
     await this.persist();
     await this.memento.update(LEGACY_PANE_STATE_KEY, undefined);
     await this.memento.update(LEGACY_V1_PANE_STATE_KEY, undefined);

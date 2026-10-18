@@ -74,5 +74,6 @@
   "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.": "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.",
   "{0} (follow off)": "{0} (follow off)",
   "→ Folder Space {0}": "→ Folder Space {0}",
-  "Folder Spaces:": "Folder Spaces:"
+  "Folder Spaces:": "Folder Spaces:",
+  "Folder Space {0} has no folder yet: use Switch Root to pick one.": "Folder Space {0} has no folder yet: use Switch Root to pick one."
 }

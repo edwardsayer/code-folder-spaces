@@ -74,5 +74,6 @@
   "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.": "已還原先前的點擊行為設定，並略過來自其他工作區的記錄。",
   "{0} (follow off)": "{0}（未跟隨）",
   "→ Folder Space {0}": "→ 資料夾空間 {0}",
-  "Folder Spaces:": "資料夾空間："
+  "Folder Spaces:": "資料夾空間：",
+  "Folder Space {0} has no folder yet: use Switch Root to pick one.": "資料夾空間 {0} 尚未設定資料夾：請用「切換根目錄」選一個。"
 }

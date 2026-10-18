@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { LEGACY_PANE_STATE_KEY, PaneStateStore, PANE_STATE_KEY } from '../../src/spaces/viewState';
 import { panesToSyncWorkspaceRoots } from '../../src/spaces/paneLinks';
 
-describe('OP-15 Global/Profile 級別儲存與工作區目錄跟隨 (Profile Storage & Follow Workspace Directory)', () => {
-  it('若 globalState 為空，可安全從 workspaceState 平滑轉移 v2 窗格配置', async () => {
+describe('OP-15 工作區目錄跟隨 + S4.1R19 per-workspace 儲存', () => {
+  it('S4.1R19：workspaceState 為空時，可安全從 globalState 平滑轉移（方向已反轉）', async () => {
     const wsMap = new Map<string, unknown>();
     const globalMap = new Map<string, unknown>();
 
@@ -24,15 +24,16 @@ describe('OP-15 Global/Profile 級別儲存與工作區目錄跟隨 (Profile Sto
         pane1: { root: '/old/project', preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [], showFiles: true, include: [], exclude: [] }
       }
     };
-    wsMap.set(LEGACY_PANE_STATE_KEY, oldV2);
+    globalMap.set(LEGACY_PANE_STATE_KEY, oldV2);
 
-    const store = new PaneStateStore(globalMemento);
-    await store.migrateFromWorkspaceStateIfEmpty(wsMemento, true);
+    // S4.1R19：pane 狀態改存 workspaceState；首次開啟時從 globalState 搬一次
+    const store = new PaneStateStore(wsMemento);
+    await store.migrateFromGlobalStateIfEmpty(globalMemento, true);
 
-    // globalState 應順利繼承該配置
     expect(store.get('pane1').roots).toEqual([path.normalize('/old/project')]);
     expect(store.get('pane1').preset).toBe('Files');
-    expect(globalMap.get(PANE_STATE_KEY)).toBeDefined();
+    // 搬到 workspaceState（而非 globalState）
+    expect(wsMap.get(PANE_STATE_KEY)).toBeDefined();
   });
 
   it('工作區 roots 真正變動時清空下鑽；完全同步早退時保留狀態', async () => {
@@ -71,11 +72,11 @@ describe('OP-15 Global/Profile 級別儲存與工作區目錄跟隨 (Profile Sto
     expect(store.get('pane1').roots).toEqual([other]);
   });
 
-  it('uses the same follow-workspace default when migrating workspace state and initializing', async () => {
-    const workspace = new Map<string, unknown>([[LEGACY_PANE_STATE_KEY, { version: 2, panes: { pane1: { root: '/legacy' } } }]]);
-    const global = new Map<string, unknown>();
-    const store = new PaneStateStore({ get: key => global.get(key) as never, update: async (key, value) => { global.set(key, value); } });
-    await store.migrateFromWorkspaceStateIfEmpty({ get: key => workspace.get(key) as never, update: async (key, value) => { workspace.set(key, value); } }, true);
+  it('uses the same follow-workspace default when migrating global state and initializing', async () => {
+    const workspace = new Map<string, unknown>();
+    const global = new Map<string, unknown>([[LEGACY_PANE_STATE_KEY, { version: 2, panes: { pane1: { root: '/legacy' } } }]]);
+    const store = new PaneStateStore({ get: key => workspace.get(key) as never, update: async (key: string, value: unknown) => { workspace.set(key, value); } });
+    await store.migrateFromGlobalStateIfEmpty({ get: key => global.get(key) as never, update: async (key: string, value: unknown) => { global.set(key, value); } }, true);
     expect(store.get('pane1').followWorkspaceDirectory).toBe(true);
 
     const initialized = new PaneStateStore({ get: () => undefined, update: async () => {} });

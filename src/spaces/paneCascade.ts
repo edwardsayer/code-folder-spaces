@@ -46,6 +46,8 @@ export interface PaneCascadeOptions {
   stat(uri: vscode.Uri): Promise<vscode.FileStat>;
   directoryType: vscode.FileType;
   onError?(error: unknown): void;
+  /** S4.1R19：follow 中的子窗格尚無 root（scope 為空）時回呼，供上層提示而非靜默略過。 */
+  onEmptyChild?(childPaneId: string): void;
   debounceMs?: number;
   expectedRootMs?: number;
 }
@@ -174,7 +176,12 @@ export class PaneCascadeController implements vscode.Disposable {
     for (const childId of getFollowingChildPaneIds(this.options.state.getPaneLinks(), paneId)) {
       if (!this.isCurrent(paneId, task, generation, parentSnapshot)) return;
       const child = this.options.getRuntime(childId);
-      if (!child?.scope) continue;
+      // S4.1R19（Bug C 修正）：子窗格還沒 root（scope 為空）時，沉靜 continue 會讓使用者覺得
+      // 「點資料夾沒反應」。改為回報一次原因，讓呼叫端提示（父側照常運作）。
+      if (!child?.scope) {
+        this.options.onEmptyChild?.(childId);
+        continue;
+      }
       // 序列化狀態寫入，避免前一筆尚在持久化時，舊選取覆蓋後到的新根。
       const write = this.writes.then(async () => {
         if (!this.isCurrent(paneId, task, generation, parentSnapshot)) return;

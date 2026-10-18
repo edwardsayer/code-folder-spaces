@@ -4891,30 +4891,10 @@
           "default": true,
           "description": "%configuration.showFiles.description%"
         },
-        "codeFolderSpaces.openFilesIn": {
-          "type": "string",
-          "enum": [
-            "current",
-            "beside"
-          ],
-          "default": "current",
-          "enumDescriptions": [
-            "%configuration.openFilesIn.current%",
-            "%configuration.openFilesIn.beside%"
-          ],
-          "description": "%configuration.openFilesIn.description%"
-        },
         "codeFolderSpaces.followActiveFile": {
           "type": "boolean",
           "default": true,
           "description": "%configuration.followActiveFile.description%"
-        },
-        "codeFolderSpaces.panes.count": {
-          "type": "integer",
-          "default": 2,
-          "minimum": 1,
-          "maximum": 8,
-          "description": "%configuration.panes.count.description%"
         },
         "codeFolderSpaces.maxDepth": {
           "type": "integer",
