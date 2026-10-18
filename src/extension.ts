@@ -248,12 +248,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     runtime.treeView.description = definitions.length === 1
       ? root ?? paneDefinitionFor(paneId)?.basePath ?? definitions[0].basePath
       : definitions.length > 1 ? vscode.l10n.t('{0} folders', definitions.length) : '';
-    // S4.1R15：有連動中子空間時在標題列顯示徒章（唯一可用的 title bar 視覺標記 API）。
-    const childCount = viewState.getEnabledPaneIds()
-      .filter(id => viewState.get(id).parentPaneId === paneId).length;
-    runtime.treeView.badge = childCount > 0
-      ? { value: childCount, tooltip: vscode.l10n.t('{0} linked child space(s)', childCount) }
-      : undefined;
   };
 
   const createPaneDragAndDrop = (paneId: string) => createTreeDragAndDropController(paneId, {
@@ -1115,7 +1109,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       void vscode.window.showInformationMessage(vscode.l10n.t('Folder Spaces supports at most 8 folder space slots.'));
       return;
     }
-    const root = presetRoot ?? await pickPaneRoot();
+    // S4.1R16（使用者要求）：Add Space 的選單項目與 Switch Root... 一致——
+    // 列出「已設定的 spaces」＋「目前主窗格資料夾下的子目錄」＋「Browse for folder…」。
+    const root = presetRoot ?? await browsePaneRoot(primaryPaneId());
     if (!root) return;
     const source = viewState.get(primaryPaneId());
     const initialPreset = resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset'));
