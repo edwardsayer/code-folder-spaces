@@ -199,8 +199,9 @@ describe('pane chain normalization helpers', () => {
       pane3: { parentPaneId: 'pane1', follow: true },
     });
     assertNoOrphansAndChains(mixed);
+    // S4.1R15（OP-22）：一父多子合法——斷環後 pane3 不再是「多子被收斂」的犧牲者。
     expect(mixed.pane2.parentPaneId).toBe('pane1');
-    expect(mixed.pane3).toEqual({ parentPaneId: null, follow: false });
+    expect(mixed.pane3.parentPaneId).toBe('pane1');
 
     const valid = { pane1: { parentPaneId: null, follow: false }, pane2: { parentPaneId: 'pane1', follow: true }, pane3: { parentPaneId: 'pane2', follow: true } };
     expect(normalizePaneChains(valid)).toEqual(valid);
@@ -213,12 +214,13 @@ describe('pane chain normalization helpers', () => {
       pane3: { parentPaneId: 'pane2', follow: true },
     });
     expect(normalized.pane1.parentPaneId).toBe('pane2');
-    expect(normalized.pane2).toEqual({ parentPaneId: null, follow: false });
-    expect(normalized.pane3).toEqual({ parentPaneId: null, follow: false });
+    // 環 pane2→pane3→pane2：切入點 pane2 被清為 null；pane3 保留指向 pane2（已不再成環）。
+    expect(normalized.pane2.parentPaneId).toBeNull();
+    expect(normalized.pane3.parentPaneId).toBe('pane2');
     assertNoOrphansAndChains(normalized);
   });
 
-  it('filters invalid pane keys before retaining the lowest-numbered child', () => {
+  it('filters invalid pane keys and keeps all valid siblings (S4.1R15 multi-child)', () => {
     const normalized = normalizePaneChains({
       pane1: { parentPaneId: null, follow: false },
       pane2: { parentPaneId: 'pane1', follow: true },
@@ -227,10 +229,11 @@ describe('pane chain normalization helpers', () => {
     });
     expect(Object.keys(normalized)).toEqual(['pane1', 'pane2', 'pane3']);
     expect(normalized.pane2.parentPaneId).toBe('pane1');
-    expect(normalized.pane3).toEqual({ parentPaneId: null, follow: false });
+    // 一父多子：兩個合法子都保留。
+    expect(normalized.pane3.parentPaneId).toBe('pane1');
   });
 
-  it('normalizes missing, invalid, self parents and keeps only the lowest-id child', () => {
+  it('normalizes missing, invalid and self parents while keeping multiple valid children', () => {
     const normalized = normalizePaneChains({
       pane1: { parentPaneId: null, follow: false },
       pane2: { parentPaneId: 'pane1', follow: true },
@@ -240,7 +243,8 @@ describe('pane chain normalization helpers', () => {
       pane6: { parentPaneId: 'pane8', follow: true },
     });
     expect(normalized.pane2.parentPaneId).toBe('pane1');
-    expect(normalized.pane3).toEqual({ parentPaneId: null, follow: false });
+    // S4.1R15（OP-22）：pane3 是合法子，不因 pane2 存在而被踢出。
+    expect(normalized.pane3.parentPaneId).toBe('pane1');
     expect(normalized.pane4).toEqual({ parentPaneId: null, follow: false });
     expect(normalized.pane5).toEqual({ parentPaneId: null, follow: false });
     expect(normalized.pane6).toEqual({ parentPaneId: null, follow: false });

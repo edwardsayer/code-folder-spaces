@@ -77,7 +77,7 @@ describe('pane view state v3 schema (S4R6-D60/D63, S4.1R11 v3)', () => {
     expect(LEGACY_PANE_STATE_KEY).toBe('codeFolderSpaces.panes.v2');
   });
 
-  it('normalizes pane chains by detaching dangling parents and all but the lowest-id child', () => {
+  it('normalizes pane chains by detaching dangling parents while keeping multiple valid children (S4.1R15)', () => {
     const normalized = normalizePaneState({ version: 3, panes: {
       pane1: { parentPaneId: null },
       pane2: { parentPaneId: 'pane1', follow: true },
@@ -85,7 +85,8 @@ describe('pane view state v3 schema (S4R6-D60/D63, S4.1R11 v3)', () => {
       pane4: { parentPaneId: 'pane8', follow: true },
     } });
     expect(normalized.panes.pane2.parentPaneId).toBe('pane1');
-    expect(normalized.panes.pane3).toMatchObject({ parentPaneId: null, follow: false });
+    // S4.1R15（OP-22）：一父多子合法，pane3 不再因 pane2 存在而被移為頂層。
+    expect(normalized.panes.pane3).toMatchObject({ parentPaneId: 'pane1' });
     expect(normalized.panes.pane4).toMatchObject({ parentPaneId: null, follow: false });
   });
 
@@ -431,11 +432,12 @@ describe('slot allocation (PD-U2, S4R6-D62)', () => {
     expect(store.getEnabledPaneIds()).toEqual(['pane1', 'pane2', 'pane3']);
   });
 
-  it('enabling a child under an occupied parent detaches its former child', async () => {
+  it('enabling a second child under the same parent keeps the former child (S4.1R15 multi-child)', async () => {
     const store = loaded(['pane1', 'pane2']);
     await store.enablePane('pane3', { parentPaneId: 'pane1', follow: true });
     expect(store.get('pane3').parentPaneId).toBe('pane1');
-    expect(store.get('pane2')).toMatchObject({ parentPaneId: null, follow: false });
+    // 一父多子：pane2 仍是 pane1 的子，不被踢到頂層。
+    expect(store.get('pane2')).toMatchObject({ parentPaneId: 'pane1' });
   });
 
   it('rejects an already-enabled or malformed slot id, and a link that would form a cycle', async () => {
@@ -446,15 +448,22 @@ describe('slot allocation (PD-U2, S4R6-D62)', () => {
     expect(store.getEnabledPaneIds()).toEqual(['pane1', 'pane2']);
   });
 
-  it('re-links a pane without slot ordering and keeps the parent at one child; removing a parent clears follow', async () => {
-    const store = loaded(['pane1', 'pane2', 'pane3']);
-    await store.setPaneParent('pane3', 'pane1', true);
+  it('re-links a pane without slot ordering and allows multiple children; removing a parent clears follow', async () => {
+    const store = loaded(['pane1']);
+    // S4.1R15（OP-22）：一父多子——同一個父 pane1 下掛兩個子。
+    await store.enablePane('pane2', { parentPaneId: 'pane1', follow: true });
+    await store.enablePane('pane3', { parentPaneId: 'pane1', follow: true });
+    expect(store.get('pane2')).toMatchObject({ parentPaneId: 'pane1', follow: true });
     expect(store.get('pane3')).toMatchObject({ parentPaneId: 'pane1', follow: true });
-    expect(store.get('pane2')).toMatchObject({ parentPaneId: null, follow: false });
-    await store.setPaneParent('pane1', 'pane2', true);
-    expect(store.get('pane1').parentPaneId).toBe('pane2');
-    await store.setPaneParent('pane2', null, true);
-    expect(store.get('pane2')).toMatchObject({ parentPaneId: null, follow: false });
+    // 子改掛到自己的子會成環，仍須被拒。
+    await store.setPaneParent('pane2', 'pane3', true);
+    expect(store.get('pane2').parentPaneId).toBe('pane3');
+    await expect(store.setPaneParent('pane3', 'pane2', true)).rejects.toThrow(/acyclic/);
+    // 頂層 pane 解除父子關係後 follow 清除。
+    await store.setPaneParent('pane3', null, true);
+    expect(store.get('pane3')).toMatchObject({ parentPaneId: null, follow: false });
+    // 解除後 pane1 底下仍有 pane2。
+    expect(store.get('pane2').parentPaneId).toBe('pane3');
   });
 });
 

@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import type { SpaceDefinition } from '../types';
 import type { ViewAxisChange, ViewPresetName, ViewSettings } from './viewPresets';
 import { DEFAULT_VIEW_PRESET, VIEW_PRESETS, applyViewAxis, isViewPresetName, isViewSettings, matchPresetName } from './viewPresets';
-import { detachChildrenOf, hasValidPaneLinks, normalizePaneChains, reattachChildren, wouldCreateCycle } from './paneLinks';
+import { hasValidPaneLinks, normalizePaneChains, reattachChildren, wouldCreateCycle } from './paneLinks';
 
 /** Current workspaceState key (S4R6-D63: per-pane view state, no more `bySpace`). */
 export const PANE_STATE_KEY = 'codeFolderSpaces.panes.v3';
@@ -524,8 +524,8 @@ export class PaneStateStore {
     if (!PANE_ID_PATTERN.test(paneId)) throw new Error(`Invalid pane id: ${paneId}`);
     if (this.state.panes[paneId]) throw new Error(`Pane already enabled: ${paneId}`);
     const merged = normalizePane({ ...defaultPaneState(), ...state });
-    const current = merged.parentPaneId ? detachChildrenOf(this.state.panes, merged.parentPaneId, paneId) : this.state.panes;
-    const candidate = { ...current, [paneId]: merged };
+    // S4.1R15（OP-22）：一父多子合法，不再把父空間的既有子空間改掛到祖父。
+    const candidate = { ...this.state.panes, [paneId]: merged };
     if (!hasValidPaneLinks(candidate)) throw new Error('Pane links must be acyclic and no deeper than eight panes.');
     this.state = { ...this.state, panes: candidate };
     await this.persist();
@@ -608,7 +608,8 @@ export class PaneStateStore {
   async setPaneParent(paneId: string, parentPaneId: string | null, follow: boolean): Promise<void> {
     const pane = this.state.panes[paneId];
     if (!pane) return;
-    const current = parentPaneId ? detachChildrenOf(this.state.panes, parentPaneId, paneId) : this.state.panes;
+    // S4.1R15（OP-22）：一父多子合法，不再踢掉父空間的其他子空間。
+    const current = this.state.panes;
     const candidate: Record<string, PaneLinkState> = { ...Object.fromEntries(Object.entries(current).map(([id, item]) => [id, { root: activeRoot(item), parentPaneId: item.parentPaneId, follow: item.follow }])), [paneId]: { root: activeRoot(pane), parentPaneId, follow } };
     if (parentPaneId && wouldCreateCycle(candidate, parentPaneId, paneId)) {
       throw new Error('Pane links must be acyclic and no deeper than eight panes.');

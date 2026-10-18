@@ -23,14 +23,41 @@ export type SpaceNode = SpaceRootNode | SpaceEntryNode;
 export type PaneLinkMarkerProvider = (paneId: string, fsPath: string) => string | undefined;
 
 /** Apply an injected pane-link marker to a folder tree item without touching other item fields. */
-export function applyPaneLinkMarker<T extends { description?: string | boolean }>(
+/** 記錄哪些 item 的 label 是「我們自己從字串轉成物件」的，用於精確還原（不動別人的 label 物件）。 */
+const highlightedItems = new WeakSet<object>();
+
+/**
+ * 套用父側連動標記（S4.1R13）＋名稱高亮（S4.1R15）。
+ * - `description`：顯示「→ Folder Space n」。
+ * - `label.highlights`：對資料夾名稱做原生底色高亮（比尾巴文字標記明顯）。
+ * 僅 folder 列生效；file 列與未連動列不動。
+ */
+export function applyPaneLinkMarker<T extends { description?: string | boolean; label?: string | { label: string; highlights?: [number, number][] } }>(
   item: T,
   paneId: string,
   fsPath: string,
   isFolder: boolean,
   markerProvider?: PaneLinkMarkerProvider,
 ): T {
-  if (isFolder && markerProvider) item.description = markerProvider(paneId, fsPath);
+  if (!isFolder || !markerProvider) return item;
+  const marker = markerProvider(paneId, fsPath);
+  if (marker) {
+    item.description = marker;
+    // S4.1R15：label 為字串時轉成 TreeItemLabel 以套用 highlights（整個名稱高亮）。
+    if (typeof item.label === 'string' && item.label.length > 0) {
+      item.label = { label: item.label, highlights: [[0, item.label.length]] };
+      highlightedItems.add(item);
+    }
+  } else {
+    item.description = undefined;
+    // 只還原「本函式自己轉出來的」label 物件，避免破壞其他來源的高亮。
+    if (highlightedItems.has(item)) {
+      highlightedItems.delete(item);
+      if (item.label && typeof item.label === 'object' && typeof item.label.label === 'string') {
+        item.label = item.label.label;
+      }
+    }
+  }
   return item;
 }
 

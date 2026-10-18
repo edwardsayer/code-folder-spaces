@@ -248,6 +248,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     runtime.treeView.description = definitions.length === 1
       ? root ?? paneDefinitionFor(paneId)?.basePath ?? definitions[0].basePath
       : definitions.length > 1 ? vscode.l10n.t('{0} folders', definitions.length) : '';
+    // S4.1R15：有連動中子空間時在標題列顯示徒章（唯一可用的 title bar 視覺標記 API）。
+    const childCount = viewState.getEnabledPaneIds()
+      .filter(id => viewState.get(id).parentPaneId === paneId).length;
+    runtime.treeView.badge = childCount > 0
+      ? { value: childCount, tooltip: vscode.l10n.t('{0} linked child space(s)', childCount) }
+      : undefined;
   };
 
   const createPaneDragAndDrop = (paneId: string) => createTreeDragAndDropController(paneId, {
@@ -1039,14 +1045,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 
   /** 「在此開子 pane」（S4.1R12）：優先重用既有子窗格，否則配置可用插槽。 */
-  const addChildPane = async (node: unknown, paneId = targetPaneId(node)): Promise<void> => {
+  const addChildPane = async (node: unknown, paneId = targetPaneId(node), options?: { alwaysCreate?: boolean }): Promise<void> => {
     const info = nodeInfo(node);
     const target = info?.isDirectory ? info.uri.fsPath : rootOf(paneId);
     if (!target) {
       void vscode.window.showInformationMessage(vscode.l10n.t('Choose a folder inside this folder space first.'));
       return;
     }
-    const existingChild = viewState.getEnabledPaneIds().find(id => viewState.get(id).parentPaneId === paneId);
+    // 樹列的 Activate Child Space（無 options 或 alwaysCreate=false）保留 R12a 行為：已有子窗格則改換其根。
+    // 「…」選單的 Add Child Space（alwaysCreate=true）名實相符：總是新增一個子空間。
+    const existingChild = options?.alwaysCreate
+      ? undefined
+      : viewState.getEnabledPaneIds().find(id => viewState.get(id).parentPaneId === paneId);
     if (existingChild) {
       await viewState.switchRoot(existingChild, target);
       await paneChanged(existingChild);
@@ -1393,7 +1403,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
           const runtime = paneRuntime.get(id);
           const selected = runtime?.treeView.selection[0];
           const target = nodeInfo(selected)?.isDirectory ? selected : rootNodeForPane(id);
-          return addChildPane(target, id);
+          // 「…」選單的 Add Child Space：名稱與行為一致——**總是新增**子空間（不重用既有的）。
+          return addChildPane(target, id, { alwaysCreate: true });
         }),
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.close`, () => closePane(id)),
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.collapseAll`, () => collapseAllForPane(id)),

@@ -91,15 +91,20 @@ export function wouldCreateCycle(links: Record<string, PaneChainEntry>, parentPa
     current = links[current]?.parentPaneId ?? null;
   }
   const ancestors = visited.size;
-  let descendants = 0;
-  current = childPaneId;
-  while (true) {
-    const next = Object.entries(links).find(([, link]) => link.parentPaneId === current)?.[0];
-    if (!next) break;
-    if (visited.has(next) || ++descendants >= MAX_PANE_COUNT) return true;
-    current = next;
+  // S4.1R15（OP-22）：一父多子合法，走訪必須看**所有**後代（BFS），不能只取第一個子。
+  const descendants = new Set<string>();
+  const queue: string[] = [childPaneId];
+  while (queue.length > 0) {
+    const node = queue.shift() as string;
+    for (const [id, link] of Object.entries(links)) {
+      if (link.parentPaneId !== node) continue;
+      if (id === childPaneId || visited.has(id) || descendants.has(id)) return true;
+      descendants.add(id);
+      queue.push(id);
+      if (ancestors + 1 + descendants.size > MAX_PANE_COUNT) return true;
+    }
   }
-  return ancestors + 1 + descendants > MAX_PANE_COUNT;
+  return ancestors + 1 + descendants.size > MAX_PANE_COUNT;
 }
 
 /** Validate every stored parent edge and ensure no chain exceeds the eight static views. */
@@ -198,17 +203,7 @@ export function normalizePaneChains<T extends PaneFollowEntry>(panes: Record<str
       current = result[current]?.parentPaneId ?? null;
     }
   }
-  for (let pass = 0; pass < MAX_PANE_COUNT; pass += 1) {
-    let changed = false;
-    for (const parentPaneId of Object.keys(result)) {
-      const children = Object.keys(result).filter(id => result[id].parentPaneId === parentPaneId).sort((a, b) => paneIndex(a) - paneIndex(b));
-      if (children.length > 1) {
-        result = detachChildrenOf(result, parentPaneId, children[0]);
-        changed = true;
-      }
-    }
-    if (!changed) break;
-  }
+  // S4.1R15（OP-22）：一父多子合法。只保留環／懸空修復，**不**再把多子收斂為單一。
   return result;
 }
 

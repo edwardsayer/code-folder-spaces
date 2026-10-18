@@ -73,5 +73,6 @@
   "Click behavior records from other workspaces were skipped.": "已略過來自其他工作區的點擊行為記錄。",
   "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.": "已還原先前的點擊行為設定，並略過來自其他工作區的記錄。",
   "{0} (follow off)": "{0}（未跟隨）",
-  "→ Folder Space {0}": "→ 資料夾空間 {0}"
+  "→ Folder Space {0}": "→ 資料夾空間 {0}",
+  "{0} linked child space(s)": "{0} 個連動的子空間"
 }
