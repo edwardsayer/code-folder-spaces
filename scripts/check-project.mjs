@@ -163,10 +163,9 @@ if (!pkg) {
     const paneActions = [
       'filter', 'clearFilter', 'drillUp', 'followOn', 'followOff', 'toggleFollow', 'mode', 'switchRoot', 'addChild', 'close', 'refresh',
       'collapseAll', 'expandAll', 'root.add', 'root.remove',
-      ...['Explorer', 'Navigate', 'Columns', 'Context', 'Contents', 'Files', 'List'].map((name) => `preset.${name}`),
-      ...['1', '2', 'all'].map((level) => `level.${level}`),
-      ...['all', 'folders', 'files'].map((content) => `content.${content}`),
-      ...['name', 'mtime', 'ctime'].flatMap((key) => ['asc', 'desc'].map((direction) => `sort.${key}.${direction}`)),
+      // S4.1R20（方案 B）：原 4 個 submenu 的 per-value 命令（preset.*／level.*／content.*／sort.*）
+      // 已改為 4 個 QuickPick 命令；契約改檢查這四個。
+      'preset', 'level', 'content', 'sort',
     ];
     const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];

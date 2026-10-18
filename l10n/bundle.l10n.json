@@ -75,5 +75,19 @@
   "{0} (follow off)": "{0} (follow off)",
   "→ Folder Space {0}": "→ Folder Space {0}",
   "Folder Spaces:": "Folder Spaces:",
-  "Folder Space {0} has no folder yet: use Switch Root to pick one.": "Folder Space {0} has no folder yet: use Switch Root to pick one."
+  "Folder Space {0} has no folder yet: use Switch Root to pick one.": "Folder Space {0} has no folder yet: use Switch Root to pick one.",
+  "N/A": "N/A",
+  "Level": "Level",
+  "Level 1": "Level 1",
+  "Level 2": "Level 2",
+  "All levels": "All levels",
+  "Content": "Content",
+  "All items": "All items",
+  "Folders only": "Folders only",
+  "Files only": "Files only",
+  "Mode": "Mode",
+  "Tree": "Tree",
+  "Flat": "Flat",
+  "Preset": "Preset",
+  "Sort": "Sort"
 }

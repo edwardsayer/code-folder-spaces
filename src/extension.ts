@@ -6,18 +6,20 @@ import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
-import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, resolveConfiguredDefaultChildPreset, resolveConfiguredCascadeParentPreset, type ViewAxisChange, type ViewContent, type ViewLevel, type ViewMode } from './spaces/viewPresets';
+import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, resolveConfiguredDefaultChildPreset, resolveConfiguredCascadeParentPreset, type ViewAxisChange } from './spaces/viewPresets';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
 import { canClosePane, describePaneLinkEdgeGroups, isPaneRootDirectory, linkedChildPaneNumber, nextChildPaneId, panesToSyncWorkspaceRoots } from './spaces/paneLinks';
 import { createLinkStatusSummaryFromEdges, LinkStatusBar } from './spaces/linkStatusBar';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
+import { normalizeExcludeSetting, parseGitIgnore, shouldHideLikeExplorer, type GitIgnoreRule } from './spaces/explorerVisibility';
+import { matchesAnyPattern } from './spaces/spaceConfig';
 import { PaneCascadeController } from './spaces/paneCascade';
 import { diffWatchers, planWatchers } from './spaces/watcherPlan';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
 import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
-import { selectedQuickPickId, stableQuickPickItems } from './ui/stableQuickPick';
+import { labelledValue, selectedQuickPickId, stableQuickPickItems } from './ui/stableQuickPick';
 import { belongsToWorkspace, normalizeExpandModeProvenance, resolveAlignedProvenance, resolveExpandModeRestore, resolveExpandModeTarget, resolveWorkspaceIdentity, shouldWriteExpandModeRestore, type ExpandModeProvenance } from './spaces/clickBehavior';
 
 const MAX_PANE_INDEX = 8;
@@ -76,17 +78,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const hasWorkspace = Boolean(vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length);
   const viewState = new PaneStateStore(hasWorkspace ? context.workspaceState : context.globalState);
   const settings = () => vscode.workspace.getConfiguration('codeFolderSpaces');
+  /**
+   * S4.1R20（使用者）：新建 layout 的 pane1 預設 preset。
+   * - 啟用 `adaptiveCascadeParent` 時，pane1 遲早會被切成 `cascadeParentPreset`（因為預設 pane2 會 follow），
+   *   所以直接用 `cascadeParentPreset`，避免「先 Explorer 再被改成 Navigate」的跳動。
+   * - 停用時才用 `defaultPreset`。
+   */
+  const resolvePrimaryPreset = () => settings().get<boolean>('adaptiveCascadeParent', true)
+    ? resolveConfiguredCascadeParentPreset(settings().get<string>('cascadeParentPreset'))
+    : resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset'));
   // 平滑迁移：若本 workspace 尚無 v3 資料，嘗試從 globalState 取一次（只搬一次，不覆寫已存在的 workspace 狀態）。
   await viewState.migrateFromGlobalStateIfEmpty(context.globalState, settings().get<boolean>('followWorkspaceDirectory', true));
   const paneInitContext = () => ({
     spaces: store.getDefinitions(),
-    showFilesDefault: settings().get<boolean>('view.showFiles', true),
+    // S4.1R20：`view.showFiles` 已移除；由 preset 的 content 維度控制顯示範圍。
+    showFilesDefault: true,
     // S4.1R19（使用者）：移除 `panes.count` 設定；固定 2 個窗格（不滿意可由程式面自行調整）。
     configuredCount: DEFAULT_PANE_COUNT,
     followWorkspaceDirectoryDefault: settings().get<boolean>('followWorkspaceDirectory', true),
     // S4.1R19（使用者）：全新 workspace 的兩個 space 各依 Default Preset／Default Child Preset 呈現。
+    // S4.1R20（使用者修正）：pane1 若啟用 Adaptive Cascade Parent，優先用 Cascade Parent Preset；
+    // 否則才用 Default Preset。pane2+ 維持 Default Child Preset。
     presets: {
-      primary: resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset')),
+      primary: resolvePrimaryPreset(),
       child: resolveConfiguredDefaultChildPreset(settings().get<string>('defaultChildPreset')),
     },
   });
@@ -337,6 +351,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     });
     // S4.1R17：把 `codeFolderSpaces.maxDepth` 注入 provider（建構後設定，避免改動既有建構子簽名）。
     provider.maxDepth = readMaxDepth();
+    // S4.1R20（使用者）：跟隨 Explorer 的隱藏規則（files.exclude + explorer.excludeGitIgnore）。
+    provider.explorerVisibility = explorerVisibility.check;
     const runtime: PaneRuntime = { id: paneId, provider, treeView, disposables: [] };
     runtime.disposables.push(
       provider,
@@ -622,6 +638,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       void followActiveFile(generation, getActiveTabUri());
     }, FOLLOW_DEBOUNCE_MS);
   };
+  /** S4.1R20：讀取 Explorer 等價隱藏規則並回傳判斷函式。
+   *  來源：`files.exclude`（值為 true 的樣式）＋（選用）`explorer.excludeGitIgnore` 開啟時的 `.gitignore`。
+   *  結果快取到下次設定變更／檔案變更為止，避免每次列舉都重讀。 */
+  const createExplorerVisibility = (): { check: (relativePath: string, isDirectory: boolean) => boolean; refresh: () => void } => {
+    let excludePatterns: readonly string[] = [];
+    let gitIgnoreRules: readonly GitIgnoreRule[] = [];
+    let loaded = false;
+
+    const load = async (): Promise<void> => {
+      loaded = true;
+      excludePatterns = normalizeExcludeSetting(vscode.workspace.getConfiguration('files').get<unknown>('exclude'));
+      const useGitIgnore = vscode.workspace.getConfiguration('explorer').get<boolean>('excludeGitIgnore', false);
+      const rules: GitIgnoreRule[] = [];
+      if (useGitIgnore) {
+        // 以工作區根目錄的 .gitignore 為主（多根時逐一收集）。
+        for (const folder of vscode.workspace.workspaceFolders ?? []) {
+          try {
+            const uri = vscode.Uri.joinPath(folder.uri, '.gitignore');
+            const bytes = await vscode.workspace.fs.readFile(uri);
+            rules.push(...parseGitIgnore(Buffer.from(bytes).toString('utf8')));
+          } catch { /* 沒有 .gitignore 是常態 */ }
+        }
+      }
+      gitIgnoreRules = rules;
+    };
+
+    return {
+      check: (relativePath, isDirectory) => {
+        if (!loaded) void load();
+        if (!excludePatterns.length && !gitIgnoreRules.length) return false;
+        return shouldHideLikeExplorer(relativePath, isDirectory, excludePatterns, gitIgnoreRules,
+          (pattern, path, name) => matchesAnyPattern(name, path, [pattern]));
+      },
+      refresh: () => { loaded = false; },
+    };
+  };
+  const explorerVisibility = createExplorerVisibility();
+
   const followConfiguration = vscode.workspace.onDidChangeConfiguration(event => {
     if (event.affectsConfiguration('codeFolderSpaces.maxDepth')) {
       // S4.1R17：設定變更後套用到所有 provider 並重繪（扁平列舉深度由 provider 持有）。
@@ -884,6 +938,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const picked = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a folder for this folder space') });
     if (!picked) return undefined;
     if (picked.rootPath) return picked.rootPath;
+    return pickFolderDialog();
+  };
+
+  /** S4.1R20：原生資料夾選擇對話框（本檔唯一入口，避免重複程式碼與雙擊問題）。 */
+  const pickFolderDialog = async (): Promise<string | undefined> => {
     const folder = await vscode.window.showOpenDialog({
       canSelectFiles: false,
       canSelectFolders: true,
@@ -907,10 +966,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       void vscode.window.showErrorMessage(vscode.l10n.t('Could not read folders: {0}', String(error)));
       return undefined;
     }
-    items.push({ label: vscode.l10n.t('Browse for folder…'), rootPath: current });
+    // S4.1R20（使用者）：原本把 `rootPath` 設為 `current`，選中後再呼叫 pickPaneRoot()→又彈一層 QuickPick，
+    // 造成「Browse for folder…」要點兩次才出資料夾對話框。改用獨立旗標一次直達 showOpenDialog。
+    items.push({ label: vscode.l10n.t('Browse for folder…'), rootPath: '', browse: true } as never);
     const picked = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a folder for this folder space') });
     if (!picked) return undefined;
-    if (picked.rootPath === current) return pickPaneRoot();
+    if ((picked as { browse?: boolean }).browse) return pickFolderDialog();
     let stat: vscode.FileStat | undefined;
     try { stat = await vscode.workspace.fs.stat(vscode.Uri.file(picked.rootPath)); } catch { /* missing paths are rejected below */ }
     if (!stat) {
@@ -924,46 +985,50 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     return picked.rootPath;
   };
 
-  const setPresetForPane = async (paneId: string, preset?: unknown): Promise<void> => {
-    let selected = preset;
-    if (!isViewPresetName(selected)) {
-      const presets = stableQuickPickItems([
-        { id: 'Explorer', label: vscode.l10n.t('Explorer') },
-        { id: 'Navigate', label: vscode.l10n.t('Navigate') },
-        { id: 'Columns', label: vscode.l10n.t('Columns') },
-        { id: 'Context', label: vscode.l10n.t('Context') },
-        { id: 'Contents', label: vscode.l10n.t('Contents') },
-        { id: 'Files', label: vscode.l10n.t('Files') },
-        { id: 'List', label: vscode.l10n.t('List') },
-      ] as const);
-      selected = selectedQuickPickId(await vscode.window.showQuickPick(presets, { placeHolder: vscode.l10n.t('Choose a view preset') }));
-    }
-    if (!isViewPresetName(selected)) return;
+  const setPresetForPane = async (paneId: string): Promise<void> => {
+    // S4.1R20（方案 B）：改為 QuickPick，右側 description 顯示各預設集的組合，
+    // 當前值以 picked 打勾；標題顯示 `Preset: <當前>` 或 `Preset: N/A`。
+    const current = effectiveView(viewState.get(paneId));
+    const matched = matchPresetName(current);
+    const names = Object.keys(VIEW_PRESETS) as Array<keyof typeof VIEW_PRESETS>;
+    const items = stableQuickPickItems(names.map(name => ({
+      id: name,
+      label: name,
+      description: `${VIEW_PRESETS[name].mode} / ${VIEW_PRESETS[name].level} / ${VIEW_PRESETS[name].content}`,
+      picked: name === matched,
+    })));
+    const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
+      placeHolder: labelledValue(vscode.l10n.t('Preset'), matched, vscode.l10n.t('N/A')),
+    }));
+    if (!selected || !isViewPresetName(selected)) return;
     await viewState.setPreset(paneId, selected);
     repaintPane(paneId);
     await syncContext();
   };
 
-  const setSortForPane = async (paneId: string, key?: unknown, direction?: unknown): Promise<void> => {
-    const fields = stableQuickPickItems([
-      { id: 'name', label: vscode.l10n.t('Name') },
-      { id: 'mtime', label: vscode.l10n.t('Modified') },
-      { id: 'ctime', label: vscode.l10n.t('Created') },
-    ] as const);
-    const selectedKey = key === 'name' || key === 'mtime' || key === 'ctime'
-      ? key
-      : selectedQuickPickId(await vscode.window.showQuickPick(fields, { placeHolder: vscode.l10n.t('Choose sort field') }));
-    if (!selectedKey) return;
-    const directions = stableQuickPickItems([
-      { id: 'asc', label: vscode.l10n.t('Ascending') },
-      { id: 'desc', label: vscode.l10n.t('Descending') },
-    ] as const);
-    const selectedDirection = direction === 'desc' || direction === 'asc'
-      ? direction
-      : selectedQuickPickId(await vscode.window.showQuickPick(directions, { placeHolder: vscode.l10n.t('Choose sort direction') }));
-    if (selectedDirection !== 'asc' && selectedDirection !== 'desc') return;
-    await viewState.setSort(paneId, selectedKey as 'name' | 'mtime' | 'ctime', selectedDirection);
+  const setSortForPane = async (paneId: string): Promise<void> => {
+    // S4.1R20（方案 B）：欄位與方向合併在同一個 QuickPick（使用者：Mode 移到 Sort 上方，排序方向用箭頭）。
+    const state = viewState.get(paneId);
+    type SortId = 'name' | 'mtime' | 'ctime' | 'asc' | 'desc';
+    const items = stableQuickPickItems<SortId>([
+      { id: 'name', label: vscode.l10n.t('Name'), picked: state.sort.key === 'name' },
+      { id: 'mtime', label: vscode.l10n.t('Modified'), picked: state.sort.key === 'mtime' },
+      { id: 'ctime', label: vscode.l10n.t('Created'), picked: state.sort.key === 'ctime' },
+      // 使用者要求：Ascending／Descending 改用向上／向下符號
+      { id: 'asc', label: vscode.l10n.t('Ascending'), description: '↑', picked: state.sort.direction === 'asc' },
+      { id: 'desc', label: vscode.l10n.t('Descending'), description: '↓', picked: state.sort.direction === 'desc' },
+    ]);
+    const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
+      placeHolder: labelledValue(vscode.l10n.t('Sort'), `${state.sort.key} ${state.sort.direction === 'asc' ? '↑' : '↓'}`, vscode.l10n.t('N/A')),
+    }));
+    if (!selected) return;
+    if (selected === 'asc' || selected === 'desc') {
+      await viewState.setSort(paneId, state.sort.key, selected);
+    } else {
+      await viewState.setSort(paneId, selected, state.sort.direction);
+    }
     repaintPane(paneId);
+    await syncContext();
   };
 
   const filterForPane = async (paneId: string): Promise<void> => {
@@ -978,14 +1043,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       filterRuntime.provider.filterMessage = '';
       filterRuntime.treeView.message = '';
     }
-    repaintPane(paneId);
-    await syncContext();
-  };
-
-  const toggleModeForPane = async (paneId: string): Promise<void> => {
-    // OP-14：只翻轉「模式」維度，層級與內容保持不變（組合不必落在預設集內）。
-    const mode: ViewMode = effectiveView(viewState.get(paneId)).mode === 'tree' ? 'flat' : 'tree';
-    await viewState.setViewAxis(paneId, { axis: 'mode', value: mode });
     repaintPane(paneId);
     await syncContext();
   };
@@ -1218,6 +1275,54 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     repaintPane(paneId);
     await syncContext();
   };
+
+  /** S4.1R20（方案 B）：Level／Content／Mode 均改為 QuickPick，右側顯示當前值、picked 打勾。
+   *  任一維度選定後，Preset 的顯示（`matchPresetName`）會自動跟隨；無匹配即 `Preset: N/A`。 */
+  const pickLevelForPane = async (paneId: string): Promise<void> => {
+    const current = effectiveView(viewState.get(paneId));
+    type LevelId = '1' | '2' | 'all';
+    const items = stableQuickPickItems<LevelId>([
+      { id: '1', label: vscode.l10n.t('Level 1'), description: '1', picked: current.level === 1 },
+      { id: '2', label: vscode.l10n.t('Level 2'), description: '2', picked: current.level === 2 },
+      { id: 'all', label: vscode.l10n.t('All levels'), description: 'all', picked: current.level === 'all' },
+    ]);
+    const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
+      placeHolder: labelledValue(vscode.l10n.t('Level'), String(current.level), vscode.l10n.t('N/A')),
+    }));
+    if (!selected) return;
+    await applyAxisForPane(paneId, { axis: 'level', value: selected === 'all' ? 'all' : (Number(selected) as 1 | 2) });
+  };
+
+  const pickContentForPane = async (paneId: string): Promise<void> => {
+    const current = effectiveView(viewState.get(paneId));
+    type ContentId = 'all' | 'folders' | 'files';
+    const items = stableQuickPickItems<ContentId>([
+      { id: 'all', label: vscode.l10n.t('All items'), picked: current.content === 'all' },
+      { id: 'folders', label: vscode.l10n.t('Folders only'), picked: current.content === 'folders' },
+      { id: 'files', label: vscode.l10n.t('Files only'), picked: current.content === 'files' },
+    ]);
+    const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
+      placeHolder: labelledValue(vscode.l10n.t('Content'), current.content, vscode.l10n.t('N/A')),
+    }));
+    if (!selected) return;
+    await applyAxisForPane(paneId, { axis: 'content', value: selected });
+  };
+
+  const pickModeForPane = async (paneId: string): Promise<void> => {
+    const current = effectiveView(viewState.get(paneId));
+    type ModeId = 'tree' | 'flat';
+    const items = stableQuickPickItems<ModeId>([
+      { id: 'tree', label: vscode.l10n.t('Tree'), picked: current.mode === 'tree' },
+      { id: 'flat', label: vscode.l10n.t('Flat'), picked: current.mode === 'flat' },
+    ]);
+    const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
+      placeHolder: labelledValue(vscode.l10n.t('Mode'), current.mode, vscode.l10n.t('N/A')),
+    }));
+    if (!selected) return;
+    await viewState.setViewAxis(paneId, { axis: 'mode', value: selected });
+    repaintPane(paneId);
+    await syncContext();
+  };
   const collapseAllForPane = async (paneId: string): Promise<void> => {
     const runtime = paneRuntime.get(paneId);
     if (!runtime) return;
@@ -1428,15 +1533,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const id = `pane${index + 1}`;
       return [
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.toggleFollow`, () => toggleFollowForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.mode`, () => toggleModeForPane(id)),
-        ...(Object.keys(VIEW_PRESETS) as Array<keyof typeof VIEW_PRESETS>).map(name =>
-          vscode.commands.registerCommand(`codeFolderSpaces.${id}.preset.${name}`, () => setPresetForPane(id, name))),
-        ...(([1, 2, 'all'] as ViewLevel[]).map(level =>
-          vscode.commands.registerCommand(`codeFolderSpaces.${id}.level.${level}`, () => applyAxisForPane(id, { axis: 'level', value: level })))),
-        ...(([ 'all', 'folders', 'files' ] as ViewContent[]).map(content =>
-          vscode.commands.registerCommand(`codeFolderSpaces.${id}.content.${content}`, () => applyAxisForPane(id, { axis: 'content', value: content })))),
-        ...(['name', 'mtime', 'ctime'] as const).flatMap(key => (['asc', 'desc'] as const).map(direction =>
-          vscode.commands.registerCommand(`codeFolderSpaces.${id}.sort.${key}.${direction}`, () => setSortForPane(id, key, direction)))),
+        // S4.1R20（方案 B）：原 4 個 submenu（Preset／Level／Content／Sort）改為 QuickPick 命令；
+        // Mode 取代舊的 toggle 按鈕（可由選單直接選 Tree／Flat）。
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.preset`, () => setPresetForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.level`, () => pickLevelForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.content`, () => pickContentForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.mode`, () => pickModeForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.sort`, () => setSortForPane(id)),
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.switchRoot`, () => switchRootForPane(id)),
         // S4.1R11b：per-pane id 路由（D47——view/title 不提供 view id，全域 id 會操作錯 pane）。
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.add`, (given?: unknown) => addRootForPane(id, typeof given === 'string' ? given : undefined)),
@@ -1486,7 +1589,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }),
     vscode.commands.registerCommand('codeFolderSpaces.drillUp', (node?: unknown) => drillUpForPane(targetPaneId(node))),
     vscode.commands.registerCommand('codeFolderSpaces.switchRoot', (node?: unknown) => switchRootForPane(targetPaneId(node))),
-    vscode.commands.registerCommand('codeFolderSpaces.setPreset', (preset?: unknown) => setPresetForPane(primaryPaneId(), preset)),
+    vscode.commands.registerCommand('codeFolderSpaces.setPreset', () => setPresetForPane(primaryPaneId())),
     vscode.commands.registerCommand('codeFolderSpaces.filter', () => filterForPane(primaryPaneId())),
     vscode.commands.registerCommand('codeFolderSpaces.clearFilter', async () => {
       await viewState.clearFilter(primaryPaneId());
@@ -1495,8 +1598,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (runtime) runtime.treeView.message = '';
       await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasFilter', false);
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.setSort', (key?: unknown, direction?: unknown) => setSortForPane(primaryPaneId(), key, direction)),
-    vscode.commands.registerCommand('codeFolderSpaces.toggleMode', () => toggleModeForPane(primaryPaneId())),
+    vscode.commands.registerCommand('codeFolderSpaces.setSort', () => setSortForPane(primaryPaneId())),
+    vscode.commands.registerCommand('codeFolderSpaces.toggleMode', () => pickModeForPane(primaryPaneId())),
     // S4.1R17（F-46）：從 Explorer 右鍵「Open in Folder Spaces」——只開新頂層 pane，**不寫入 spaces 設定**。
     // 與 addSpace 的差異：addSpace 會把資料夾加入 `codeFolderSpaces.spaces`；本命令僅建立 pane。
     vscode.commands.registerCommand('codeFolderSpaces.openInFolderSpaces', async (target?: unknown) => {

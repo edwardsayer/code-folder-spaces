@@ -75,5 +75,19 @@
   "{0} (follow off)": "{0}（未跟隨）",
   "→ Folder Space {0}": "→ 資料夾空間 {0}",
   "Folder Spaces:": "資料夾空間：",
-  "Folder Space {0} has no folder yet: use Switch Root to pick one.": "資料夾空間 {0} 尚未設定資料夾：請用「切換根目錄」選一個。"
+  "Folder Space {0} has no folder yet: use Switch Root to pick one.": "資料夾空間 {0} 尚未設定資料夾：請用「切換根目錄」選一個。",
+  "N/A": "N/A",
+  "Level": "層級",
+  "Level 1": "層級 1",
+  "Level 2": "層級 2",
+  "All levels": "所有層級",
+  "Content": "內容",
+  "All items": "全部項目",
+  "Folders only": "僅資料夾",
+  "Files only": "僅檔案",
+  "Mode": "模式",
+  "Tree": "樹狀",
+  "Flat": "扁平",
+  "Preset": "預設集",
+  "Sort": "排序"
 }

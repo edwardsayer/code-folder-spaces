@@ -6,7 +6,6 @@ import { normalizeSpaceEntries } from './spaceConfig';
 
 const SECTION = 'codeFolderSpaces';
 const SPACES_KEY = 'spaces';
-const SHOW_FILES_KEY = 'view.showFiles';
 
 function samePath(a: string, b: string): boolean {
   const left = path.normalize(a);
@@ -26,10 +25,8 @@ export class SpaceStore implements vscode.Disposable {
 
   constructor() {
     this._configurationListener = vscode.workspace.onDidChangeConfiguration((event) => {
-      if (
-        event.affectsConfiguration(`${SECTION}.${SPACES_KEY}`) ||
-        event.affectsConfiguration(`${SECTION}.${SHOW_FILES_KEY}`)
-      ) {
+      // S4.1R20：`view.showFiles` 設定已移除，僅監聽 spaces 清單變更。
+      if (event.affectsConfiguration(`${SECTION}.${SPACES_KEY}`)) {
         this._onDidChange.fire();
       }
     });
@@ -45,7 +42,9 @@ export class SpaceStore implements vscode.Disposable {
   getDefinitions(): SpaceDefinition[] {
     const configuration = vscode.workspace.getConfiguration(SECTION);
     const entries = configuration.get<SpaceConfigEntry[]>(SPACES_KEY, []);
-    const showFiles = configuration.get<boolean>(SHOW_FILES_KEY, true);
+    // S4.1R20（使用者）：移除 `view.showFiles` 設定。顯示與否改由每個 pane 的 preset
+    // 的 content 維度（all / folders / files）決定；這裡固定 true 保留 legacy 欄位相容性。
+    const showFiles = true;
     return normalizeSpaceEntries(
       entries,
       {

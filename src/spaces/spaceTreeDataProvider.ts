@@ -22,6 +22,13 @@ export type SpaceNode = SpaceRootNode | SpaceEntryNode;
 /** Supplies the parent-side follow marker for a folder row. */
 export type PaneLinkMarkerProvider = (paneId: string, fsPath: string) => string | undefined;
 
+/**
+ * S4.1R20：Explorer 等價的可見性判斷。
+ * 回傳 true 表示該項目應被隱藏（依 files.exclude 與 explorer.excludeGitIgnore）。
+ * 路徑以「相對於 pane root、斜線分隔、無前導斜線」傳入。
+ */
+export type ExplorerVisibilityProvider = (relativePath: string, isDirectory: boolean) => boolean;
+
 /** Apply an injected pane-link marker to a folder tree item without touching other item fields. */
 export function applyPaneLinkMarker<T extends { description?: string | boolean }>(
   item: T,
@@ -210,6 +217,9 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   private _generation = 0;
   private _disposed = false;
   private _paneLinkMarkerProvider?: PaneLinkMarkerProvider;
+  /** S4.1R20：跟隨 Explorer 隱藏規則（files.exclude 與 explorer.excludeGitIgnore）。
+   *  未注入時不套用任何額外隱藏（保留既有行為）。 */
+  explorerVisibility?: ExplorerVisibilityProvider;
   /** S4.1R17：扁平列舉最大遞歸深度（設定 `codeFolderSpaces.maxDepth`，預設 10）。 */
   maxDepth = DEFAULT_FLAT_MAX_DEPTH;
   filterMessage = '';
@@ -301,6 +311,11 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
 
   getParent(element: SpaceNode): SpaceNode | undefined {
     return element.parent;
+  }
+
+  /** S4.1R20：Explorer 等價隱藏（files.exclude + explorer.excludeGitIgnore）。 */
+  private _hiddenByExplorer(relativePath: string, isDirectory: boolean): boolean {
+    return this.explorerVisibility ? this.explorerVisibility(relativePath, isDirectory) : false;
   }
 
   private _paneState(): PaneTreeState | undefined {
@@ -603,12 +618,13 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
       const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
       const uri = vscode.Uri.joinPath(element.uri, name);
       if (type & vscode.FileType.Directory) {
-        if (!isVisibleDirectory(name, relativePath, space.exclude)) {
+        if (!isVisibleDirectory(name, relativePath, space.exclude) || this._hiddenByExplorer(relativePath, true)) {
           continue;
         }
         directories.push({ name, uri, relativePath });
       } else if (type & vscode.FileType.File) {
-        if (settings.content === 'folders' || !space.showFiles || !isVisibleFile(name, relativePath, space.include, space.exclude)) {
+        if (settings.content === 'folders' || !space.showFiles || !isVisibleFile(name, relativePath, space.include, space.exclude)
+          || this._hiddenByExplorer(relativePath, false)) {
           continue;
         }
         fileCandidates.push({ name, uri });
@@ -680,9 +696,10 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
         const relativePath = parentRelative ? `${parentRelative}/${name}` : name;
         const uri = vscode.Uri.joinPath(parentUri, name);
         if (type & vscode.FileType.Directory) {
-          if (isVisibleDirectory(name, relativePath, space.exclude)) result.push({ value: uri, isDirectory: true });
+          if (isVisibleDirectory(name, relativePath, space.exclude) && !this._hiddenByExplorer(relativePath, true)) result.push({ value: uri, isDirectory: true });
         } else if (type & vscode.FileType.File) {
-          if (content !== 'folders' && space.showFiles && isVisibleFile(name, relativePath, space.include, space.exclude)) {
+          if (content !== 'folders' && space.showFiles && isVisibleFile(name, relativePath, space.include, space.exclude)
+            && !this._hiddenByExplorer(relativePath, false)) {
             result.push({ value: uri, isDirectory: false });
           }
         }

@@ -43,10 +43,8 @@
   "configuration.spaces.path.description": "資料夾路徑（絕對路徑或使用支援的變數）。",
   "configuration.spaces.name.description": "此空間的顯示名稱（預設為資料夾名稱）。",
   "configuration.spaces.icon.description": "選用的 ThemeIcon id 或 SVG/PNG 圖示的絕對路徑。",
-  "configuration.spaces.showFiles.description": "此空間是否在樹中顯示檔案（覆寫全域設定）。",
   "configuration.spaces.include.description": "選用的 glob 樣式；僅顯示符合的檔案。",
   "configuration.spaces.exclude.description": "選用的 glob 樣式；符合的檔案與資料夾將被隱藏。",
-  "configuration.showFiles.description": "僅影響**新建立**的資料夾空間：是否在資料夾之外一併列出檔案。每個空間各自保留自己的值；既有空間請用「…」選單的「內容」切換顯示範圍（全部／資料夾／檔案）。",
   "capabilities.untrustedWorkspaces.description": "受限模式（Restricted Mode）下可瀏覽、開啟與複製路徑；新增、重新命名、刪除及其他會修改磁碟的操作在工作區受信任前停用。",
   "capabilities.virtualWorkspaces.description": "資料夾空間目前需要本機資料夾路徑；尚不支援虛擬工作區。",
   "command.newFile.title": "新增檔案",
@@ -126,5 +124,10 @@
   "command.root.remove.title": "從資料夾空間移除資料夾",
   "command.paneAction.toggleFollow.title": "切換跟隨父資料夾空間",
   "command.alignClickBehavior.title": "對齊點擊行為",
-  "command.resetClickBehavior.title": "重設點擊行為"
+  "command.resetClickBehavior.title": "重設點擊行為",
+  "command.paneAction.preset.title": "檢視預設集…",
+  "command.paneAction.level.title": "層級…",
+  "command.paneAction.content.title": "內容…",
+  "command.paneAction.sort.title": "排序…",
+  "configuration.spaces.showFiles.description": "每個空間是否在樹中顯示檔案（舊版欄位；功能已由「…」選單的「內容」取代）。"
 }
