@@ -27,6 +27,40 @@ export interface PaneLinkChainDescription {
   segments: PaneLinkChainSegment[];
 }
 
+/** 一組父子邊（S4.1R17／OP-22）：一個父窗格與它所有的直接子窗格。 */
+export interface PaneLinkEdgeGroup {
+  parentPaneIndex: number;
+  /** 直接子窗格的編號，升冪。 */
+  childPaneIndexes: number[];
+  /** 這些子窗格是否全部 follow（任一關閉則為 false）。 */
+  allFollow: boolean;
+}
+
+/**
+ * S4.1R17（OP-22 狀態列改版）：列出**所有**父子關係，每組只呈現「父→其直接子」這兩層。
+ * 回傳依父窗格編號升冪排序的邊組；無任何父子邊時回傳空陣列（呼叫端應隱藏狀態列）。
+ * 純邏輯層只回傳編號，UI 文字（`Folder Spaces: 1→2/3, 2→4`）由呼叫端組。
+ */
+export function describePaneLinkEdgeGroups(
+  links: Record<string, PaneLinkDisplayEntry>,
+): PaneLinkEdgeGroup[] {
+  const groups: PaneLinkEdgeGroup[] = [];
+  for (const parentId of Object.keys(links)) {
+    const parentIndex = paneNumber(parentId);
+    if (parentIndex < 1) continue;
+    const children = Object.keys(links)
+      .filter(id => links[id].parentPaneId === parentId && paneNumber(id) >= 1)
+      .sort((a, b) => paneNumber(a) - paneNumber(b));
+    if (!children.length) continue;
+    groups.push({
+      parentPaneIndex: parentIndex,
+      childPaneIndexes: children.map(paneNumber),
+      allFollow: children.every(id => links[id].follow),
+    });
+  }
+  return groups.sort((a, b) => a.parentPaneIndex - b.parentPaneIndex);
+}
+
 /** Build the primary pane's downward chain for a status-bar summary. */
 export function describePaneLinkChain(
   links: Record<string, PaneLinkDisplayEntry>,

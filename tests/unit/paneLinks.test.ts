@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   describePaneLinkChain,
+  describePaneLinkEdgeGroups,
   linkedChildPaneNumber,
   canClosePane,
   getFollowingChildPaneIds,
@@ -395,5 +396,53 @@ describe('reattachChildren (PD-U3, S4R6-D62/D71)', () => {
     expect(shouldSyncWorkspaceRoots([], ['D:/a'], same)).toBe(true);
     // 順序不同視為不同集合。
     expect(shouldSyncWorkspaceRoots(['D:/b', 'D:/a'], ['D:/a', 'D:/b'], same)).toBe(true);
+  });
+});
+
+describe('describePaneLinkEdgeGroups (S4.1R17 / OP-22 狀態列改版)', () => {
+  const make = (spec: Record<string, { parent: string | null; follow?: boolean }>) =>
+    Object.fromEntries(Object.entries(spec).map(([id, v]) => [id, { parentPaneId: v.parent, follow: v.follow ?? true }]));
+
+  it('returns every parent-child edge as one group per parent, sorted by parent index', () => {
+    const groups = describePaneLinkEdgeGroups(make({
+      pane1: { parent: null },
+      pane2: { parent: 'pane1' },
+      pane3: { parent: 'pane1' },
+      pane4: { parent: 'pane2' },
+    }));
+    expect(groups).toEqual([
+      { parentPaneIndex: 1, childPaneIndexes: [2, 3], allFollow: true },
+      { parentPaneIndex: 2, childPaneIndexes: [4], allFollow: true },
+    ]);
+  });
+
+  it('reports allFollow=false when any child stops following', () => {
+    const groups = describePaneLinkEdgeGroups(make({
+      pane1: { parent: null },
+      pane2: { parent: 'pane1', follow: true },
+      pane3: { parent: 'pane1', follow: false },
+    }));
+    expect(groups).toEqual([{ parentPaneIndex: 1, childPaneIndexes: [2, 3], allFollow: false }]);
+  });
+
+  it('returns an empty list when there is no parent-child edge', () => {
+    expect(describePaneLinkEdgeGroups(make({ pane1: { parent: null }, pane2: { parent: null } }))).toEqual([]);
+  });
+
+  it('lists independent trees side by side instead of only the primary chain', () => {
+    const groups = describePaneLinkEdgeGroups(make({
+      pane1: { parent: null }, pane2: { parent: 'pane1' },
+      pane3: { parent: null }, pane4: { parent: 'pane3' },
+    }));
+    expect(groups.map(g => g.parentPaneIndex)).toEqual([1, 3]);
+  });
+
+  it('ignores non-pane keys and dangling parents', () => {
+    const groups = describePaneLinkEdgeGroups({
+      pane1: { parentPaneId: null, follow: false },
+      bogus: { parentPaneId: 'pane1', follow: true },
+      pane3: { parentPaneId: 'pane9', follow: true },
+    });
+    expect(groups).toEqual([{ parentPaneIndex: 1, childPaneIndexes: [], allFollow: true }].slice(0, 0));
   });
 });

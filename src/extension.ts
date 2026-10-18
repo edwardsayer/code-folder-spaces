@@ -8,8 +8,8 @@ import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, resolveConfiguredDefaultChildPreset, resolveConfiguredCascadeParentPreset, type ViewAxisChange, type ViewContent, type ViewLevel, type ViewMode } from './spaces/viewPresets';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
-import { canClosePane, describePaneLinkChain, isPaneRootDirectory, linkedChildPaneNumber, nextChildPaneId, panesToSyncWorkspaceRoots } from './spaces/paneLinks';
-import { createLinkStatusSummary, LinkStatusBar } from './spaces/linkStatusBar';
+import { canClosePane, describePaneLinkEdgeGroups, isPaneRootDirectory, linkedChildPaneNumber, nextChildPaneId, panesToSyncWorkspaceRoots } from './spaces/paneLinks';
+import { createLinkStatusSummaryFromEdges, LinkStatusBar } from './spaces/linkStatusBar';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { PaneCascadeController } from './spaces/paneCascade';
 import { diffWatchers, planWatchers } from './spaces/watcherPlan';
@@ -543,14 +543,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const pane = viewState.get(id);
       return [id, { parentPaneId: pane.parentPaneId, follow: pane.follow, roots: pane.roots, drillRoot: pane.drillRoot }];
     }));
-    const chain = describePaneLinkChain(links, { mainPaneId: primaryPaneId() });
-    if (chain.hidden) return { visible: false, text: '', tooltip: '', follow: [] };
-    // check:project 只辨識字面形式；所有訊息在此逐字寫出，不經動態轉發。
-    const labels = chain.segments.map(segment => vscode.l10n.t('Folder Space {0}', segment.paneIndex));
-    const tooltip = chain.segments
-      .map((segment, index) => segment.follow || index === 0 ? labels[index] : vscode.l10n.t('{0} (follow off)', labels[index]))
-      .join(' → ');
-    return createLinkStatusSummary(labels, tooltip, chain.segments.slice(1).map(segment => segment.follow));
+    // S4.1R17（OP-22，使用者裁決）：列出**所有**父子關係，每組只呈現上下兩層。
+    // 格式：`Folder Spaces: 1→2/3, 2→4`（一父多子以 `/` 串接、多組以 `, ` 分隔）。
+    const groups = describePaneLinkEdgeGroups(links);
+    return createLinkStatusSummaryFromEdges(
+      groups,
+      index => String(index),
+      {
+        prefix: vscode.l10n.t('Folder Spaces:'),
+        separator: ', ',
+        childJoiner: '/',
+        arrow: '→',
+        followOff: line => vscode.l10n.t('{0} (follow off)', line),
+      },
+    );
   }, 'codeFolderSpaces.focusMainPane');
   context.subscriptions.push(linkStatusBar);
 
