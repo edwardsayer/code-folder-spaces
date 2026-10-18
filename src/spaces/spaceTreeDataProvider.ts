@@ -19,6 +19,21 @@ import { effectiveView, rootForUri, type PaneState, type PaneStateStore } from '
 
 export type SpaceNode = SpaceRootNode | SpaceEntryNode;
 
+/** Supplies the parent-side follow marker for a folder row. */
+export type PaneLinkMarkerProvider = (paneId: string, fsPath: string) => string | undefined;
+
+/** Apply an injected pane-link marker to a folder tree item without touching other item fields. */
+export function applyPaneLinkMarker<T extends { description?: string | boolean }>(
+  item: T,
+  paneId: string,
+  fsPath: string,
+  isFolder: boolean,
+  markerProvider?: PaneLinkMarkerProvider,
+): T {
+  if (isFolder && markerProvider) item.description = markerProvider(paneId, fsPath);
+  return item;
+}
+
 const DIRECTORY_CHILD_CHECK_CONCURRENCY = 16;
 
 /** F-42: file-nesting matching is case-insensitive on these platforms (spec §2). */
@@ -194,6 +209,7 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
   /** Listing generation: bumped on refresh／root switch／dispose so stale awaits cause no side effects (S4R7-D83). */
   private _generation = 0;
   private _disposed = false;
+  private _paneLinkMarkerProvider?: PaneLinkMarkerProvider;
   filterMessage = '';
 
   /**
@@ -205,9 +221,11 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     store: SpaceStore,
     private readonly _viewState?: PaneStateStore,
     scope?: PaneProviderScope,
-    directoryCache?: DirectoryCache
+    directoryCache?: DirectoryCache,
+    paneLinkMarkerProvider?: PaneLinkMarkerProvider
   ) {
     this._scope = scope;
+    this._paneLinkMarkerProvider = paneLinkMarkerProvider;
     this._ownsDirectoryCache = directoryCache === undefined;
     this._directoryCache = directoryCache ?? createDefaultDirectoryCache(() => {
       // Only a snapshot hint that actually changed triggers this, so one repaint converges (S4R7-D82).
@@ -268,8 +286,15 @@ export class SpaceTreeDataProvider implements vscode.TreeDataProvider<SpaceNode>
     await this._directoryCache.whenSettled();
   }
 
+  /** Set or replace the parent-side link marker callback, then repaint the tree. */
+  setPaneLinkMarkerProvider(provider: PaneLinkMarkerProvider | undefined): void {
+    this._paneLinkMarkerProvider = provider;
+    this.refresh();
+  }
+
   getTreeItem(element: SpaceNode): vscode.TreeItem {
-    return element;
+    const isFolder = element instanceof SpaceRootNode || (element instanceof SpaceEntryNode && element.isDirectory);
+    return applyPaneLinkMarker(element, element.paneId, element instanceof SpaceRootNode ? element.rootPath : element.uri.fsPath, isFolder, this._paneLinkMarkerProvider);
   }
 
   getParent(element: SpaceNode): SpaceNode | undefined {

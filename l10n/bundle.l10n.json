@@ -71,5 +71,7 @@
   "Select a folder from the root rows to remove it.": "Select a folder from the root rows to remove it.",
   "Click behavior is already set to double-click; no reset value was recorded.": "Click behavior is already set to double-click; no reset value was recorded.",
   "Click behavior records from other workspaces were skipped.": "Click behavior records from other workspaces were skipped.",
-  "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.": "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped."
+  "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.": "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.",
+  "{0} (follow off)": "{0} (follow off)",
+  "→ Folder Space {0}": "→ Folder Space {0}"
 }

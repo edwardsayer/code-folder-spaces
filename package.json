@@ -317,6 +317,11 @@
         "category": "%category.folderSpaces%"
       },
       {
+        "command": "codeFolderSpaces.focusMainPane",
+        "title": "%command.focusMainPane.title%",
+        "category": "%category.folderSpaces%"
+      },
+      {
         "command": "codeFolderSpaces.pane.addChild",
         "title": "%command.pane.addChild.title%",
         "icon": "$(symbol-interface)",
@@ -2094,6 +2099,10 @@
     ],
     "menus": {
       "commandPalette": [
+      {
+        "command": "codeFolderSpaces.focusMainPane",
+        "when": "false"
+      },
         {
           "command": "codeFolderSpaces.pane1.mode",
           "when": "false"

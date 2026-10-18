@@ -13,6 +13,7 @@
   "command.pane.add.title": "新增窗格...",
   "command.pane.remove.title": "移除窗格",
   "command.pane.resetLayout.title": "重設窗格配置",
+  "command.focusMainPane.title": "聚焦資料夾空間",
   "command.pane.addChild.title": "啟用子資料夾空間",
   "command.pane.setRoot.title": "設定資料夾空間根目錄",
   "command.pane.toggleFollow.title": "切換跟隨父窗格",

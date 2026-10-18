@@ -13,6 +13,7 @@
   "command.pane.add.title": "Add Pane...",
   "command.pane.remove.title": "Remove Pane",
   "command.pane.resetLayout.title": "Reset Pane Layout",
+  "command.focusMainPane.title": "Focus Folder Space",
   "command.pane.addChild.title": "Activate Child Space",
   "command.pane.setRoot.title": "Set Folder Space Root",
   "command.pane.toggleFollow.title": "Toggle Parent Follow",

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  describePaneLinkChain,
+  linkedChildPaneNumber,
   canClosePane,
   getFollowingChildPaneIds,
   hasValidPaneLinks,
@@ -14,6 +16,7 @@ import {
   shouldSyncWorkspaceDirectory,
   wouldCreateCycle,
 } from '../../src/spaces/paneLinks';
+import type { PaneLinkDisplayEntry } from '../../src/spaces/paneLinks';
 import type { PaneLinkState } from '../../src/spaces/viewState';
 
 const chain = (count: number): Record<string, PaneLinkState> => Object.fromEntries(Array.from({ length: count }, (_, index) => [`pane${index + 1}`, {
@@ -35,6 +38,58 @@ function assertNoOrphansAndChains(panes: Record<string, { parentPaneId: string |
     }
   }
 }
+
+describe('pane link display helpers (R13)', () => {
+  const makeLinks = (count: number): Record<string, PaneLinkState> => Object.fromEntries(
+    Array.from({ length: count }, (_, index) => [`pane${index + 1}`, {
+      root: `/space/${index + 1}`, parentPaneId: index ? `pane${index}` : null, follow: index > 0,
+    }]),
+  );
+
+  it('hides an unlinked chain and describes single- and multi-link chains', () => {
+    expect(describePaneLinkChain(makeLinks(1), { mainPaneId: 'pane1' })).toEqual({ hidden: true, segments: [] });
+    const one = describePaneLinkChain(makeLinks(2), { mainPaneId: 'pane1' });
+    expect(one.hidden).toBe(false);
+    expect(one.segments.map(segment => segment.paneIndex)).toEqual([1, 2]);
+    const three = describePaneLinkChain(makeLinks(3), { mainPaneId: 'pane1' });
+    expect(three.segments.map(segment => segment.paneId)).toEqual(['pane1', 'pane2', 'pane3']);
+  });
+
+  it('marks paused links, safely truncates cycles and enforces the depth limit', () => {
+    const paused = makeLinks(2);
+    paused.pane2.follow = false;
+    expect(describePaneLinkChain(paused, { mainPaneId: 'pane1' }).segments[1].icon).toBe('debug-disconnect');
+    const cycle = makeLinks(3);
+    cycle.pane1.parentPaneId = 'pane3';
+    expect(describePaneLinkChain(cycle, { mainPaneId: 'pane1' }).segments).toHaveLength(3);
+    expect(describePaneLinkChain(makeLinks(4), { mainPaneId: 'pane1', maxDepth: 2 }).segments).toHaveLength(2);
+    expect(describePaneLinkChain(makeLinks(2), { mainPaneId: 'pane8' })).toEqual({ hidden: true, segments: [] });
+  });
+
+  it('marks only the direct following child that targets the candidate root', () => {
+    const links: Record<string, PaneLinkState> = {
+      pane1: { root: '/parent', parentPaneId: null, follow: false },
+      pane2: { root: '/target', parentPaneId: 'pane1', follow: true },
+      pane3: { root: '/target', parentPaneId: 'pane1', follow: true },
+    };
+    expect(linkedChildPaneNumber(links, 'pane1', 'pane2', '/target')).toBe(2);
+    expect(linkedChildPaneNumber(links, 'pane1', 'pane2', '/elsewhere')).toBeUndefined();
+    links.pane2.follow = false;
+    expect(linkedChildPaneNumber(links, 'pane1', 'pane2', '/target')).toBeUndefined();
+    expect(linkedChildPaneNumber(links, 'pane3', 'pane2', '/target')).toBeUndefined();
+  });
+
+  it('uses active drilled roots and supports multiple roots without confusing sibling panes', () => {
+    const links: Record<string, PaneLinkDisplayEntry> = {
+      pane1: { root: '/parent', parentPaneId: null, follow: false },
+      pane2: { roots: ['/first', '/second'], drillRoot: '/drilled', parentPaneId: 'pane1', follow: true },
+      pane3: { roots: ['/second'], parentPaneId: null, follow: false },
+    };
+    expect(linkedChildPaneNumber(links, 'pane1', 'pane2', '/drilled')).toBe(2);
+    expect(linkedChildPaneNumber(links, 'pane1', 'pane2', '/second')).toBe(2);
+    expect(linkedChildPaneNumber(links, 'pane1', 'pane3', '/second')).toBeUndefined();
+  });
+});
 
 describe('pane links', () => {
   it('selects only panes whose workspace roots need synchronization in pane order', () => {

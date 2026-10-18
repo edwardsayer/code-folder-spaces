@@ -1,8 +1,82 @@
+import * as path from 'node:path';
+
 const MAX_PANE_COUNT = 8;
 
 /** Minimal chain shape both `PaneLinkState` views and full `PaneState` records satisfy. */
 type PaneChainEntry = { parentPaneId: string | null };
 type PaneFollowEntry = PaneChainEntry & { follow: boolean };
+
+export interface PaneLinkDisplayEntry {
+  parentPaneId: string | null;
+  follow: boolean;
+  root?: string | null;
+  roots?: readonly string[];
+  drillRoot?: string | null;
+}
+
+export interface PaneLinkChainSegment {
+  paneId: string;
+  /** 1..8 的窗格編號；顯示文字由呼叫端以 l10n 產生（純邏輯層不產生 UI 字串）。 */
+  paneIndex: number;
+  follow: boolean;
+  icon: 'link' | 'debug-disconnect';
+}
+
+export interface PaneLinkChainDescription {
+  hidden: boolean;
+  segments: PaneLinkChainSegment[];
+}
+
+/** Build the primary pane's downward chain for a status-bar summary. */
+export function describePaneLinkChain(
+  links: Record<string, PaneLinkDisplayEntry>,
+  options: { mainPaneId: string; maxDepth?: number },
+): PaneLinkChainDescription {
+  const hidden = (): PaneLinkChainDescription => ({ hidden: true, segments: [] });
+  if (!links[options.mainPaneId]) return hidden();
+  const maxDepth = Math.min(MAX_PANE_COUNT, Math.max(1, Math.floor(options.maxDepth ?? MAX_PANE_COUNT)));
+  const segments: PaneLinkChainSegment[] = [];
+  const visited = new Set<string>();
+  let current: string | undefined = options.mainPaneId;
+  while (current && segments.length < maxDepth) {
+    if (visited.has(current)) return segments.length > 1 ? { hidden: false, segments } : hidden();
+    const entry = links[current];
+    if (!entry) break;
+    visited.add(current);
+    segments.push({ paneId: current, paneIndex: paneNumber(current), follow: segments.length === 0 ? true : entry.follow,
+      icon: segments.length === 0 || entry.follow ? 'link' : 'debug-disconnect' });
+    const child = Object.keys(links).filter(id => links[id].parentPaneId === current)
+      .sort((a, b) => paneNumber(a) - paneNumber(b))[0];
+    if (!child) break;
+    current = child;
+  }
+  return segments.length > 1 ? { hidden: false, segments } : hidden();
+}
+
+/**
+ * 回傳「該列正被哪個 follow 中的子窗格連動」的子窗格編號（1..8），否則 undefined。
+ * 只回傳資料、不組 UI 字串：description 文字由呼叫端以 l10n 產生。
+ */
+export function linkedChildPaneNumber(
+  links: Record<string, PaneLinkDisplayEntry>, parentPaneId: string, candidatePaneId: string, candidatePath: string,
+): number | undefined {
+  const child = links[candidatePaneId];
+  if (!child || child.parentPaneId !== parentPaneId || !child.follow) return undefined;
+  const active = child.drillRoot ?? child.roots?.[0] ?? child.root ?? null;
+  const targets = [active, ...(child.roots ?? [])].filter((root): root is string => typeof root === 'string');
+  return targets.some(root => sameLinkPath(root, candidatePath)) ? paneNumber(candidatePaneId) : undefined;
+}
+
+function sameLinkPath(left: string, right: string): boolean {
+  const a = path.normalize(left);
+  const b = path.normalize(right);
+  return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
+function paneNumber(id: string): number {
+  const match = /^pane([1-8])$/.exec(id);
+  return match ? Number(match[1]) : 0;
+}
 
 /** True when assigning childPaneId to parentPaneId violates the pane chain; only a newly allocated id (absent from state) makes a new cycle impossible, never an empty root. */
 export function wouldCreateCycle(links: Record<string, PaneChainEntry>, parentPaneId: string, childPaneId: string): boolean {

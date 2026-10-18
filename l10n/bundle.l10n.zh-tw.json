@@ -71,5 +71,7 @@
   "Select a folder from the root rows to remove it.": "請從根目錄列選取資料夾以移除。",
   "Click behavior is already set to double-click; no reset value was recorded.": "點擊行為已設為雙擊；未記錄可重設的原值。",
   "Click behavior records from other workspaces were skipped.": "已略過來自其他工作區的點擊行為記錄。",
-  "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.": "已還原先前的點擊行為設定，並略過來自其他工作區的記錄。"
+  "The previous click behavior setting was restored. Click behavior records from other workspaces were skipped.": "已還原先前的點擊行為設定，並略過來自其他工作區的記錄。",
+  "{0} (follow off)": "{0}（未跟隨）",
+  "→ Folder Space {0}": "→ 資料夾空間 {0}"
 }

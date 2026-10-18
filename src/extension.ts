@@ -8,7 +8,8 @@ import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, resolveConfiguredDefaultChildPreset, resolveConfiguredCascadeParentPreset, type ViewAxisChange, type ViewContent, type ViewLevel, type ViewMode } from './spaces/viewPresets';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
-import { canClosePane, isPaneRootDirectory, nextChildPaneId, panesToSyncWorkspaceRoots } from './spaces/paneLinks';
+import { canClosePane, describePaneLinkChain, isPaneRootDirectory, linkedChildPaneNumber, nextChildPaneId, panesToSyncWorkspaceRoots } from './spaces/paneLinks';
+import { createLinkStatusSummary, LinkStatusBar } from './spaces/linkStatusBar';
 import { PaneCascadeController } from './spaces/paneCascade';
 import { diffWatchers, planWatchers } from './spaces/watcherPlan';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
@@ -155,6 +156,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   }));
 
   const paneRuntime = new Map<string, PaneRuntime>();
+
+  /** S4.1R13：只重繪指定的 pane（避免全樹重繪）；重複 id 去重、null／undefined 忽略。
+   *  宣告提前至 cascadeController 之前，供其 switchRoot callback（延遲執行）安全引用。 */
+  const refreshLinkRows = (...paneIds: Array<string | null | undefined>): void => {
+    for (const paneId of new Set(paneIds.filter((id): id is string => Boolean(id)))) {
+      paneRuntime.get(paneId)?.provider.refresh();
+    }
+  };
+
+  /** 子窗格鏈結變更後，重繪它的父窗格（父列上的「→ Folder Space n」標記所在）。 */
+  const refreshParentLinkRow = (childPaneId: string, previousParent?: string | null): void => {
+    refreshLinkRows(previousParent, viewState.getEnabledPaneIds().includes(childPaneId)
+      ? viewState.get(childPaneId).parentPaneId : undefined);
+  };
   const cascadeDisposables = new Map<string, vscode.Disposable>();
   const cascadeController = new PaneCascadeController({
     state: {
@@ -165,6 +180,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         applyPaneScope(paneId);
         rebuildWatchers();
         await syncPaneContexts();
+        refreshParentLinkRow(paneId);
       },
       // S4.1R11-D6：守門以父 pane 的**全部** root 判定（審查 P1-2），
       // 否則多 root pane 選取 roots[1..N] 內的資料夾時 follow 不會連動。
@@ -259,7 +275,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   const createPane = (paneId: string): PaneRuntime => {
     // 第 4 參注入共享 cache（W2 凍結的簽名：store, viewState, scope?, directoryCache?）；注入時 provider 不 dispose 它。
-    const provider = new SpaceTreeDataProvider(store, viewState, undefined, directoryCache);
+    // 第 5 參（S4.1R13）：父側鏈路標記；僅 follow 子窗格目前指向的資料夾會標示。
+    const provider = new SpaceTreeDataProvider(store, viewState, undefined, directoryCache, (parentPaneId, fsPath) => {
+      const links = Object.fromEntries(viewState.getEnabledPaneIds().map(id => {
+        const pane = viewState.get(id);
+        return [id, { parentPaneId: pane.parentPaneId, follow: pane.follow, roots: pane.roots, drillRoot: pane.drillRoot }];
+      }));
+      for (const [childPaneId, link] of Object.entries(links)) {
+        if (link.parentPaneId !== parentPaneId) continue;
+        const childNumber = linkedChildPaneNumber(links, parentPaneId, childPaneId, fsPath);
+        // 純邏輯層只回傳編號；UI 文字在此以 l10n 產生。
+        if (childNumber !== undefined) return vscode.l10n.t('→ Folder Space {0}', childNumber);
+      }
+      return undefined;
+    });
     const treeView = vscode.window.createTreeView(`codeFolderSpaces.${paneId}`, {
       treeDataProvider: provider,
       showCollapseAll: false, // S4.1R4：改用自訂「收合全部／展開」切換按鈕（paneN.collapseAll／expandAll）
@@ -391,6 +420,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canRemovePane', enabled.length > 1);
     // S4.1R3：pane1 可關閉，其 `when` 改為 `!layoutReady || pane1.enabled`；啟動後才為 true，確保冷啟動時 pane1 恆可見（S4R6-D77）。
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.layoutReady', true);
+    linkStatusBar?.update();
     await reconcileAdaptiveParents();
   };
 
@@ -424,6 +454,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     applyPaneScope(paneId);
     rebuildWatchers();
     await syncPaneContexts();
+    refreshParentLinkRow(paneId);
     await reconcilePaneRoots();
     await syncContext();
   };
@@ -433,6 +464,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     void syncContext();
   };
 
+  /** S4.1R13：只重繪指定的 pane（避免全樹重繪）；重複 id 去重、null／undefined 忽略。 */
   const repaintAllPanes = (): void => {
     for (const runtime of paneRuntime.values()) runtime.provider.refresh();
     void syncContext();
@@ -479,6 +511,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   // S4.1R3：pane1 可關閉，原本寫死 pane1 的全域命令／follow 改以「主 pane」（最低編號啟用窗格）為標的。
   const primaryPaneId = (): string => viewState.getEnabledPaneIds()[0] ?? 'pane1';
   const pane1 = (): PaneRuntime | undefined => paneRuntime.get(primaryPaneId());
+  // S4.1R13：以 let 宣告，允許 syncPaneContexts（定義於上方）在賦值前呼叫時安全跳過（避免 TDZ）。
+  let linkStatusBar: LinkStatusBar | undefined;
+  linkStatusBar = new LinkStatusBar(() => {
+    const links = Object.fromEntries(viewState.getEnabledPaneIds().map(id => {
+      const pane = viewState.get(id);
+      return [id, { parentPaneId: pane.parentPaneId, follow: pane.follow, roots: pane.roots, drillRoot: pane.drillRoot }];
+    }));
+    const chain = describePaneLinkChain(links, { mainPaneId: primaryPaneId() });
+    if (chain.hidden) return { visible: false, text: '', tooltip: '', follow: [] };
+    // check:project 只辨識字面形式；所有訊息在此逐字寫出，不經動態轉發。
+    const labels = chain.segments.map(segment => vscode.l10n.t('Folder Space {0}', segment.paneIndex));
+    const tooltip = chain.segments
+      .map((segment, index) => segment.follow || index === 0 ? labels[index] : vscode.l10n.t('{0} (follow off)', labels[index]))
+      .join(' → ');
+    return createLinkStatusSummary(labels, tooltip, chain.segments.slice(1).map(segment => segment.follow));
+  }, 'codeFolderSpaces.focusMainPane');
+  context.subscriptions.push(linkStatusBar);
 
   /**
    * D84：reveal 前等待已開始的列舉收斂。whenSettled 內部已吸收 rejection，理論不 reject；
@@ -955,6 +1004,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const pane = viewState.get(paneId);
     if (!pane.parentPaneId) return;
     await viewState.setPaneParent(paneId, pane.parentPaneId, !pane.follow);
+    refreshParentLinkRow(paneId);
     await syncPaneContexts();
   };
 
@@ -1025,6 +1075,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       return;
     }
     syncPaneViews();
+    // 標記出現在父 pane（paneId）的列上，必須刷新父自己。
+    refreshLinkRows(paneId);
     await syncPaneContexts();
     await reconcilePaneRoots();
     await syncContext();
@@ -1036,8 +1088,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const target = paneId ?? enabled[enabled.length - 1];
     // 審查 F-11：關閉守門抽為純函式（`canClosePane`）以便單元測試。
     if (!target || !canClosePane(target, enabled)) return;
+    const removed = viewState.get(target);
+    // 被關閉窗格的父為唯一受影響列（子窗格重掛後仍指向同一個父）。
+    const affectedParentIds = [removed.parentPaneId];
     await viewState.disablePane(target);
     syncPaneViews();
+    refreshLinkRows(...affectedParentIds);
     await syncPaneContexts();
     await reconcilePaneRoots();
     await syncContext();
@@ -1180,6 +1236,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   // --- commands --------------------------------------------------------------
 
   context.subscriptions.push(
+    // S4.1R13：狀態列點擊目標（manifest 已註冊並在 commandPalette 隱藏）。
+    vscode.commands.registerCommand('codeFolderSpaces.focusMainPane', async () => {
+      const runtime = paneRuntime.get(primaryPaneId());
+      if (!runtime) return;
+      const [root] = await runtime.provider.getChildren();
+      if (root) void runtime.treeView.reveal(root, { select: false, focus: true, expand: false });
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.alignClickBehavior', async () => {
       const confirmation = vscode.l10n.t('Align Click Behavior');
       const accepted = await vscode.window.showWarningMessage(
