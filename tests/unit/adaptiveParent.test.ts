@@ -60,9 +60,9 @@ describe('OP-13 接龍自適應父面板模式與四項原版設定 (Adaptive pa
 
   it('父面板處於自訂組合時，自適應模式同樣能完整備份並精確還原自訂 view', async () => {
     const { store } = await createStore();
-    // 設為自訂組合 (flat + all + level 1)
+    // 設為自訂組合（必須是**不命中**任何預設集的組合；OP-21 後 `flat+1+all` 已成為 `Items`，故改用 flat+2+all）
     await store.setViewAxis('pane1', { axis: 'mode', value: 'flat' });
-    await store.setViewAxis('pane1', { axis: 'level', value: 1 });
+    await store.setViewAxis('pane1', { axis: 'level', value: 2 });
     expect(store.get('pane1').view).toBeDefined();
 
     // 進入自適應
@@ -72,6 +72,6 @@ describe('OP-13 接龍自適應父面板模式與四項原版設定 (Adaptive pa
 
     // 還原
     await store.handleAdaptiveCascadeParent('pane1', false);
-    expect(store.get('pane1').view).toEqual({ mode: 'flat', level: 1, content: 'all' });
+    expect(store.get('pane1').view).toEqual({ mode: 'flat', level: 2, content: 'all' });
   });
 });

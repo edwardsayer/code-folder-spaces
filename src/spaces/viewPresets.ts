@@ -1,7 +1,7 @@
 export type ViewMode = 'tree' | 'flat';
 export type ViewLevel = 1 | 2 | 'all';
 export type ViewContent = 'all' | 'folders' | 'files';
-export type ViewPresetName = 'Explorer' | 'Navigate' | 'Columns' | 'Context' | 'Contents' | 'Files' | 'List';
+export type ViewPresetName = 'Explorer' | 'Navigate' | 'Columns' | 'Context' | 'Contents' | 'Files' | 'List' | 'Items';
 
 export interface ViewPreset {
   readonly mode: ViewMode;
@@ -17,6 +17,8 @@ export const VIEW_PRESETS: Readonly<Record<ViewPresetName, ViewPreset>> = {
   Contents: { mode: 'flat', level: 'all', content: 'all' },
   Files: { mode: 'flat', level: 'all', content: 'files' },
   List: { mode: 'flat', level: 1, content: 'files' },
+  // OP-21（S4.1R14）：第一層扁平清單，資料夾與檔案全列——補足既有 7 個預設集未涵蓋的組合。
+  Items: { mode: 'flat', level: 1, content: 'all' },
 };
 
 export const DEFAULT_VIEW_PRESET: ViewPresetName = 'Explorer';

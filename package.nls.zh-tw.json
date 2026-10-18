@@ -101,6 +101,7 @@
   "command.paneAction.preset.Contents.title": "內容清單",
   "command.paneAction.preset.Files.title": "檔案",
   "command.paneAction.preset.List.title": "清單",
+  "command.paneAction.preset.Items.title": "項目",
   "command.paneAction.level.1.title": "一層",
   "command.paneAction.level.2.title": "兩層",
   "command.paneAction.level.all.title": "全部層級",

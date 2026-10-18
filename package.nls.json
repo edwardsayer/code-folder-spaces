@@ -101,6 +101,7 @@
   "command.paneAction.preset.Contents.title": "Contents",
   "command.paneAction.preset.Files.title": "Files",
   "command.paneAction.preset.List.title": "List",
+  "command.paneAction.preset.Items.title": "Items",
   "command.paneAction.level.1.title": "1 Level",
   "command.paneAction.level.2.title": "2 Levels",
   "command.paneAction.level.all.title": "All Levels",

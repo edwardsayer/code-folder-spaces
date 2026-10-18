@@ -4,7 +4,7 @@ import { applyViewAxis, isViewSettings, matchPresetName, VIEW_PRESETS } from '..
 import { effectiveView, normalizePaneState, PaneStateStore, PANE_STATE_KEY } from '../../src/spaces/viewState';
 
 describe('view presets and state', () => {
-  it('maps all seven presets to their designed mode, level, and content', () => {
+  it('maps all eight presets to their designed mode, level, and content', () => {
     expect(VIEW_PRESETS).toEqual({
       Explorer: { mode: 'tree', level: 'all', content: 'all' },
       Navigate: { mode: 'tree', level: 'all', content: 'folders' },
@@ -13,7 +13,19 @@ describe('view presets and state', () => {
       Contents: { mode: 'flat', level: 'all', content: 'all' },
       Files: { mode: 'flat', level: 'all', content: 'files' },
       List: { mode: 'flat', level: 1, content: 'files' },
+      // OP-21（S4.1R14）：補齊 flat + 1 + all，與 List（flat + 1 + files）區分。
+      Items: { mode: 'flat', level: 1, content: 'all' },
     });
+  });
+
+  it('OP-21: Items is distinct from List and is the only flat + level 1 + all combination', () => {
+    expect(VIEW_PRESETS.Items).not.toEqual(VIEW_PRESETS.List);
+    expect(matchPresetName({ mode: 'flat', level: 1, content: 'all' })).toBe('Items');
+    // 既有組合不得被 Items 搶走
+    expect(matchPresetName({ mode: 'flat', level: 1, content: 'files' })).toBe('List');
+    expect(matchPresetName({ mode: 'flat', level: 'all', content: 'all' })).toBe('Contents');
+    // flat + 2 + all 仍為自訂組合（不落在任何預設集）
+    expect(matchPresetName({ mode: 'flat', level: 2, content: 'all' })).toBeUndefined();
   });
 
   it('normalizes missing, wrong-version, and malformed per-pane fields independently', () => {
