@@ -301,7 +301,7 @@ export async function withPaneCascade<T>(
     };
 
     const adapter: PaneCascadeStateAdapter = {
-      getPaneLinks: () => state.getPaneLinks(),
+      getMode: () => state.getMode(),
       switchRoot: async (paneId: string, root: string) => {
         await state.switchRoot(paneId, root);
         sync(paneId);

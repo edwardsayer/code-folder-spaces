@@ -81,7 +81,7 @@ export class PaneStateStore extends LayoutStore {
   }
 
   async resetToDefaults(ctx: LayoutInitContext): Promise<void> {
-    await this.initialize(ctx);
+    this.setContext(ctx);
     await this.reset();
   }
 }

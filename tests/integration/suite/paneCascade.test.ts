@@ -174,8 +174,8 @@ suite('pane cascade integration', () => {
       const writeRoots: Array<string | null> = [];
       const gatedAdapter: PaneCascadeStateAdapter = {
         getPaneRoots: (paneId: string) => state.get(paneId).roots,
-        getPaneLinks: () => {
-          const result = adapter.getPaneLinks();
+        getMode: () => {
+          const result = adapter.getMode();
           if (secondStatComplete && !notifiedQueued) {
             notifiedQueued = true;
             // getPaneLinks 在 enqueue 操作之前呼叫；microtask 令同步 enqueue 完成後再解鎖首筆寫入。
@@ -237,7 +237,7 @@ suite('pane cascade integration', () => {
         const statStarted = new Promise<void>(resolve => { startedStat = resolve; });
         // 用不帶 scope 同步的 adapter：若守門失效，延後寫入會真的落地並被下面斷言抓到。
         const delayed = createController({
-          getPaneLinks: () => state.getPaneLinks(),
+          getMode: () => state.getMode(),
           switchRoot: async (paneId, root) => await state.switchRoot(paneId, root),
           getPaneRoots: (paneId: string) => state.get(paneId).roots,
         }, {
@@ -274,7 +274,7 @@ suite('pane cascade integration', () => {
       const statStarted = new Promise<void>(resolve => { startedStat = resolve; });
       let controllerWrites = 0;
       const removable = createController({
-        getPaneLinks: () => state.getPaneLinks(),
+        getMode: () => state.getMode(),
         switchRoot: async (paneId, root) => {
           controllerWrites++;
           await state.switchRoot(paneId, root);

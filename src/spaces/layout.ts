@@ -183,8 +183,12 @@ export class LayoutStore {
     this.document = normalizeLayout(memento.get<unknown>(LAYOUT_KEY)) ?? undefined;
   }
 
-  async initialize(ctx: LayoutInitContext): Promise<LayoutInitOutcome> {
+  setContext(ctx: LayoutInitContext): void {
     this.context = { ...ctx };
+  }
+
+  async initialize(ctx: LayoutInitContext): Promise<LayoutInitOutcome> {
+    this.setContext(ctx);
     const stored = this.memento.get<unknown>(LAYOUT_KEY);
     const normalized = normalizeLayout(stored);
     if (normalized) {

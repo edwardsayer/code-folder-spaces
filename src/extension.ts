@@ -191,20 +191,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 
   /** 子窗格鏈結變更後，重繪它的父窗格（父列上的「→ Folder Space n」標記所在）。 */
-  const refreshParentLinkRow = (childPaneId: string, previousParent?: string | null): void => {
-    refreshLinkRows(previousParent, viewState.getPaneLinks()[childPaneId]?.parentPaneId);
-  };
+  const refreshParentLinkRow = (): void => refreshLinkRows('pane1');
   const cascadeDisposables = new Map<string, vscode.Disposable>();
   const cascadeController = new PaneCascadeController({
     state: {
-      getPaneLinks: () => viewState.getPaneLinks(),
+      getMode: () => viewState.getMode(),
       // D74：父 pane 每次選取不同資料夾時寫入子 root（手動值自然被取代），不關閉 follow。
       switchRoot: async (paneId, root) => {
         await viewState.switchRoot(paneId, root);
         applyPaneScope(paneId);
         rebuildWatchers();
         await syncPaneContexts();
-        refreshParentLinkRow(paneId);
+        refreshParentLinkRow();
       },
       // S4.1R11-D6：守門以父 pane 的**全部** root 判定（審查 P1-2），
       // 否則多 root pane 選取 roots[1..N] 內的資料夾時 follow 不會連動。
@@ -399,17 +397,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
 
   const syncPaneContexts = async (): Promise<void> => {
-    const links = viewState.getPaneLinks();
     const enabled = new Set(viewState.getEnabledPaneIds());
     for (let index = 1; index <= MAX_PANE_INDEX; index++) {
       const id = `pane${index}`;
       const active = enabled.has(id);
-      const pane = active ? links[id] : undefined;
+      const pane = active ? viewState.get(id) : undefined;
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.enabled`, active);
-      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasRoot`, Boolean(pane && viewState.get(id).roots.length > 0));
-      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.canRemoveRoot`, Boolean(pane && viewState.get(id).roots.length > 1));
-      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasParent`, Boolean(pane?.parentPaneId));
-      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.follow`, Boolean(pane?.follow));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasRoot`, Boolean(pane && pane.roots.length > 0));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.canRemoveRoot`, Boolean(pane && pane.roots.length > 1));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasParent`, id === 'pane2' && active);
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.follow`, id === 'pane2' && active);
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasChild`, active && id === 'pane1' && enabled.has('pane2'));
     }
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', viewState.getMode());
@@ -449,7 +446,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     applyPaneScope(paneId);
     rebuildWatchers();
     await syncPaneContexts();
-    refreshParentLinkRow(paneId);
+    refreshParentLinkRow();
     await reconcilePaneRoots();
     await syncContext();
   };
@@ -509,12 +506,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   // S4.1R13：以 let 宣告，允許 syncPaneContexts（定義於上方）在賦值前呼叫時安全跳過（避免 TDZ）。
   let linkStatusBar: LinkStatusBar | undefined;
   linkStatusBar = new LinkStatusBar(() => {
-    const projectedLinks = viewState.getPaneLinks();
-    const links = Object.fromEntries(viewState.getEnabledPaneIds().map(id => [id, {
-      ...projectedLinks[id], roots: viewState.get(id).roots, drillRoot: viewState.get(id).drillRoot,
-    }]));
-    // S4.1R17（OP-22，使用者裁決）：列出**所有**父子關係，每組只呈現上下兩層。
-    // 格式：`Folder Spaces: 1→2/3, 2→4`（一父多子以 `/` 串接、多組以 `, ` 分隔）。
+    const links: Record<string, { parentPaneId: string | null; follow: boolean }> = viewState.getMode() === 'dual'
+      ? { pane1: { parentPaneId: null, follow: false }, pane2: { parentPaneId: 'pane1', follow: true } }
+      : { pane1: { parentPaneId: null, follow: false } };
+    // v2 R1 暫時保留的雙窗格狀態列；tree 模式不顯示鏈結。
     const groups = describePaneLinkEdgeGroups(links);
     return createLinkStatusSummaryFromEdges(
       groups,
