@@ -33,11 +33,12 @@ suite('S1-5 大型目錄量測', () => {
 
   test('量測大型樹的根列舉、單層子目錄展開及深度路徑解析', async () => {
     const config = vscode.workspace.getConfiguration('codeFolderSpaces');
-    const previous = config.inspect<unknown[]>('spaces');
+    const previousWorkspace = config.inspect<unknown[]>('spaces.workspace')?.workspaceValue;
+    const previousGlobal = config.inspect<unknown[]>('spaces.global')?.globalValue;
     const store = new SpaceStore();
     let provider: SpaceTreeDataProvider | undefined;
     try {
-      await config.update('spaces', [{ path: tmpRoot }], vscode.ConfigurationTarget.Global);
+      await config.update('spaces.global', [{ path: tmpRoot }], vscode.ConfigurationTarget.Global);
       // S4R6：provider 綁定單一 pane，scope 由 pane 狀態＋空間定義解析。
       const { state: viewState } = createPaneStateHarness();
       await seedPane(viewState, 'pane1', { roots: [tmpRoot] });
@@ -79,8 +80,8 @@ suite('S1-5 大型目錄量測', () => {
     } finally {
       provider?.dispose();
       store.dispose();
-      await config.update('spaces', previous?.workspaceValue, vscode.ConfigurationTarget.Workspace);
-      await config.update('spaces', previous?.globalValue, vscode.ConfigurationTarget.Global);
+      await config.update('spaces.workspace', previousWorkspace, vscode.ConfigurationTarget.Workspace);
+      await config.update('spaces.global', previousGlobal, vscode.ConfigurationTarget.Global);
     }
   });
 });

@@ -129,5 +129,10 @@
   "command.paneAction.level.title": "Level…",
   "command.paneAction.content.title": "Content…",
   "command.paneAction.sort.title": "Sort…",
-  "configuration.spaces.showFiles.description": "Per-space override for showing files in the tree (legacy; superseded by the Content setting in the \"…\" menu)."
+  "configuration.spaces.showFiles.description": "Per-space override for showing files in the tree (legacy; superseded by the Content setting in the \"…\" menu).",
+  "configuration.spaces.disabled.description": "Disabled since v2: this setting is no longer read. Use `codeFolderSpaces.spaces.workspace` or `codeFolderSpaces.spaces.global` instead.",
+  "configuration.spaces.workspace.description": "Folder spaces configured for this workspace.",
+  "configuration.spaces.global.description": "Folder spaces configured globally.",
+  "command.root.markAsGlobal.title": "Mark as Global",
+  "command.root.unmarkGlobal.title": "Unmark Global"
 }

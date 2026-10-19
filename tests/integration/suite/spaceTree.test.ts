@@ -176,7 +176,7 @@ suite('空間樹 provider', () => {
     [{ paneId: 'pane1', root: path.join(alpha, 'nested') }],
     async ({ provider, state, sync }) => {
       const paneProvider = provider('pane1');
-      const beforeSetting = vscode.workspace.getConfiguration('codeFolderSpaces').inspect('spaces')?.globalValue;
+      const beforeSetting = vscode.workspace.getConfiguration('codeFolderSpaces').inspect('spaces.global')?.globalValue;
       const drilledRoot = await rootOf(paneProvider) as SpaceRootNode;
       assert.deepEqual((await paneProvider.getChildren(drilledRoot) as Node[]).map(node => node.label), ['deeper', 'deep.md']);
       await state.switchRoot('pane1', alpha);
@@ -185,23 +185,23 @@ suite('空間樹 provider', () => {
       assert.equal(afterRoot.uri.fsPath, alpha);
       assert.deepEqual((await paneProvider.getChildren(afterRoot) as Node[]).map(node => node.label), ['nested', 'a.txt', 'B.txt']);
       assert.deepEqual(state.get('pane1').drillStack, []);
-      assert.deepEqual(vscode.workspace.getConfiguration('codeFolderSpaces').inspect('spaces')?.globalValue, beforeSetting);
+      assert.deepEqual(vscode.workspace.getConfiguration('codeFolderSpaces').inspect('spaces.global')?.globalValue, beforeSetting);
     }
   ));
 
   test('SpaceStore 重新命名會寫回設定名稱且保留原始路徑', async () => {
     const config = vscode.workspace.getConfiguration('codeFolderSpaces');
-    const previous = config.inspect<SpaceConfigEntry[]>('spaces')?.workspaceValue;
+    const previous = config.inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue;
     try {
-      await config.update('spaces', [alpha], vscode.ConfigurationTarget.Workspace);
+      await config.update('spaces.workspace', [alpha], vscode.ConfigurationTarget.Workspace);
       const store = new SpaceStore();
       try {
         assert.equal(await store.renameSpace(alpha, '新名稱'), true);
-        const saved = config.inspect<SpaceConfigEntry[]>('spaces')?.workspaceValue;
+        const saved = config.inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue;
         assert.deepEqual(saved, [{ path: alpha, name: '新名稱' }]);
       } finally { store.dispose(); }
     } finally {
-      await config.update('spaces', previous, vscode.ConfigurationTarget.Workspace);
+      await config.update('spaces.workspace', previous, vscode.ConfigurationTarget.Workspace);
     }
   });
 

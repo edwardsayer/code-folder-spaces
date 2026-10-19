@@ -30,23 +30,30 @@ export function sameFixturePath(left: string, right: string): boolean {
 /** 清除整合測試使用的 Global 設定，作為 suite 結束時的殘留保險。 */
 export async function clearGlobalSettings(): Promise<void> {
   const config = vscode.workspace.getConfiguration('codeFolderSpaces');
-  await config.update('spaces', undefined, vscode.ConfigurationTarget.Global);
+  await config.update('spaces.workspace', undefined, vscode.ConfigurationTarget.Workspace);
+  await config.update('spaces.global', undefined, vscode.ConfigurationTarget.Global);
   await config.update('view.showFiles', undefined, vscode.ConfigurationTarget.Global);
   await config.update('followActiveFile', undefined, vscode.ConfigurationTarget.Global);
 }
 
 /** 僅操作 Global 設定，完成後逐項還原，不寫入工作區設定。 */
 export async function withGlobalSettings<T>(
-  values: { spaces?: SpaceConfigEntry[]; showFiles?: boolean; followActiveFile?: boolean },
+  values: { spaces?: SpaceConfigEntry[]; spacesWorkspace?: SpaceConfigEntry[]; spacesGlobal?: SpaceConfigEntry[]; showFiles?: boolean; followActiveFile?: boolean },
   run: () => Promise<T>
 ): Promise<T> {
   const config = vscode.workspace.getConfiguration('codeFolderSpaces');
-  const previousSpaces = config.inspect<SpaceConfigEntry[]>('spaces')?.globalValue;
+  const previousWorkspaceSpaces = config.inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue;
+  const previousGlobalSpaces = config.inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue;
   const previousShowFiles = config.inspect<boolean>('view.showFiles')?.globalValue;
   const previousFollowActiveFile = config.inspect<boolean>('followActiveFile')?.globalValue;
   try {
-    if (values.spaces !== undefined) {
-      await config.update('spaces', values.spaces, vscode.ConfigurationTarget.Global);
+    if (values.spacesWorkspace !== undefined) {
+      await config.update('spaces.workspace', values.spacesWorkspace, vscode.ConfigurationTarget.Workspace);
+    }
+    // 舊參數 spaces 維持 Global 語意；明確的 spacesGlobal 優先。
+    const globalSpaces = values.spacesGlobal ?? values.spaces;
+    if (globalSpaces !== undefined) {
+      await config.update('spaces.global', globalSpaces, vscode.ConfigurationTarget.Global);
     }
     if (values.showFiles !== undefined) {
       await config.update('view.showFiles', values.showFiles, vscode.ConfigurationTarget.Global);
@@ -56,7 +63,8 @@ export async function withGlobalSettings<T>(
     }
     return await run();
   } finally {
-    await config.update('spaces', previousSpaces, vscode.ConfigurationTarget.Global);
+    await config.update('spaces.workspace', previousWorkspaceSpaces, vscode.ConfigurationTarget.Workspace);
+    await config.update('spaces.global', previousGlobalSpaces, vscode.ConfigurationTarget.Global);
     await config.update('view.showFiles', previousShowFiles, vscode.ConfigurationTarget.Global);
     await config.update('followActiveFile', previousFollowActiveFile, vscode.ConfigurationTarget.Global);
   }

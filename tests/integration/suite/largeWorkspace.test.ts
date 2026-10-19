@@ -25,7 +25,8 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
 
     let tmpRoot: string | undefined;
     let config: vscode.WorkspaceConfiguration | undefined;
-    let previousSpaces: { workspaceValue?: unknown; globalValue?: unknown } | undefined;
+    let previousWorkspaceSpaces: unknown;
+    let previousGlobalSpaces: unknown;
     let settingsUpdateStarted = false;
     let store: SpaceStore | undefined;
     let provider: SpaceTreeDataProvider | undefined;
@@ -52,7 +53,8 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
       const fixtureCreationMilliseconds = performance.now() - fixtureStarted;
 
       config = vscode.workspace.getConfiguration('codeFolderSpaces');
-      previousSpaces = config.inspect<unknown[]>('spaces');
+      previousWorkspaceSpaces = config.inspect<unknown[]>('spaces.workspace')?.workspaceValue;
+      previousGlobalSpaces = config.inspect<unknown[]>('spaces.global')?.globalValue;
       store = new SpaceStore();
       // S4R6：provider 綁定單一 pane（paneId 為狀態 key）。
       const { state: viewState } = createPaneStateHarness();
@@ -65,7 +67,7 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
       }, MEMORY_SAMPLE_INTERVAL_MS);
 
       settingsUpdateStarted = true;
-      await config.update('spaces', [{ path: tmpRoot }], vscode.ConfigurationTarget.Global);
+      await config.update('spaces.global', [{ path: tmpRoot }], vscode.ConfigurationTarget.Global);
       provider = createPaneProvider(store, viewState, 'pane1');
       const roots = await provider.getChildren() as SpaceNode[];
       assert.equal(roots.length, 1);
@@ -166,8 +168,8 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
       await cleanup(() => provider?.dispose());
       await cleanup(() => store?.dispose());
       if (settingsUpdateStarted && config) {
-        await cleanup(() => config!.update('spaces', previousSpaces?.workspaceValue, vscode.ConfigurationTarget.Workspace));
-        await cleanup(() => config!.update('spaces', previousSpaces?.globalValue, vscode.ConfigurationTarget.Global));
+        await cleanup(() => config!.update('spaces.workspace', previousWorkspaceSpaces, vscode.ConfigurationTarget.Workspace));
+        await cleanup(() => config!.update('spaces.global', previousGlobalSpaces, vscode.ConfigurationTarget.Global));
       }
       if (tmpRoot) await cleanup(() => fs.rmSync(tmpRoot!, { recursive: true, force: true }));
       if (cleanupErrors.length) throw new AggregateError(cleanupErrors, '大型工作區效能測試清理失敗');

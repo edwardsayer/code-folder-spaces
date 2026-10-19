@@ -66,13 +66,12 @@ suite('工作區外空間根', () => {
 
   test('provider 列出外部根、排序並解析可見路徑', async () => {
     const config = vscode.workspace.getConfiguration('codeFolderSpaces');
-    const original = config.inspect<unknown[]>('spaces');
-    const originalWorkspace = original?.workspaceValue;
-    const originalGlobal = original?.globalValue;
+    const originalWorkspace = config.inspect<unknown[]>('spaces.workspace')?.workspaceValue;
+    const originalGlobal = config.inspect<unknown[]>('spaces.global')?.globalValue;
     const store = new SpaceStore();
     let provider: SpaceTreeDataProvider | undefined;
     try {
-      await config.update('spaces', [{ path: tmpRoot, exclude: ['**/*.log'] }], vscode.ConfigurationTarget.Global);
+      await config.update('spaces.global', [{ path: tmpRoot, exclude: ['**/*.log'] }], vscode.ConfigurationTarget.Global);
       // S4R6：工作區外的任意資料夾可直接作為 pane root（D69：不要求命中 spaces）；
       // 本例以 space 設定提供顯示預設值，pane 建立時複製之（D70）。
       const { state } = createPaneStateHarness();
@@ -98,8 +97,8 @@ suite('工作區外空間根', () => {
     } finally {
       provider?.dispose();
       store.dispose();
-      await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces', originalWorkspace, vscode.ConfigurationTarget.Workspace);
-      await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces', originalGlobal, vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.global', originalWorkspace, vscode.ConfigurationTarget.Workspace);
+      await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.global', originalGlobal, vscode.ConfigurationTarget.Global);
     }
   });
 

@@ -5,7 +5,7 @@ import { mapWithConcurrency } from '../util/concurrency';
 import { getLogChannel } from '../util/log';
 import { DirectoryCache } from './directoryCache';
 import type { DirectoryEntry } from './directoryCache';
-import { isVisibleDirectory, isVisibleFile } from './spaceConfig';
+import { isVisibleDirectory, isVisibleFile, originOf } from './spaceConfig';
 import { assignNestedChildren, parseNestingPatterns } from './fileNesting';
 import type { FileNestingRule } from './fileNesting';
 import { buildFlatListing, DEFAULT_FLAT_MAX_DEPTH } from './flatListing';
@@ -100,6 +100,10 @@ export class SpaceRootNode extends vscode.TreeItem {
     this.resourceUri = vscode.Uri.file(definition.basePath);
     this.contextValue = 'codeFolderSpaces.spaceRoot';
     this.tooltip = definition.basePath;
+    if (originOf(definition) === 'global') {
+      const description = typeof this.description === 'string' ? this.description : '';
+      this.description = description ? `$(globe) ${description}` : '$(globe)';
+    }
     this.iconPath = resolveIcon(definition.icon) ?? vscode.ThemeIcon.Folder;
   }
 

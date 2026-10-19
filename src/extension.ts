@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import type { SpaceDefinition } from './types';
+import type { SpaceDefinition, SpaceOrigin } from './types';
 import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider, setLeafFolderIcon } from './spaces/spaceTreeDataProvider';
 import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
+import { originOf } from './spaces/spaceConfig';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, type ViewAxisChange } from './spaces/viewPresets';
@@ -37,7 +38,8 @@ const DIRECTORY_SNAPSHOT_KEY = 'codeFolderSpaces.directorySnapshot.v1';
 /** Public surface returned from `activate()` for other extensions. */
 export interface FolderSpacesApi {
   readonly version: string;
-  getSpaces(): Array<{ name: string; basePath: string }>;
+  /** 已設定的資料夾空間，包含其來源設定層。 */
+  getSpaces(): Array<{ name: string; basePath: string; origin: SpaceOrigin }>;
   /** 目前啟用的窗格：id／root／roots／佈局模式／固定插槽。 */
   getPanes(): Array<{ id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }>;
 }
@@ -344,6 +346,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     return runtime;
   };
 
+  const rootOriginAttached = new Set<string>();
+  // v2-R2：`root.isGlobal` context listener 只註冊一次／pane（插槽重用時於 disposePane 清除）。
   const disposePane = (paneId: string): void => {
     cascadeDisposables.get(paneId)?.dispose();
     cascadeDisposables.delete(paneId);
@@ -354,16 +358,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     // 插槽可能被重用：清除該 pane 的收合狀態與 context key，避免新 pane 顯示舊狀態。
     collapsedPanes.delete(paneId);
     expandedIds.delete(paneId);
+    rootOriginAttached.delete(paneId);
     void setCollapsedContext(paneId);
   };
 
   const attachPaneCascade = (runtime: PaneRuntime): void => {
     if (cascadeDisposables.has(runtime.id)) return;
     const disposable = cascadeController.attach(runtime.id, listener => runtime.treeView.onDidChangeSelection(event => {
-      const info = nodeInfo(event.selection[0]);
+      const selection = event.selection[0];
+      const info = nodeInfo(selection);
       listener(info ? { uri: info.uri, isDirectory: info.isDirectory } : undefined);
     }));
     cascadeDisposables.set(runtime.id, disposable);
+  };
+
+  /**
+   * v2-R2：`codeFolderSpaces.root.isGlobal` context key 必須由**所有** pane 的選取驅動。
+   * 不可依附在 `attachPaneCascade` 內——`PaneCascadeController.attach` 對非 pane1 會 early-return，
+   * 導致在 pane2 選取 root 時右鍵選單（Mark／Unmark Global）依舊值顯示錯誤項目。
+   */
+  const attachRootOriginContext = (runtime: PaneRuntime): void => {
+    if (rootOriginAttached.has(runtime.id)) return;
+    rootOriginAttached.add(runtime.id);
+    runtime.disposables.push(runtime.treeView.onDidChangeSelection(event => {
+      const selection = event.selection[0];
+      void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal',
+        selection instanceof SpaceRootNode && originOf(selection.definition) === 'global');
+    }));
   };
 
 
@@ -392,6 +413,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }
     for (const paneId of enabled) applyPaneScope(paneId);
     for (const runtime of paneRuntime.values()) attachPaneCascade(runtime);
+    for (const runtime of paneRuntime.values()) attachRootOriginContext(runtime);
     rebuildWatchers();
   };
 
@@ -1372,6 +1394,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const root = typeof candidate?.rootPath === 'string' ? candidate.rootPath : undefined;
       return removeRootForPane(paneId, root);
     }),
+    vscode.commands.registerCommand('codeFolderSpaces.root.markAsGlobal', async (node?: unknown) => {
+      if (!(node instanceof SpaceRootNode)) return;
+      if (!await store.markAsGlobal(node.definition.basePath)) return;
+      for (const runtime of paneRuntime.values()) runtime.provider.refresh();
+      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal', true);
+      await syncContext();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.root.unmarkGlobal', async (node?: unknown) => {
+      if (!(node instanceof SpaceRootNode)) return;
+      if (!await store.unmarkGlobal(node.definition.basePath)) return;
+      for (const runtime of paneRuntime.values()) runtime.provider.refresh();
+      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal', false);
+      await syncContext();
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.pane.close', (node?: unknown) => closePaneFromNode(node)),
     vscode.commands.registerCommand('codeFolderSpaces.pane.remove', (paneId?: unknown) => closePane(typeof paneId === 'string' ? paneId : undefined)),
     vscode.commands.registerCommand('codeFolderSpaces.pane.addChild', (node?: unknown) => addChildPane(node ?? pane1()?.treeView.selection[0])),
@@ -1562,7 +1598,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const version = String(context.extension.packageJSON.version ?? '0.0.0');
   return {
     version,
-    getSpaces: () => store.getDefinitions().map((definition) => ({ name: definition.name, basePath: definition.basePath })),
+    getSpaces: () => store.getDefinitions().map((definition) => ({ name: definition.name, basePath: definition.basePath, origin: originOf(definition) })),
     getPanes: () => viewState.getEnabledPaneIds().map(id => ({
       id, root: rootOf(id), roots: [...viewState.get(id).roots], mode: viewState.getMode(), slot: paneSlotOf(id),
     })),

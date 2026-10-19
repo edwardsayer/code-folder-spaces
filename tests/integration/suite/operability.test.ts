@@ -20,7 +20,7 @@ suite('可操作性（S4.1R5）', () => {
   suiteTeardown(async () => {
     await clearGlobalSettings();
     // addSpace 在有工作區時寫入 Workspace 設定，須一併清除以免污染其他 suite（如 trust.test.ts 的精確比對）。
-    await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces', undefined, vscode.ConfigurationTarget.Workspace);
+    await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.workspace', undefined, vscode.ConfigurationTarget.Workspace);
   });
 
   const normalize = (value: string | null): string => (value ?? '').split(String.fromCharCode(92)).join('/').toLowerCase();

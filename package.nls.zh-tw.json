@@ -129,5 +129,10 @@
   "command.paneAction.level.title": "層級…",
   "command.paneAction.content.title": "內容…",
   "command.paneAction.sort.title": "排序…",
-  "configuration.spaces.showFiles.description": "每個空間是否在樹中顯示檔案（舊版欄位；功能已由「…」選單的「內容」取代）。"
+  "configuration.spaces.showFiles.description": "每個空間是否在樹中顯示檔案（舊版欄位；功能已由「…」選單的「內容」取代）。",
+  "configuration.spaces.disabled.description": "自 v2 起已停用：不再讀取此設定。請改用 `codeFolderSpaces.spaces.workspace` 或 `codeFolderSpaces.spaces.global`。",
+  "configuration.spaces.workspace.description": "為此工作區設定的資料夾空間。",
+  "configuration.spaces.global.description": "全域設定的資料夾空間。",
+  "command.root.markAsGlobal.title": "標記為全域",
+  "command.root.unmarkGlobal.title": "取消全域標記"
 }
