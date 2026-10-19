@@ -3117,56 +3117,6 @@
             ]
           }
         },
-        "codeFolderSpaces.spaces": {
-          "type": "array",
-          "default": [],
-          "markdownDescription": "%configuration.spaces.disabled.description%",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "object",
-                "required": [
-                  "path"
-                ],
-                "properties": {
-                  "path": {
-                    "type": "string",
-                    "description": "%configuration.spaces.path.description%"
-                  },
-                  "name": {
-                    "type": "string",
-                    "description": "%configuration.spaces.name.description%"
-                  },
-                  "icon": {
-                    "type": "string",
-                    "description": "%configuration.spaces.icon.description%"
-                  },
-                  "showFiles": {
-                    "type": "boolean",
-                    "description": "%configuration.spaces.showFiles.description%"
-                  },
-                  "include": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "%configuration.spaces.include.description%"
-                  },
-                  "exclude": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "%configuration.spaces.exclude.description%"
-                  }
-                }
-              }
-            ]
-          }
-        },
         "codeFolderSpaces.followActiveFile": {
           "type": "boolean",
           "default": true,

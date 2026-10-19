@@ -23,6 +23,7 @@ import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 import { labelledValue, selectedQuickPickId, stableQuickPickItems } from './ui/stableQuickPick';
 import { belongsToWorkspace, normalizeExpandModeProvenance, resolveAlignedProvenance, resolveExpandModeRestore, resolveExpandModeTarget, resolveWorkspaceIdentity, shouldWriteExpandModeRestore, type ExpandModeProvenance } from './spaces/clickBehavior';
+import { clearLegacySpacesSetting } from './spaces/legacySpaces';
 
 const MAX_PANE_INDEX = 8;
 const REFRESH_DEBOUNCE_MS = 200;
@@ -71,6 +72,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   setLeafFolderIcon(context.extensionUri);
   const log = getLogChannel();
   log.info('Activating Folder Spaces');
+
+  // v2-R2（決策 c'）：必須在建立 SpaceStore 之前清除舊 `spaces`，否則它的空值會遮蔽
+  // `spaces.workspace`／`spaces.global` 的讀取（詳見 legacySpaces.ts 的說明與實測）。
+  await clearLegacySpacesSetting(
+    vscode.workspace.getConfiguration('codeFolderSpaces'),
+    { workspace: vscode.ConfigurationTarget.Workspace, global: vscode.ConfigurationTarget.Global },
+    log,
+  );
 
   const store = new SpaceStore();
   // S4.1R19（使用者要求：全部 per-workspace）：
