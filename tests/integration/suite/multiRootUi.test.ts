@@ -225,12 +225,14 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     }).map(item => `${item.command} @ ${item.when}`);
     assert.deepEqual(offenders, [], `view/title 的 pane 專屬項目必須使用 per-pane id（D47）：${offenders.join('; ')}`);
 
-    // 新增的兩個 root 入口都必須存在且為 per-pane。
+    // v2-redesign §5（v2-R3）：root 入口已從 title bar 收起，改由 pane1「…」聚合選單的
+    // `Add Folder Space…`（`codeFolderSpaces.addSpace`）與 `Switch Root…` 提供；
+    // `root.add`／`root.remove` 命令**仍存在於 manifest**（v2-R4 才清理宣告），只是不在 title。
+    // 此處僅驗證 D47（pane 專屬 title 項目必用 per-pane id），不再要求 root.add／remove 入 title。
     const commands = new Set(titleItems.map(item => String(item.command)));
-    for (let index = 1; index <= 8; index++) {
-      assert.ok(commands.has(`codeFolderSpaces.pane${index}.root.add`), `pane${index} 缺少 root.add`);
-      assert.ok(commands.has(`codeFolderSpaces.pane${index}.root.remove`), `pane${index} 缺少 root.remove`);
-    }
+    assert.ok(commands.has('codeFolderSpaces.pane1.addRoot'), 'pane1 應有 per-pane 的 addRoot 入口');
+    assert.ok(commands.has('codeFolderSpaces.pane1.more'), 'pane1 應有「…」聚合選單');
+    assert.ok(commands.has('codeFolderSpaces.pane2.more'), 'pane2 應有「…」聚合選單');
   });
 
   test('live 命令 codeFolderSpaces.root.remove 以節點 paneId 路由（P1-1：不得错路由到 pane1）', async () => {
