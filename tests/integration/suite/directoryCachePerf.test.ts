@@ -67,7 +67,7 @@ suite('F-44 快取量測（S4R7）', () => {
     let provider: SpaceTreeDataProvider | undefined;
     try {
       const { state: viewState } = createPaneStateHarness();
-      await seedPane(viewState, 'pane1', { root: tmpRoot, showFiles: true });
+      await seedPane(viewState, 'pane1', { roots: [tmpRoot] });
       const scope = paneScopeFor(store, viewState, 'pane1');
       assert.ok(scope, 'pane1 必須有 root');
       provider = new SpaceTreeDataProvider(store, viewState, scope, harness.cache);

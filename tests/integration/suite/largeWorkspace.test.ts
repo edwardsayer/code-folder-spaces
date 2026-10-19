@@ -56,7 +56,7 @@ suite('S4R4 F-44 大型工作區效能基線', () => {
       store = new SpaceStore();
       // S4R6：provider 綁定單一 pane（paneId 為狀態 key）。
       const { state: viewState } = createPaneStateHarness();
-      await seedPane(viewState, 'pane1', { root: tmpRoot });
+      await seedPane(viewState, 'pane1', { roots: [tmpRoot] });
       startHeap = process.memoryUsage();
       memoryStarted = performance.now();
       sampler = setInterval(() => {

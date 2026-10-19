@@ -62,6 +62,7 @@
   "Folder Spaces supports at most 8 folder space slots.": "Folder Spaces 最多支援 8 個資料夾空間插槽。",
   "Folder is already in this folder space.": "此資料夾已位於這個資料夾空間。",
   "A folder space needs at least one folder. Use Close Folder Space instead.": "資料夾空間至少需要一個資料夾。請改用「關閉資料夾空間」。",
+  "Folder Space 1 cannot be closed.": "Folder Space 1 無法關閉。",
   "Align Click Behavior": "對齊點擊行為",
   "This is a window-level setting and affects all trees in this window, including the built-in File Explorer.": "此為視窗級設定，會影響本視窗所有樹狀檢視（包含內建檔案總管）。",
   "Click behavior was not changed.": "未變更點擊行為。",

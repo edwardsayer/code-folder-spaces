@@ -86,15 +86,13 @@ export function createPaneStateHarness(initial?: Record<string, unknown>): PaneS
   return { state: new PaneStateStore(memento), memento, reload: () => new PaneStateStore(memento) };
 }
 
-/** 啟用 pane 並寫入初始狀態（唯一的建立路徑，S4.1R11 起寫入 panes.v3）。 */
-export function seedPane(state: PaneStateStore, paneId: string, pane: Partial<PaneState>): Promise<void> {
-  const legacyRoot = (pane as { root?: unknown }).root;
-  const normalized = pane.roots === undefined && typeof legacyRoot === 'string'
-    ? { ...pane, roots: [legacyRoot] }
-    : pane.roots === undefined && legacyRoot === null
-      ? { ...pane, roots: [] }
-      : pane;
-  return state.enablePane(paneId, normalized);
+/** 將 pane fixture 寫入 LayoutStore（pane2 對應 dual 模式）。 */
+export async function seedPane(state: PaneStateStore, paneId: string, pane: Partial<PaneState>): Promise<void> {
+  if (paneId !== 'pane1') await state.setMode('dual');
+  const roots = pane.roots ?? ((pane as { root?: unknown }).root ? [(pane as { root: string }).root] : []);
+  await state.setPaneRoots(paneId, roots);
+  const target = state.get(paneId);
+  Object.assign(target, pane);
 }
 
 /**
@@ -109,10 +107,10 @@ export async function seedPaneFromRoot(
   overrides: Partial<PaneState> = {}
 ): Promise<void> {
   const hit = store.getDefinitions().find(definition => sameFixturePath(definition.basePath, root));
-  const showFilesDefault = vscode.workspace.getConfiguration('codeFolderSpaces').get<boolean>('view.showFiles', true);
-  await state.enablePane(paneId, {
-    roots: [root],
-    showFiles: hit?.showFiles ?? showFilesDefault,
+  if (paneId !== 'pane1') await state.setMode('dual');
+  await state.setPaneRoots(paneId, [root]);
+  Object.assign(state.get(paneId), {
+    icon: hit?.icon ?? null,
     include: hit?.include ?? [],
     exclude: hit?.exclude ?? [],
     ...overrides,
@@ -330,12 +328,9 @@ export async function withPaneCascade<T>(
     };
     try {
       for (const seed of seeds) {
-        await state.enablePane(seed.paneId, {
-          roots: seed.root ? [seed.root] : [],
-          parentPaneId: seed.parentPaneId ?? null,
-          follow: seed.follow ?? false,
-          ...seed.overrides,
-        });
+        if (seed.paneId !== 'pane1') await state.setMode('dual');
+        await state.setPaneRoots(seed.paneId, seed.root ? [seed.root] : []);
+        Object.assign(state.get(seed.paneId), seed.overrides ?? {});
         attachRuntime(seed.paneId);
       }
       controller = createController();

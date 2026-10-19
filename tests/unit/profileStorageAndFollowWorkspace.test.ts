@@ -1,87 +1,36 @@
 import * as path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { LEGACY_PANE_STATE_KEY, PaneStateStore, PANE_STATE_KEY } from '../../src/spaces/viewState';
-import { panesToSyncWorkspaceRoots } from '../../src/spaces/paneLinks';
 
-describe('OP-15 工作區目錄跟隨 + S4.1R19 per-workspace 儲存', () => {
-  it('S4.1R19：workspaceState 為空時，可安全從 globalState 平滑轉移（方向已反轉）', async () => {
-    const wsMap = new Map<string, unknown>();
-    const globalMap = new Map<string, unknown>();
-
-    const wsMemento = {
-      get: (k: string) => wsMap.get(k) as never,
-      update: async (k: string, v: unknown) => { wsMap.set(k, v); }
-    };
-    const globalMemento = {
-      get: (k: string) => globalMap.get(k) as never,
-      update: async (k: string, v: unknown) => { globalMap.set(k, v); }
-    };
-
-    // 模擬舊版在 workspaceState 存了配置
-    const oldV2 = {
-      version: 2,
-      panes: {
-        pane1: { root: '/old/project', preset: 'Files', filter: '', sort: { key: 'name', direction: 'asc' }, drillStack: [], showFiles: true, include: [], exclude: [] }
-      }
-    };
-    globalMap.set(LEGACY_PANE_STATE_KEY, oldV2);
-
-    // S4.1R19：pane 狀態改存 workspaceState；首次開啟時從 globalState 搬一次
-    const store = new PaneStateStore(wsMemento);
-    await store.migrateFromGlobalStateIfEmpty(globalMemento, true);
-
-    expect(store.get('pane1').roots).toEqual([path.normalize('/old/project')]);
-    expect(store.get('pane1').preset).toBe('Files');
-    // 搬到 workspaceState（而非 globalState）
-    expect(wsMap.get(PANE_STATE_KEY)).toBeDefined();
+describe('layout storage and workspace roots', () => {
+  it('stores layout.v1 in the supplied workspace memento and ignores legacy pane state', async () => {
+    const legacy = { version: 3, panes: { pane1: { roots: ['/legacy'] } } };
+    const values = new Map<string, unknown>([[LEGACY_PANE_STATE_KEY, legacy]]);
+    const store = new PaneStateStore({ get: key => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
+    await store.initialize({ primaryRoot: '/workspace' });
+    expect(store.get('pane1').roots).toEqual([path.normalize('/workspace')]);
+    expect(values.get(PANE_STATE_KEY)).toBeDefined();
+    expect(values.get(LEGACY_PANE_STATE_KEY)).toBe(legacy);
   });
 
-  it('工作區 roots 真正變動時清空下鑽；完全同步早退時保留狀態', async () => {
-    const root = path.normalize('/workspace/project');
-    const sub = path.normalize('/workspace/project/sub');
+  it('resets drill navigation when workspace roots change', async () => {
     const values = new Map<string, unknown>();
-    values.set(PANE_STATE_KEY, {
-      version: 3,
-      panes: { pane1: { roots: [root], drillRoot: sub, parentPaneId: null, follow: false, followWorkspaceDirectory: true } },
-    });
-    const store = new PaneStateStore({ get: (k: string) => values.get(k) as never, update: async (k: string, v: unknown) => { values.set(k, v); } });
-
-    await store.drillDown('pane1', sub);
-    const setPaneRoots = vi.spyOn(store, 'setPaneRoots');
-    const panes = Object.fromEntries(['pane1'].map(paneId => [paneId, store.get(paneId)]));
-    for (const paneId of panesToSyncWorkspaceRoots(panes, [root], (a, b) => a === b)) {
-      await store.setPaneRoots(paneId, [root]);
-    }
-    // 呼叫端以純函式結果驅動寫入；完全同步時清單為空，確實未呼叫 setPaneRoots。
-    expect(setPaneRoots).not.toHaveBeenCalled();
-    expect(store.get('pane1').drillRoot).toBe(sub);
-    expect(store.get('pane1').drillStack).toHaveLength(1);
-    setPaneRoots.mockRestore();
-
-    // roots 真正變動時不論下鑽是否仍位於 root 內，都必須全歸零。
-    await store.drillDown('pane1', sub);
-    await store.setPaneRoots('pane1', [root, path.normalize('/workspace/extra')]);
+    const store = new PaneStateStore({ get: key => values.get(key) as never, update: async (key, value) => { values.set(key, value); } });
+    await store.initialize({ primaryRoot: '/workspace/project' });
+    await store.drillDown('pane1', '/workspace/project/sub');
+    await store.setPaneRoots('pane1', ['/workspace/other']);
     expect(store.get('pane1').drillRoot).toBeNull();
     expect(store.get('pane1').drillStack).toEqual([]);
-
-    const other = path.normalize('/workspace/other');
-    await store.drillDown('pane1', sub);
-    await store.setPaneRoots('pane1', [other]);
-    expect(store.get('pane1').drillRoot).toBeNull();
-    expect(store.get('pane1').drillStack).toEqual([]);
-    expect(store.get('pane1').roots).toEqual([other]);
+    expect(store.get('pane1').roots).toEqual([path.normalize('/workspace/other')]);
   });
 
-  it('uses the same follow-workspace default when migrating global state and initializing', async () => {
+  it('uses the workspace memento when a workspace is present and global memento otherwise', async () => {
     const workspace = new Map<string, unknown>();
-    const global = new Map<string, unknown>([[LEGACY_PANE_STATE_KEY, { version: 2, panes: { pane1: { root: '/legacy' } } }]]);
-    const store = new PaneStateStore({ get: key => workspace.get(key) as never, update: async (key: string, value: unknown) => { workspace.set(key, value); } });
-    await store.migrateFromGlobalStateIfEmpty({ get: key => global.get(key) as never, update: async (key: string, value: unknown) => { global.set(key, value); } }, true);
-    expect(store.get('pane1').followWorkspaceDirectory).toBe(true);
-
-    const initialized = new PaneStateStore({ get: () => undefined, update: async () => {} });
-    await initialized.initialize({ spaces: [], showFilesDefault: true, configuredCount: 1, followWorkspaceDirectoryDefault: true });
-    expect(initialized.get('pane1').followWorkspaceDirectory).toBe(store.get('pane1').followWorkspaceDirectory);
+    const global = new Map<string, unknown>();
+    const make = (map: Map<string, unknown>) => ({ get: (key: string) => map.get(key) as never, update: async (key: string, value: unknown) => { map.set(key, value); } });
+    await new PaneStateStore(make(workspace)).initialize({ primaryRoot: '/project' });
+    await new PaneStateStore(make(global)).initialize({});
+    expect(workspace.has(PANE_STATE_KEY)).toBe(true);
+    expect(global.has(PANE_STATE_KEY)).toBe(true);
   });
 });
-

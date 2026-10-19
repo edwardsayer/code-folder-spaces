@@ -3,8 +3,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { clearGlobalSettings, createTempTree, paneRootNode, removeTempTree, withPaneProviders } from './helpers';
+import { effectiveView } from '../../../src/spaces/viewState';
+import { matchPresetName } from '../../../src/spaces/viewPresets';
 
-interface PaneInfo { id: string; root: string | null }
+interface PaneInfo { id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }
 interface Api { getPanes(): PaneInfo[] }
 
 // S4.1R5：OP-9（addSpace 後窗格顯示新根）。以 live extension 命令驗證。
@@ -96,10 +98,11 @@ suite('檢視維度解耦（S4.1R7）', () => {
         await state.setViewAxis('pane1', { axis: 'level', value: 1 });
         const level1 = await provider('pane1').getChildren(root) as vscode.TreeItem[];
         assert.deepEqual(level1.map(node => String(node.label)), ['a', 'c']);
-        // 翻回 tree：維持 level 1＋folders ＝ Columns 預設集。
+        // 翻回 tree：維持 level 1＋folders；v2 的 `view` 恆為顯式組合（已無 preset 欄位），
+        // 命名投影僅由 `matchPresetName` 提供。
         await state.setViewAxis('pane1', { axis: 'mode', value: 'tree' });
-        assert.equal(state.get('pane1').preset, 'Columns');
-        assert.equal(state.get('pane1').view, undefined);
+        assert.equal(matchPresetName(effectiveView(state.get('pane1'))) , 'Columns');
+        assert.deepEqual(state.get('pane1').view, { mode: 'tree', level: 1, content: 'folders' });
       });
     } finally {
       removeTempTree(tree);
@@ -107,28 +110,29 @@ suite('檢視維度解耦（S4.1R7）', () => {
   });
 });
 
-// S4.1R8（OP-12）：智慧就地下鑽自動切換為 Contents 預設集與還原。
-suite('OP-12 智慧就地下鑽 (Smart Routing In-place Drill-down)', () => {
-  test('drillDown 自動套用 Contents，drillUp 完整無損還原', async () => {
+// v2-redesign D4（2026-10-19）：就地下鑽**不再切換 preset/view**，只做 root 切換＋返回堆疊。
+// 原本 S4.1R8／OP-12 的「自動套用 Contents」已由 spec §8 推翻，本 suite 改驗 v2 語意。
+suite('v2 D4 就地下鑽（不再切換 preset）', () => {
+  test('drillDown 只換根、不動 view；drillUp 完整還原原檢視狀態', async () => {
     const tree = createTempTree({ 'root.txt': 'r', 'sub/a.txt': 'a', 'sub/b.txt': 'b' });
     try {
       await withPaneProviders([tree], [{ paneId: 'pane1', root: tree }], async ({ provider, state }) => {
         // 初始狀態為預設 Explorer (tree)
-        assert.equal(state.get('pane1').preset, 'Explorer');
+        assert.equal(matchPresetName(effectiveView(state.get('pane1'))) , 'Explorer');
 
         // 執行就地下鑽
         await state.drillDown('pane1', path.join(tree, 'sub'));
-        // 下鑽後應自動切換為子預設集 Contents
-        assert.equal(state.get('pane1').preset, 'Contents');
+        // v2 D4：下鑽不切 preset——view 維持 Explorer（tree/all/all）
+        assert.equal(matchPresetName(effectiveView(state.get('pane1'))) , 'Explorer');
 
         const items = await provider('pane1').getChildren() as vscode.TreeItem[];
-        // Contents 模式下，第一層為資料夾群組（root 直屬檔案歸 '.'），且檔案僅檔名
-        assert.ok(items.some(node => String(node.label) === '.'));
+        // tree 模式下直接列出下鑽根的內容（檔案＋資料夾），不產生 '.' 資料夾群組列。
+        assert.deepEqual(items.map(node => String(node.label)).sort(), ['a.txt', 'b.txt']);
 
         // 返回上一層
         const success = await state.drillUp('pane1');
         assert.ok(success);
-        assert.equal(state.get('pane1').preset, 'Explorer');
+        assert.equal(matchPresetName(effectiveView(state.get('pane1'))) , 'Explorer');
         assert.deepEqual(state.get('pane1').roots, [tree]);
         assert.equal(state.get('pane1').drillRoot, null);
       });
@@ -138,39 +142,7 @@ suite('OP-12 智慧就地下鑽 (Smart Routing In-place Drill-down)', () => {
   });
 });
 
-// S4.1R9（OP-13）：四項 Obsidian 原版設定與接龍自適應連動。
-suite('OP-13 原版四項設定與接龍自適應 (Adaptive Cascade Parent)', () => {
-  test('接龍自適應：父 pane 連動子 pane 時切為 Navigate，子 pane 解除時還原', async () => {
-    const tree = createTempTree({ 'root.txt': 'r', 'sub/a.txt': 'a' });
-    try {
-      await withPaneProviders([tree], [{ paneId: 'pane1', root: tree }], async ({ state }) => {
-        assert.equal(state.get('pane1').preset, 'Explorer');
-
-        // 在 pane1 下開啟子 pane2 並開啟 follow
-        await state.enablePane('pane2', {
-          root: path.join(tree, 'sub'),
-          parentPaneId: 'pane1',
-          follow: true,
-          showFiles: true,
-          include: [],
-          exclude: []
-        });
-
-        // 觸發自適應檢查
-        await state.handleAdaptiveCascadeParent('pane1', true, 'Navigate');
-        // 父面板應自動切換為導覽預設集 (Navigate: 純目錄)
-        assert.equal(state.get('pane1').preset, 'Navigate');
-
-        // 解除子面板連動
-        await state.handleAdaptiveCascadeParent('pane1', false);
-        // 父面板應無損還原為 Explorer
-        assert.equal(state.get('pane1').preset, 'Explorer');
-      });
-    } finally {
-      removeTempTree(tree);
-    }
-  });
-});
+// v2-R1：OP-13（adaptive cascade parent）已由 spec §7 移除，無 v2 承接功能，相關案例整併刪除。
 
 // S4.1R10（OP-15）：Follow Workspace Directory 連動。
 suite('OP-15 Follow Workspace Directory', () => {

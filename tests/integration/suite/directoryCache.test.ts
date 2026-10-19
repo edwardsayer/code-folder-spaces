@@ -98,7 +98,7 @@ interface PaneFixture {
 async function createPaneFixture(root: string, cache: DirectoryCache | undefined): Promise<PaneFixture> {
   const store = new SpaceStore();
   const { state } = createPaneStateHarness();
-  await seedPane(state, 'pane1', { root, showFiles: true });
+  await seedPane(state, 'pane1', { roots: [root] });
   const scopeFor = (): PaneProviderScope => {
     const scope = paneScopeFor(store, state, 'pane1');
     if (!scope) throw new Error('pane1 沒有 root，無法建立 provider scope');

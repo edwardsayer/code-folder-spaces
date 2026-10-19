@@ -106,24 +106,17 @@ suite('剪貼簿與檔案開啟位置', () => {
     }
   });
 
-  test('openFilesIn current/beside selects the corresponding editor group', async () => {
-    const setting = vscode.workspace.getConfiguration('codeFolderSpaces');
-    const previous = setting.inspect<string>('openFilesIn');
-    const target = vscode.ConfigurationTarget.Workspace;
+  // v2-R1：`codeFolderSpaces.openFilesIn` 已於 S4.1R19（使用者決策）移除——對 VS Code 不適用，
+  // 一律在目前編輯區開檔。本案例改驗現行行為（不再寫該設定，也無 beside 分支）。
+  test('openEntry opens in the active editor group (openFilesIn setting removed in R19)', async () => {
     const tempPath = path.join(os.tmpdir(), `folder-spaces-open-${Date.now()}.txt`);
     await fs.writeFile(tempPath, 'open location');
     try {
-      await setting.update('openFilesIn', 'current', target);
       const currentColumn = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
       await vscode.commands.executeCommand('codeFolderSpaces.openEntry', vscode.Uri.file(tempPath));
       assert.ok(vscode.window.activeTextEditor, 'current editor should be active after opening');
       assert.equal(vscode.window.activeTextEditor.viewColumn, currentColumn);
-      await setting.update('openFilesIn', 'beside', target);
-      await vscode.commands.executeCommand('codeFolderSpaces.openEntry', vscode.Uri.file(tempPath));
-      assert.ok(vscode.window.activeTextEditor, 'beside editor should be active after opening');
-      assert.ok(vscode.window.activeTextEditor.viewColumn !== currentColumn);
     } finally {
-      await setting.update('openFilesIn', previous?.workspaceValue ?? previous?.globalValue ?? 'current', target);
       await fs.rm(tempPath, { force: true });
     }
   });

@@ -6,9 +6,9 @@ import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
-import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, resolveConfiguredDefaultChildPreset, resolveConfiguredCascadeParentPreset, type ViewAxisChange } from './spaces/viewPresets';
+import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, type ViewAxisChange } from './spaces/viewPresets';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
-import { canClosePane, describePaneLinkEdgeGroups, isPaneRootDirectory, linkedChildPaneNumber, nextChildPaneId, panesToSyncWorkspaceRoots } from './spaces/paneLinks';
+import { describePaneLinkEdgeGroups, isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
 import { createLinkStatusSummaryFromEdges, LinkStatusBar } from './spaces/linkStatusBar';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { normalizeExcludeSetting, parseGitIgnore, shouldHideLikeExplorer, type GitIgnoreRule } from './spaces/explorerVisibility';
@@ -23,8 +23,6 @@ import { labelledValue, selectedQuickPickId, stableQuickPickItems } from './ui/s
 import { belongsToWorkspace, normalizeExpandModeProvenance, resolveAlignedProvenance, resolveExpandModeRestore, resolveExpandModeTarget, resolveWorkspaceIdentity, shouldWriteExpandModeRestore, type ExpandModeProvenance } from './spaces/clickBehavior';
 
 const MAX_PANE_INDEX = 8;
-/** S4.1R19：固定預設 2 個窗格（原 `codeFolderSpaces.panes.count` 設定已移除）。 */
-const DEFAULT_PANE_COUNT = 2;
 const REFRESH_DEBOUNCE_MS = 200;
 const FOLLOW_DEBOUNCE_MS = 250;
 // S4R7-D85 啟動事件合併與 S4R7-D81 快照持久化的時間常數。
@@ -40,8 +38,8 @@ const DIRECTORY_SNAPSHOT_KEY = 'codeFolderSpaces.directorySnapshot.v1';
 export interface FolderSpacesApi {
   readonly version: string;
   getSpaces(): Array<{ name: string; basePath: string }>;
-  /** 目前啟用的窗格，供自動化驗證命令接線：id／root／roots／父窗格／follow／工作區目錄跟隨／預設集。 */
-  getPanes(): Array<{ id: string; root: string | null; roots: string[]; parentPaneId: string | null; follow: boolean; followWorkspaceDirectory: boolean; preset: string }>;
+  /** 目前啟用的窗格：id／root／roots／佈局模式／固定插槽。 */
+  getPanes(): Array<{ id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }>;
 }
 
 /** Runtime of one enabled pane: provider + TreeView + cascade scope (paneId-keyed, S4R6). */
@@ -78,37 +76,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const hasWorkspace = Boolean(vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length);
   const viewState = new PaneStateStore(hasWorkspace ? context.workspaceState : context.globalState);
   const settings = () => vscode.workspace.getConfiguration('codeFolderSpaces');
-  /**
-   * S4.1R20（使用者）：新建 layout 的 pane1 預設 preset。
-   * - 啟用 `adaptiveCascadeParent` 時，pane1 遲早會被切成 `cascadeParentPreset`（因為預設 pane2 會 follow），
-   *   所以直接用 `cascadeParentPreset`，避免「先 Explorer 再被改成 Navigate」的跳動。
-   * - 停用時才用 `defaultPreset`。
-   */
-  const resolvePrimaryPreset = () => settings().get<boolean>('adaptiveCascadeParent', true)
-    ? resolveConfiguredCascadeParentPreset(settings().get<string>('cascadeParentPreset'))
-    : resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset'));
-  // 平滑迁移：若本 workspace 尚無 v3 資料，嘗試從 globalState 取一次（只搬一次，不覆寫已存在的 workspace 狀態）。
-  await viewState.migrateFromGlobalStateIfEmpty(context.globalState, settings().get<boolean>('followWorkspaceDirectory', true));
   const paneInitContext = () => ({
-    spaces: store.getDefinitions(),
-    // S4.1R20：`view.showFiles` 已移除；由 preset 的 content 維度控制顯示範圍。
-    showFilesDefault: true,
-    // S4.1R19（使用者）：移除 `panes.count` 設定；固定 2 個窗格（不滿意可由程式面自行調整）。
-    configuredCount: DEFAULT_PANE_COUNT,
-    followWorkspaceDirectoryDefault: settings().get<boolean>('followWorkspaceDirectory', true),
-    // S4.1R19（使用者）：全新 workspace 的兩個 space 各依 Default Preset／Default Child Preset 呈現。
-    // S4.1R20（使用者修正）：pane1 若啟用 Adaptive Cascade Parent，優先用 Cascade Parent Preset；
-    // 否則才用 Default Preset。pane2+ 維持 Default Child Preset。
-    presets: {
-      primary: resolvePrimaryPreset(),
-      child: resolveConfiguredDefaultChildPreset(settings().get<string>('defaultChildPreset')),
-    },
+    primaryRoot: store.getDefinitions()[0]?.basePath,
+    primaryView: VIEW_PRESETS[resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset'))],
   });
   const layout = await viewState.initialize(paneInitContext());
   if (layout.kind === 'rebuilt') {
     log.warn(`Rebuilt default pane layout: ${layout.reason}`);
   } else {
-    log.info(`Pane layout ${layout.kind}; ${'enabled' in layout ? layout.enabled : 0} pane(s)`);
+    log.info(`Pane layout ${layout.kind}; ${viewState.getEnabledPaneIds().length} pane(s)`);
   }
   // S4.1R17（OP-6）：首次安裝且無已配置 space 時，以**工作區根**作為主窗格預設根，
   // 使上方窗格內容與內建 File Explorer 一致。
@@ -216,8 +192,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   /** 子窗格鏈結變更後，重繪它的父窗格（父列上的「→ Folder Space n」標記所在）。 */
   const refreshParentLinkRow = (childPaneId: string, previousParent?: string | null): void => {
-    refreshLinkRows(previousParent, viewState.getEnabledPaneIds().includes(childPaneId)
-      ? viewState.get(childPaneId).parentPaneId : undefined);
+    refreshLinkRows(previousParent, viewState.getPaneLinks()[childPaneId]?.parentPaneId);
   };
   const cascadeDisposables = new Map<string, vscode.Disposable>();
   const cascadeController = new PaneCascadeController({
@@ -296,7 +271,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const definitions = paneDefinitionsFor(paneId);
     const root = activeRoot(pane);
     runtime.scope = root ? { paneId, root } : undefined;
-    runtime.provider.expandRoot = Boolean(pane.parentPaneId);
+    runtime.provider.expandRoot = paneSlotOf(paneId) === 'secondary';
     runtime.provider.setScope(definitions.length > 0 ? { paneId, definitions } : undefined);
     // S4.1：pane 標題一律為「Folder Space <n>」（根路徑由 description 顯示）。
     runtime.treeView.title = vscode.l10n.t('Folder Space {0}', paneIndexOf(paneId));
@@ -331,19 +306,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const createPane = (paneId: string): PaneRuntime => {
     // 第 4 參注入共享 cache（W2 凍結的簽名：store, viewState, scope?, directoryCache?）；注入時 provider 不 dispose 它。
     // 第 5 參（S4.1R13）：父側鏈路標記；僅 follow 子窗格目前指向的資料夾會標示。
-    const provider = new SpaceTreeDataProvider(store, viewState, undefined, directoryCache, (parentPaneId, fsPath) => {
-      const links = Object.fromEntries(viewState.getEnabledPaneIds().map(id => {
-        const pane = viewState.get(id);
-        return [id, { parentPaneId: pane.parentPaneId, follow: pane.follow, roots: pane.roots, drillRoot: pane.drillRoot }];
-      }));
-      for (const [childPaneId, link] of Object.entries(links)) {
-        if (link.parentPaneId !== parentPaneId) continue;
-        const childNumber = linkedChildPaneNumber(links, parentPaneId, childPaneId, fsPath);
-        // 純邏輯層只回傳編號；UI 文字在此以 l10n 產生。
-        if (childNumber !== undefined) return vscode.l10n.t('→ Folder Space {0}', childNumber);
-      }
-      return undefined;
-    });
+    const provider = new SpaceTreeDataProvider(store, viewState, undefined, directoryCache, undefined);
     const treeView = vscode.window.createTreeView(`codeFolderSpaces.${paneId}`, {
       treeDataProvider: provider,
       showCollapseAll: false, // S4.1R4：改用自訂「收合全部／展開」切換按鈕（paneN.collapseAll／expandAll）
@@ -412,12 +375,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
    * 的根目錄自動同步對齊目前工作區的第一個資料夾。
    */
     const syncWorkspaceDirectory = async (): Promise<void> => {
-    const folders = vscode.workspace.workspaceFolders ?? [];
-    const roots = folders.map(folder => folder.uri.fsPath);
-    const panes = Object.fromEntries(viewState.getEnabledPaneIds().map(paneId => [paneId, viewState.get(paneId)]));
-    for (const paneId of panesToSyncWorkspaceRoots(panes, roots, isSamePath)) {
-      await viewState.setPaneRoots(paneId, roots);
-      await paneChanged(paneId);
+    const roots = (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath);
+    const current = viewState.get('pane1').roots;
+    if (settings().get<boolean>('followWorkspaceDirectory', true) &&
+        (current.length !== roots.length || current.some((root, index) => !isSamePath(root, roots[index])))) {
+      await viewState.setPaneRoots('pane1', roots);
+      await paneChanged('pane1');
     }
   };
 
@@ -435,53 +398,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 
 
-  /**
-   * OP-13：接龍自適應父面板模式（對齊 Obsidian handleAdaptiveCascadeParent）。
-   * 檢查所有啟用的 pane：若有連動中的子 pane，父面板切換為 cascadeParentPreset；
-   * 若無連動子 pane，父面板無損還原備份的獨立檢視。
-   */
-  const reconcileAdaptiveParents = async (): Promise<void> => {
-    const adaptiveEnabled = settings().get<boolean>('adaptiveCascadeParent', true);
-    const parentPreset = resolveConfiguredCascadeParentPreset(settings().get<string>('cascadeParentPreset'));
-    const links = viewState.getPaneLinks();
-    const enabledIds = viewState.getEnabledPaneIds();
-
-    for (const paneId of enabledIds) {
-      // S4.1R19（Bug A 修正）：判定「有連動子」必須要求子窗格**實際有 root**（可顯示內容）；
-      // 否在全新 workspace 下 pane2 的 `roots` 為空但 `follow:true`，會誤把 pane1 切成 Navigate。
-      const hasFollowingChild = enabledIds.some(childId => {
-        const link = links[childId];
-        return link && link.parentPaneId === paneId && link.follow && viewState.get(childId).roots.length > 0;
-      });
-      // 當設定關閉時，hasFollowingChild 視為 false，促使父面板自動還原並清除 backup
-      const shouldBeAdaptive = adaptiveEnabled && hasFollowingChild;
-      const changed = await viewState.handleAdaptiveCascadeParent(paneId, shouldBeAdaptive, parentPreset);
-      if (changed) {
-        repaintPane(paneId);
-      }
-    }
-  };
-
   const syncPaneContexts = async (): Promise<void> => {
     const links = viewState.getPaneLinks();
-    const enabled = viewState.getEnabledPaneIds();
+    const enabled = new Set(viewState.getEnabledPaneIds());
     for (let index = 1; index <= MAX_PANE_INDEX; index++) {
       const id = `pane${index}`;
-      const pane = links[id];
-      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.enabled`, Boolean(pane));
+      const active = enabled.has(id);
+      const pane = active ? links[id] : undefined;
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.enabled`, active);
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasRoot`, Boolean(pane && viewState.get(id).roots.length > 0));
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.canRemoveRoot`, Boolean(pane && viewState.get(id).roots.length > 1));
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasParent`, Boolean(pane?.parentPaneId));
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.follow`, Boolean(pane?.follow));
-      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasChild`, enabled.some(childId => links[childId]?.parentPaneId === id));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasChild`, active && id === 'pane1' && enabled.has('pane2'));
     }
-    // D65/D71：上下限只看 pane 狀態，不再看 spaces 數量。
-    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canAddPane', enabled.length < MAX_PANE_INDEX);
-    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canRemovePane', enabled.length > 1);
-    // S4.1R3：pane1 可關閉，其 `when` 改為 `!layoutReady || pane1.enabled`；啟動後才為 true，確保冷啟動時 pane1 恆可見（S4R6-D77）。
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', viewState.getMode());
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canAddPane', false);
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canRemovePane', false);
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.layoutReady', true);
     linkStatusBar?.update();
-    await reconcileAdaptiveParents();
   };
 
   const reconcilePaneRoots = async (): Promise<void> => {
@@ -574,10 +509,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   // S4.1R13：以 let 宣告，允許 syncPaneContexts（定義於上方）在賦值前呼叫時安全跳過（避免 TDZ）。
   let linkStatusBar: LinkStatusBar | undefined;
   linkStatusBar = new LinkStatusBar(() => {
-    const links = Object.fromEntries(viewState.getEnabledPaneIds().map(id => {
-      const pane = viewState.get(id);
-      return [id, { parentPaneId: pane.parentPaneId, follow: pane.follow, roots: pane.roots, drillRoot: pane.drillRoot }];
-    }));
+    const projectedLinks = viewState.getPaneLinks();
+    const links = Object.fromEntries(viewState.getEnabledPaneIds().map(id => [id, {
+      ...projectedLinks[id], roots: viewState.get(id).roots, drillRoot: viewState.get(id).drillRoot,
+    }]));
     // S4.1R17（OP-22，使用者裁決）：列出**所有**父子關係，每組只呈現上下兩層。
     // 格式：`Folder Spaces: 1→2/3, 2→4`（一父多子以 `/` 串接、多組以 `, ` 分隔）。
     const groups = describePaneLinkEdgeGroups(links);
@@ -689,18 +624,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.followActiveFile', settings().get<boolean>('followActiveFile', true));
       scheduleFollow();
     }
-    if (event.affectsConfiguration('codeFolderSpaces.followWorkspaceDirectory')) {
-      void (async () => {
-        const enabled = settings().get<boolean>('followWorkspaceDirectory', true);
-        for (const paneId of viewState.getEnabledPaneIds()) {
-          await viewState.setPaneFollowWorkspaceDirectory(paneId, enabled);
-        }
-        await syncWorkspaceDirectory();
-      })();
-    }
-    if (event.affectsConfiguration('codeFolderSpaces.adaptiveCascadeParent') || event.affectsConfiguration('codeFolderSpaces.cascadeParentPreset')) {
-      void reconcileAdaptiveParents();
-    }
+    if (event.affectsConfiguration('codeFolderSpaces.followWorkspaceDirectory')) void syncWorkspaceDirectory();
   });
   context.subscriptions.push(
     followConfiguration,
@@ -741,7 +665,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canDrillUp', pane.drillStack.length > 0);
     const paneView = effectiveView(pane);
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.preset', matchPresetName(paneView) ?? 'Custom');
-    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.mode', paneView.mode);
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.viewMode', paneView.mode);
     // S4.1：每個 pane 自己的 title bar 按鈕狀態（行內按鈕一致、不再只服務 pane1）。
     const enabledIds = new Set(viewState.getEnabledPaneIds());
     for (let index = 1; index <= MAX_PANE_INDEX; index++) {
@@ -1108,19 +1032,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await paneChanged(paneId);
   };
 
-  const setFollowForPane = async (paneId: string, follow: boolean): Promise<void> => {
-    const pane = viewState.get(paneId);
-    if (!pane.parentPaneId || pane.follow === follow) return;
-    await viewState.setPaneParent(paneId, pane.parentPaneId, follow);
+  const setFollowForPane = async (_paneId: string, follow: boolean): Promise<void> => {
+    await viewState.setMode(follow ? 'dual' : 'tree');
+    syncPaneViews();
     await syncPaneContexts();
   };
 
   const toggleFollowForPane = async (paneId: string): Promise<void> => {
-    const pane = viewState.get(paneId);
-    if (!pane.parentPaneId) return;
-    await viewState.setPaneParent(paneId, pane.parentPaneId, !pane.follow);
-    refreshParentLinkRow(paneId);
-    await syncPaneContexts();
+    await setFollowForPane(paneId, viewState.getMode() !== 'dual');
   };
 
   const expandLevelForPane = async (paneId: string): Promise<void> => {
@@ -1153,95 +1072,36 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }
   };
 
-  /** 「在此開子 pane」（S4.1R12）：優先重用既有子窗格，否則配置可用插槽。 */
-  const addChildPane = async (node: unknown, paneId = targetPaneId(node), options?: { alwaysCreate?: boolean }): Promise<void> => {
+  const addChildPane = async (node: unknown, paneId = targetPaneId(node)): Promise<void> => {
     const info = nodeInfo(node);
     const target = info?.isDirectory ? info.uri.fsPath : rootOf(paneId);
     if (!target) {
       void vscode.window.showInformationMessage(vscode.l10n.t('Choose a folder inside this folder space first.'));
       return;
     }
-    // 樹列的 Activate Child Space（無 options 或 alwaysCreate=false）保留 R12a 行為：已有子窗格則改換其根。
-    // 「…」選單的 Add Child Space（alwaysCreate=true）名實相符：總是新增一個子空間。
-    const existingChild = options?.alwaysCreate
-      ? undefined
-      : viewState.getEnabledPaneIds().find(id => viewState.get(id).parentPaneId === paneId);
-    if (existingChild) {
-      await viewState.switchRoot(existingChild, target);
-      await paneChanged(existingChild);
-      return;
-    }
-    const sourcePane = viewState.get(paneId);
-    // 插槽決策抽為純函式（`nextChildPaneId`）以便單元測試。
-    const childId = nextChildPaneId(paneId, viewState.getEnabledPaneIds());
-    if (!childId) {
-      void vscode.window.showInformationMessage(vscode.l10n.t('Folder Spaces supports at most 8 folder space slots.'));
-      return;
-    }
-    try {
-      const childPreset = resolveConfiguredDefaultChildPreset(settings().get<string>('defaultChildPreset'));
-      await viewState.enablePane(childId, {
-        roots: [target],
-        parentPaneId: paneId,
-        follow: true,
-        preset: childPreset,
-        showFiles: sourcePane.showFiles,
-        include: [...sourcePane.include],
-        exclude: [...sourcePane.exclude],
-      });
-    } catch (error) {
-      void vscode.window.showErrorMessage(vscode.l10n.t('Invalid folder space link: {0}', String(error)));
-      return;
-    }
+    await viewState.setMode('dual');
+    await viewState.switchRoot('pane2', target);
     syncPaneViews();
-    // 標記出現在父 pane（paneId）的列上，必須刷新父自己。
-    refreshLinkRows(paneId);
-    await syncPaneContexts();
-    await reconcilePaneRoots();
-    await syncContext();
+    await paneChanged('pane2');
   };
 
-  /** 關閉 pane（D71（S4.1R3 修訂）：任一窗格可關閉；子 pane 重掛到被關閉 pane 的父）。 */
-  const closePane = async (paneId?: string): Promise<void> => {
-    const enabled = viewState.getEnabledPaneIds();
-    const target = paneId ?? enabled[enabled.length - 1];
-    // 審查 F-11：關閉守門抽為純函式（`canClosePane`）以便單元測試。
-    if (!target || !canClosePane(target, enabled)) return;
-    const removed = viewState.get(target);
-    // 被關閉窗格的父為唯一受影響列（子窗格重掛後仍指向同一個父）。
-    const affectedParentIds = [removed.parentPaneId];
-    await viewState.disablePane(target);
+  const closePane = async (paneId = 'pane2'): Promise<void> => {
+    if (paneId === 'pane1') {
+      void vscode.window.showInformationMessage(vscode.l10n.t('Folder Space 1 cannot be closed.'));
+      return;
+    }
+    await viewState.setMode('tree');
     syncPaneViews();
-    refreshLinkRows(...affectedParentIds);
     await syncPaneContexts();
-    await reconcilePaneRoots();
-    await syncContext();
   };
 
   const addPane = async (presetRoot?: string): Promise<void> => {
-    const paneId = viewState.allocatePaneId();
-    if (!paneId) {
-      void vscode.window.showInformationMessage(vscode.l10n.t('Folder Spaces supports at most 8 folder space slots.'));
-      return;
-    }
-    // S4.1R16（使用者要求）：Add Space 的選單項目與 Switch Root... 一致——
-    // 列出「已設定的 spaces」＋「目前主窗格資料夾下的子目錄」＋「Browse for folder…」。
-    const root = presetRoot ?? await browsePaneRoot(primaryPaneId());
+    const root = presetRoot ?? await browsePaneRoot('pane1');
     if (!root) return;
-    const source = viewState.get(primaryPaneId());
-    const initialPreset = resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset'));
-    // D64：頂層新 pane 的顯示設定繼承主 pane（最低編號啟用窗格）。
-    await viewState.enablePane(paneId, {
-      roots: [root],
-      preset: initialPreset,
-      showFiles: source.showFiles,
-      include: [...source.include],
-      exclude: [...source.exclude],
-    });
+    await viewState.setMode('dual');
+    await viewState.switchRoot('pane2', root);
     syncPaneViews();
-    await syncPaneContexts();
-    await reconcilePaneRoots();
-    await syncContext();
+    await paneChanged('pane2');
   };
 
   /**
@@ -1252,7 +1112,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const enabled = viewState.getEnabledPaneIds();
     if (enabled.some(id => rootOf(id) && isSamePath(rootOf(id) as string, root))) return;
     // 只填入頂層（無父窗格）的空窗格：鏈結子窗格的 root 會被父選取覆寫（D61/D74），新空間會看似消失。
-    const emptyId = enabled.find(id => !rootOf(id) && !viewState.get(id).parentPaneId);
+    const emptyId = viewState.getEnabledPaneIds().find(id => !rootOf(id));
     if (emptyId) {
       await viewState.switchRoot(emptyId, root);
       await paneChanged(emptyId);
@@ -1531,49 +1391,53 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }),
     ...Array.from({ length: MAX_PANE_INDEX }, (_, index) => {
       const id = `pane${index + 1}`;
+      const paneCommand = (handler: (...args: any[]) => unknown) => (...args: any[]): unknown => {
+        if (!viewState.getEnabledPaneIds().includes(id)) return;
+        return handler(...args);
+      };
       return [
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.toggleFollow`, () => toggleFollowForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.toggleFollow`, paneCommand(() => toggleFollowForPane(id))),
         // S4.1R20（方案 B）：原 4 個 submenu（Preset／Level／Content／Sort）改為 QuickPick 命令；
         // Mode 取代舊的 toggle 按鈕（可由選單直接選 Tree／Flat）。
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.preset`, () => setPresetForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.level`, () => pickLevelForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.content`, () => pickContentForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.mode`, () => pickModeForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.sort`, () => setSortForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.switchRoot`, () => switchRootForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.preset`, paneCommand(() => setPresetForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.level`, paneCommand(() => pickLevelForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.content`, paneCommand(() => pickContentForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.mode`, paneCommand(() => pickModeForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.sort`, paneCommand(() => setSortForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.switchRoot`, paneCommand(() => switchRootForPane(id))),
         // S4.1R11b：per-pane id 路由（D47——view/title 不提供 view id，全域 id 會操作錯 pane）。
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.add`, (given?: unknown) => addRootForPane(id, typeof given === 'string' ? given : undefined)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.add`, paneCommand((given?: unknown) => addRootForPane(id, typeof given === 'string' ? given : undefined))),
         // 兩個呼叫情境：
         //  (a) view/title 的「…」——**不帶節點**，以閉包 `id` 為 pane。
         //  (b) view/item/context 的 root 列 X——帶被點擊節點，**必須**以節點為準：
         //      該 menu 項目只有單一命令 id（pane1.root.remove）卻涵蓋 pane1..8，
         //      若用閉包 id 會讓 pane2..8 的 X 错路由到 pane1（審查 P1-1）。
         // 注意：不可改用 `targetPaneId(node)`——無節點時它會退化成主 pane，反而破壞 (a)。
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.remove`, (node?: unknown) => {
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.remove`, paneCommand((node?: unknown) => {
           const candidate = node && typeof node === 'object' ? node as { paneId?: unknown; rootPath?: unknown } : undefined;
           const nodePaneId = typeof candidate?.paneId === 'string' && /^pane[1-8]$/.test(candidate.paneId)
             ? candidate.paneId : id;
           const root = typeof candidate?.rootPath === 'string' ? candidate.rootPath : undefined;
           return removeRootForPane(nodePaneId, root);
-        }),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.addChild`, () => {
+        })),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.addChild`, paneCommand(() => {
           const runtime = paneRuntime.get(id);
           const selected = runtime?.treeView.selection[0];
           const target = nodeInfo(selected)?.isDirectory ? selected : rootNodeForPane(id);
           // 「…」選單的 Add Child Space：名稱與行為一致——**總是新增**子空間（不重用既有的）。
-          return addChildPane(target, id, { alwaysCreate: true });
-        }),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.close`, () => closePane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.collapseAll`, () => collapseAllForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.expandAll`, () => expandAllForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.refresh`, () => repaintPane(id)),
+          return addChildPane(target, id);
+        })),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.close`, paneCommand(() => closePane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.collapseAll`, paneCommand(() => collapseAllForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.expandAll`, paneCommand(() => expandAllForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.refresh`, paneCommand(() => repaintPane(id))),
         // S4.1：行內按鈕以 pane 專屬 id 路由（D47），各 pane 一致。
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.filter`, () => filterForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.clearFilter`, () => clearFilterForPane(id)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.drillUp`, () => drillUpForPane(id)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.filter`, paneCommand(() => filterForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.clearFilter`, paneCommand(() => clearFilterForPane(id))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.drillUp`, paneCommand(() => drillUpForPane(id))),
         // 審查 F-08：命令 id 描述的是**狀態**（follow 開／關），handler 則為切換，兩者故意相反。
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOn`, () => setFollowForPane(id, false)),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOff`, () => setFollowForPane(id, true)),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOn`, paneCommand(() => setFollowForPane(id, true))),
+        vscode.commands.registerCommand(`codeFolderSpaces.${id}.followOff`, paneCommand(() => setFollowForPane(id, false))),
       ];
     }).flat(),
     vscode.commands.registerCommand('codeFolderSpaces.drillDown', async (node?: unknown) => {
@@ -1583,8 +1447,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (!isAllowedSpaceRoot(info.definition.basePath, info.uri.fsPath)) return;
       // 根列對自身下鑽為 no-op，避免幽靈歷史。
       if (isSamePath(activeRoot(viewState.get(info.paneId)) ?? '', info.uri.fsPath)) return;
-      const childPreset = resolveConfiguredDefaultChildPreset(settings().get<string>('defaultChildPreset'));
-      await viewState.drillDown(info.paneId, info.uri.fsPath, childPreset);
+      // v2-redesign D4（使用者 2026-10-18）：就地下鑽只做root 切換＋返回堆疊，**不再切換 preset/view**。
+      // 舊行為（S4.1R8／OP-12 自動套用 `Contents`）已由 spec §8「就地導航 ✅ 保留（不再動 preset）」推翻。
+      await viewState.drillDown(info.paneId, info.uri.fsPath);
       await paneChanged(info.paneId);
     }),
     vscode.commands.registerCommand('codeFolderSpaces.drillUp', (node?: unknown) => drillUpForPane(targetPaneId(node))),
@@ -1703,10 +1568,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   return {
     version,
     getSpaces: () => store.getDefinitions().map((definition) => ({ name: definition.name, basePath: definition.basePath })),
-    getPanes: () => viewState.getEnabledPaneIds().map((id) => {
-      const pane = viewState.get(id);
-      return { id, root: rootOf(id), roots: [...pane.roots], parentPaneId: pane.parentPaneId, follow: pane.follow, followWorkspaceDirectory: pane.followWorkspaceDirectory, preset: matchPresetName(effectiveView(pane)) ?? 'Custom' };
-    }),
+    getPanes: () => viewState.getEnabledPaneIds().map(id => ({
+      id, root: rootOf(id), roots: [...viewState.get(id).roots], mode: viewState.getMode(), slot: paneSlotOf(id),
+    })),
   };
 }
 

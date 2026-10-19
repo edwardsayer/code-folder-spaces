@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
-import { getFollowingChildPaneIds, isPaneRootDirectory } from './paneLinks';
-import type { PaneLinkState } from './viewState';
+import { isPaneRootDirectory, type PaneLinkState } from './paneRules';
+
+/** v2 過渡（R1 S2）：固定 pane1→pane2，等價於原 getFollowingChildPaneIds 的單子情境。 */
+function followingChildPaneIds(links: Record<string, PaneLinkState>, parentPaneId: string): string[] {
+  return Object.keys(links).filter(id => links[id].parentPaneId === parentPaneId && links[id].follow);
+}
 
 /** Pane cascade scope (S4R6): keyed by pane id; `root` is the pane's own root. */
 export interface PaneCascadeScope {
@@ -115,7 +119,7 @@ export class PaneCascadeController implements vscode.Disposable {
       roots: this.options.state.getPaneRoots(paneId),
     };
     const links = this.options.state.getPaneLinks();
-    if (!getFollowingChildPaneIds(links, paneId).length) return;
+    if (!followingChildPaneIds(links, paneId).length) return;
     const generation = ++task.generation;
     if (task.timer) clearTimeout(task.timer);
     task.timer = setTimeout(() => {
@@ -173,7 +177,7 @@ export class PaneCascadeController implements vscode.Disposable {
     try { stat = await this.options.stat(selectedUri); } catch { return; }
     if (!this.isCurrent(paneId, task, generation, parentSnapshot) || !isPaneRootDirectory(stat.type, this.options.directoryType)) return;
 
-    for (const childId of getFollowingChildPaneIds(this.options.state.getPaneLinks(), paneId)) {
+    for (const childId of followingChildPaneIds(this.options.state.getPaneLinks(), paneId)) {
       if (!this.isCurrent(paneId, task, generation, parentSnapshot)) return;
       const child = this.options.getRuntime(childId);
       // S4.1R19（Bug C 修正）：子窗格還沒 root（scope 為空）時，沉靜 continue 會讓使用者覺得

@@ -5,7 +5,8 @@ import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
 import { SpaceRootNode, SpaceTreeDataProvider } from '../../../src/spaces/spaceTreeDataProvider';
 import type { SpaceNode } from '../../../src/spaces/spaceTreeDataProvider';
-import { resolvePaneDefinition } from '../../../src/spaces/viewState';
+import { effectiveView, resolvePaneDefinition } from '../../../src/spaces/viewState';
+import { VIEW_PRESETS } from '../../../src/spaces/viewPresets';
 import type { SpaceConfigEntry } from '../../../src/types';
 import {
   assertFixtureWorkspace,
@@ -125,7 +126,7 @@ suite('空間樹 provider', () => {
     const { state } = createPaneStateHarness();
     try {
       const space = store.getDefinitions()[0];
-      await seedPane(state, 'pane1', { root: alpha });
+      await seedPane(state, 'pane1', { roots: [alpha] });
       // 未下鑽：definition.basePath = pane root，命中 space 時沿用其 name／icon。
       assert.equal(resolvePaneDefinition(state.get('pane1'), store.getDefinitions())?.basePath, alpha);
       assert.equal(resolvePaneDefinition(state.get('pane1'), store.getDefinitions())?.name, space.name);
@@ -138,7 +139,7 @@ suite('空間樹 provider', () => {
       assert.equal(drilled?.name, space.name);
 
       // 無 root 的 pane（viewsWelcome 情境）解析為 null。
-      await seedPane(state, 'pane2', { root: null });
+      await seedPane(state, 'pane2', { roots: [] });
       assert.equal(resolvePaneDefinition(state.get('pane2'), store.getDefinitions()), null);
     } finally {
       store.dispose();
@@ -155,8 +156,9 @@ suite('空間樹 provider', () => {
       await state.drillDown('pane1', path.join(alpha, 'nested'));
       sync('pane1');
       const drilled = await paneProvider.getChildren() as Node[];
-      assert.deepEqual(drilled.map(node => node.label).sort(), ['.', 'deeper']);
-      assert.equal(state.get('pane1').preset, 'Contents');
+      // v2-redesign D4：下鑽不再切換 preset/view，維持 Files（flat/all/files）→ 直接列出扁平的僅檔名。
+      assert.deepEqual(drilled.map(node => node.label).sort(), ['deep.md', 'deeper/two-level.md']);
+      assert.deepEqual(effectiveView(state.get('pane1')), { mode: 'flat', level: 'all', content: 'files' });
       assert.equal(await state.drillUp('pane1'), true);
       sync('pane1');
       const returned = await rootOf(paneProvider) as SpaceRootNode;
@@ -164,8 +166,8 @@ suite('空間樹 provider', () => {
       assert.equal(returned.id, `codeFolderSpaces.pane1:root:${alpha}`, 'root row id 應含 pane id 與 root 路徑');
       // 下鑽返回只還原 root，同時還原進入堆疊時的 preset／filter（v3 snapshot 語意）。
       assert.deepEqual(
-        { preset: state.get('pane1').preset, filter: state.get('pane1').filter, sort: state.get('pane1').sort, roots: state.get('pane1').roots, drillRoot: state.get('pane1').drillRoot, drillStack: state.get('pane1').drillStack },
-        { preset: 'Files', filter: 'deep', sort: { key: 'name', direction: 'asc' }, roots: [alpha], drillRoot: null, drillStack: [] }
+        { view: effectiveView(state.get('pane1')), filter: state.get('pane1').filter, sort: state.get('pane1').sort, roots: state.get('pane1').roots, drillRoot: state.get('pane1').drillRoot, drillStack: state.get('pane1').drillStack },
+        { view: { mode: 'flat', level: 'all', content: 'files' }, filter: 'deep', sort: { key: 'name', direction: 'asc' }, roots: [alpha], drillRoot: null, drillStack: [] }
       );
     }
   ));
@@ -231,6 +233,9 @@ suite('空間樹 provider', () => {
     [alpha, { path: beta, name: '自訂空間' }],
     [{ paneId: 'pane1', root: alpha }, { paneId: 'pane2', root: beta }],
     async ({ provider, state }) => {
+      // v2-redesign §2.2：`secondary` 的預設檢視是 `Contents`（flat）；本案例要驗「兩個 pane 各自
+      // 平鋪呈現自己的根」，故明確把 pane2 設回 `Explorer`（tree/all/all），不依賴隱含預設。
+      await state.setView('pane2', VIEW_PRESETS.Explorer);
       assert.deepEqual((await provider('pane1').getChildren()).map(node => node.label), ['nested', 'a.txt', 'B.txt']);
       assert.deepEqual((await provider('pane2').getChildren()).map(node => node.label), ['nested', 'b.md']);
       assert.ok((await provider('pane1').getChildren()).every(node => node.contextValue !== 'codeFolderSpaces.spaceRoot'));
@@ -273,7 +278,9 @@ suite('空間樹 provider', () => {
       { path: beta, include: ['**/*.md'] },
     ],
     [{ paneId: 'pane1', root: alpha }, { paneId: 'pane2', root: beta }],
-    async ({ provider }) => {
+    async ({ provider, state }) => {
+      // v2-redesign §2.2：pane2 預設 `Contents`（flat）；本案例比對「各層資料夾結構」，故明確設回 Explorer。
+      await state.setView('pane2', VIEW_PRESETS.Explorer);
       const alphaChildren = await provider('pane1').getChildren(await rootOf(provider('pane1'))) as Node[];
       assert.deepEqual(alphaChildren.map((node) => node.label), ['nested']);
       const nestedChildren = await provider('pane1').getChildren(alphaChildren[0]) as Node[];
@@ -286,41 +293,13 @@ suite('空間樹 provider', () => {
     }
   ));
 
-  test('per-pane 與全域 showFiles=false 均隱藏檔案', async () => {
-    await withPaneProviders(
-      [{ path: alpha, showFiles: false }],
-      [{ paneId: 'pane1', root: alpha }],
-      async ({ provider, state }) => {
-        // pane 建立時自 space 複製 showFiles=false，之後 pane 值為權威（S4R6-D70）。
-        assert.equal(state.get('pane1').showFiles, false);
-        const root = await rootOf(provider('pane1'));
-        const children = await provider('pane1').getChildren(root) as Node[];
-        assert.ok(children.length > 0);
-        assert.ok(children.every((node) => node.contextValue !== 'codeFolderSpaces.file'));
-      }
-    );
-    await withPaneProviders(
-      [alpha],
-      [{ paneId: 'pane1', root: alpha }],
-      async ({ provider, state }) => {
-        assert.equal(state.get('pane1').showFiles, false);
-        const root = await rootOf(provider('pane1'));
-        const children = await provider('pane1').getChildren(root) as Node[];
-        assert.ok(children.length > 0);
-        assert.ok(children.every((node) => node.contextValue !== 'codeFolderSpaces.file'));
-      },
-      { showFiles: false }
-    );
-  });
-
-  test('pane 可自行覆寫顯示設定而不改 space 設定（S4R6-D70）', async () => withPaneProviders(
+  test('showFiles 固定 true，space 設定中的舊值不隱藏檔案', async () => withPaneProviders(
     [{ path: alpha, showFiles: false }],
-    [{ paneId: 'pane1', root: alpha, overrides: { showFiles: true } }],
-    async ({ provider, state }) => {
-      assert.equal(state.get('pane1').showFiles, true);
+    [{ paneId: 'pane1', root: alpha }],
+    async ({ provider }) => {
       const root = await rootOf(provider('pane1'));
       const children = await provider('pane1').getChildren(root) as Node[];
-      assert.ok(children.some((node) => node.contextValue === 'codeFolderSpaces.file'));
+      assert.ok(children.some(node => node.contextValue === 'codeFolderSpaces.file'));
     }
   ));
 

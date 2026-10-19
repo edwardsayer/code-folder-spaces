@@ -18,7 +18,7 @@ import {
   wouldCreateCycle,
 } from '../../src/spaces/paneLinks';
 import type { PaneLinkDisplayEntry } from '../../src/spaces/paneLinks';
-import type { PaneLinkState } from '../../src/spaces/viewState';
+import type { PaneLinkState } from '../../src/spaces/paneRules';
 
 const chain = (count: number): Record<string, PaneLinkState> => Object.fromEntries(Array.from({ length: count }, (_, index) => [`pane${index + 1}`, {
   root: `/space/${index + 1}`, parentPaneId: index ? `pane${index}` : null, follow: index > 0,

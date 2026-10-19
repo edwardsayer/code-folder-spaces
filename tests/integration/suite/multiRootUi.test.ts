@@ -29,9 +29,22 @@ class MemoryMemento implements MementoLike {
 
 const norm = (value: string): string => path.normalize(value);
 
+/**
+ * v2-R1：`PANE_STATE_KEY` 已等於 `layout.v1` key，舊的 `{ version: 3, panes }` 文檔會被
+ * `normalizeLayout` 判為無效而重建預設（roots 為空）。因此種子資料必須以 `layout.v1` 形狀寫入：
+ * `panes.pane1` → `primary`、`panes.pane2` → `secondary`，其餘 pane 在 v2 不存在。
+ */
 function storeWith(panes: Record<string, unknown>): PaneStateStore {
   const memento = new MemoryMemento();
-  memento.values.set(PANE_STATE_KEY, { version: 3, panes });
+  const pane = (id: string): Record<string, unknown> => (panes[id] as Record<string, unknown> | undefined) ?? {};
+  const primary = pane('pane1');
+  const secondary = pane('pane2');
+  memento.values.set(PANE_STATE_KEY, {
+    version: 1,
+    mode: 'tree',
+    primary: { roots: [], drillRoot: null, drillStack: [], filter: '', sort: { key: 'name', direction: 'asc' }, view: { mode: 'tree', level: 'all', content: 'all' }, icon: null, include: [], exclude: [], ...primary },
+    secondary: { roots: [], drillRoot: null, drillStack: [], filter: '', sort: { key: 'name', direction: 'asc' }, view: { mode: 'flat', level: 'all', content: 'all' }, icon: null, include: [], exclude: [], ...secondary },
+  });
   return new PaneStateStore(memento);
 }
 
@@ -79,7 +92,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
     await vscode.commands.executeCommand('codeFolderSpaces.pane1.root.add', b);
 
-    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[] }> };
+    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }> };
     const paneBefore = api.getPanes().find(pane => pane.id === 'pane1');
     assert.equal(paneBefore?.roots.length, 2, `加入後應有 2 個 root，實際=${JSON.stringify(paneBefore?.roots)}`);
     assert.equal(normalize(paneBefore?.root ?? null), normalize(paneBefore?.roots[0] ?? null),
@@ -164,26 +177,26 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     assert.deepEqual(store.get('pane1').roots, [a, b], 'roots 必須保序且無重複');
   });
 
-  test('P1-4：真實 configuration 變更事件更新所有啟用 pane 的跟隨旗標', async () => {
+  test('P1-4：followWorkspaceDirectory 設定變更不改 layout/API pane shape', async () => {
     const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
     assert.ok(extension);
     await extension.activate();
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
-    const api = await extension.activate() as { getPanes(): Array<{ id: string; followWorkspaceDirectory: boolean }> };
+    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }> };
     const config = vscode.workspace.getConfiguration('codeFolderSpaces');
     const before = config.inspect<boolean>('followWorkspaceDirectory')?.globalValue;
     try {
-      const enabledIds = api.getPanes().map(pane => pane.id);
-      assert.ok(enabledIds.length > 0, '前置：至少有一個啟用 pane');
+      const beforePanes = api.getPanes();
+      assert.ok(beforePanes.length > 0, '前置：至少有一個啟用 pane');
       await config.update('followWorkspaceDirectory', false, vscode.ConfigurationTarget.Global);
       // P2-9：以輪詢取代固定 100ms 等待（CI 冷啟動下事件可能更慢）。
       const deadline = Date.now() + 2000;
       while (Date.now() < deadline) {
-        if (api.getPanes().every(pane => pane.followWorkspaceDirectory === false)) break;
+        if (api.getPanes().length === beforePanes.length) break;
         await new Promise(resolve => setTimeout(resolve, 25));
       }
-      assert.deepEqual(api.getPanes().map(pane => [pane.id, pane.followWorkspaceDirectory]), enabledIds.map(id => [id, false]),
-        'onDidChangeConfiguration 訂閱端應把新旗標寫入每個啟用 pane');
+      assert.deepEqual(api.getPanes().map(({ id, mode, slot }) => [id, mode, slot]), beforePanes.map(({ id, mode, slot }) => [id, mode, slot]),
+        '設定變更不得寫入或改變 layout pane 結構');
       // P2-9：原第三個斷言只是重述 paneLinks 已覆蓋的純函式，對本 seam 無鑑別力，已移除。
     } finally {
       await config.update('followWorkspaceDirectory', before, vscode.ConfigurationTarget.Global);
@@ -228,7 +241,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     await extension.activate();
 
     const normalize = (value: string | null): string => (value ?? '').split(String.fromCharCode(92)).join('/').toLowerCase();
-    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[] }> };
+    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }> };
 
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
     const pane1Before = api.getPanes().find(pane => pane.id === 'pane1');
@@ -256,7 +269,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
   test('單 root 守門：不得移除唯一 root（P1-3：Palette 等路徑可繞過 canRemoveRoot）', async () => {
     const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
     assert.ok(extension);
-    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[] }> };
+    const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }> };
 
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
     const before = api.getPanes().find(pane => pane.id === 'pane1');
