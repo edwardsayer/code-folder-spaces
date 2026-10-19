@@ -60,18 +60,3 @@ export function matchPresetName(view: ViewSettings): ViewPresetName | undefined 
     return preset.mode === view.mode && preset.level === view.level && preset.content === view.content;
   });
 }
-
-/**
- * OP-13：讀取 Obsidian 原版四項設定的安全解析函式。
- */
-export function resolveConfiguredDefaultPreset(configured?: unknown): ViewPresetName {
-  return isViewPresetName(configured) ? configured : DEFAULT_VIEW_PRESET;
-}
-
-export function resolveConfiguredDefaultChildPreset(configured?: unknown): ViewPresetName {
-  return isViewPresetName(configured) ? configured : 'Contents';
-}
-
-export function resolveConfiguredCascadeParentPreset(configured?: unknown): ViewPresetName {
-  return isViewPresetName(configured) ? configured : 'Navigate';
-}

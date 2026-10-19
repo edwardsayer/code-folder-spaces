@@ -8,7 +8,7 @@ import { originOf } from './spaces/spaceConfig';
 import { visibleWorkspaceRoots } from './spaces/workspaceRoots';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
-import { VIEW_PRESETS, matchPresetName, resolveConfiguredDefaultPreset } from './spaces/viewPresets';
+import { VIEW_PRESETS, matchPresetName } from './spaces/viewPresets';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
 import { isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
@@ -93,7 +93,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
   const paneInitContext = () => ({
     primaryRoot: store.getDefinitions()[0]?.basePath,
-    primaryView: VIEW_PRESETS[resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset'))],
+    primaryView: VIEW_PRESETS.Explorer,
   });
   const layout = await viewState.initialize(paneInitContext());
   if (layout.kind === 'rebuilt') {

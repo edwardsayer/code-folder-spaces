@@ -1199,53 +1199,6 @@
           "maximum": 100,
           "description": "%configuration.maxDepth.description%"
         },
-        "codeFolderSpaces.defaultPreset": {
-          "type": "string",
-          "enum": [
-            "Explorer",
-            "Navigate",
-            "Columns",
-            "Context",
-            "Contents",
-            "Files",
-            "List"
-          ],
-          "default": "Explorer",
-          "description": "%configuration.defaultPreset.description%"
-        },
-        "codeFolderSpaces.defaultChildPreset": {
-          "type": "string",
-          "enum": [
-            "Explorer",
-            "Navigate",
-            "Columns",
-            "Context",
-            "Contents",
-            "Files",
-            "List"
-          ],
-          "default": "Contents",
-          "description": "%configuration.defaultChildPreset.description%"
-        },
-        "codeFolderSpaces.adaptiveCascadeParent": {
-          "type": "boolean",
-          "default": true,
-          "description": "%configuration.adaptiveCascadeParent.description%"
-        },
-        "codeFolderSpaces.cascadeParentPreset": {
-          "type": "string",
-          "enum": [
-            "Explorer",
-            "Navigate",
-            "Columns",
-            "Context",
-            "Contents",
-            "Files",
-            "List"
-          ],
-          "default": "Navigate",
-          "description": "%configuration.cascadeParentPreset.description%"
-        },
         "codeFolderSpaces.followWorkspaceDirectory": {
           "type": "boolean",
           "default": true,
