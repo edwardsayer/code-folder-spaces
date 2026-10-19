@@ -2,7 +2,7 @@
   "name": "code-folder-spaces",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "edwardsayer",
   "license": "MIT",
   "engines": {
