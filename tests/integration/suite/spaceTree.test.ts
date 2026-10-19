@@ -76,9 +76,8 @@ suite('空間樹 provider', () => {
     async ({ provider, state, sync }) => {
       const scoped = provider('pane1');
       await state.drillDown('pane1', path.join(fixtureWorkspace, 'spaces/not-a-root'));
-      // drillDown 會一併切換為 Contents（扁平）預設集；本案例要驗的是「無效下鑽根 → fallback 回 pane 既有 roots」，
-      // 故先回復樹狀預設集（Explorer），否則扁平呈現（第一層僅資料夾群組）會被誤判為 fallback 失敗。
-      await state.setPreset('pane1', 'Explorer');
+      // v2-redesign D4：drillDown **不再切換 preset**，view 維持呼叫前的 Explorer（tree）。
+      // 本案例驗的是「無效下鑽根 → fallback 回 pane 既有 roots」，故不當修改 view。
       sync('pane1');
       assert.deepEqual(scoped.effectiveDefinitions().map(definition => definition.basePath), [alpha]);
       const children = await scoped.getChildren();
