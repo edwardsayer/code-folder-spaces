@@ -37,7 +37,7 @@
 4. **`resourceUri` 必填**：原生檔案圖示、Git 裝飾、問題徽章都依賴它。
 5. **無遠端程式碼**：所有相依在打包期 bundle 進 `.vsix`；`eval`／遠端載入一律禁止。
 6. **`engines.vscode` 與 `@types/vscode` 對齊**，調整最低版本需同步 `CHANGELOG.md`。
-7. **不使用 webview**：pane2 的清單效果由**檢視組合**（`mode`×`level`×`content`，即 `viewPresets.ts` 的底層維度）達成，以維持原生 TreeView 的雙 pane 佈局。v2 起 **preset 不再暴露於 UI**，僅作為內部檢視組合的具名投影（`VIEW_PRESETS` 保留）。設計見 `dev/specs/folder-spaces-v2-redesign.md`（v2 §2.2）與 `dev/specs/pane-cascade-and-presets-design.md`（歷史）。
+7. **不使用 webview**：pane2 的清單效果由**檢視組合**（`mode`×`level`×`content`，即 `viewPresets.ts` 的底層維度）達成，以維持原生 TreeView 的雙 pane 佈局。**現況（v2-R1 完成時）**：`preset` 相關 UI（`Preset:`／`Level`／`Content` QuickPick）與 4 個 preset／adaptive 設定**尚未移除**——依 v2 spec §10 排定於 **v2-R3／R4** 清理；`viewPresets.ts` 屆時仍保留作為底層檢視組合來源。設計見 `dev/specs/folder-spaces-v2-redesign.md`（v2 §2.2、§10）與 `dev/specs/pane-cascade-and-presets-design.md`（歷史）。
 8. **固定 2 pane（v2-redesign，2026-10-19 起；推翻原 S4R6-D60「8 pane／任意鏈結」）**：容器內只有 **`pane1`（永遠存在）＋ `pane2`（僅 `dual` 模式顯示）**。`mode: tree` 時 pane1 = `Explorer`（tree/all/all）、pane2 隱藏；`mode: dual` 時 pane1 = `Navigate`（tree/all/folders）、pane2 = `Contents`（flat/all/all）。**移除** `parentPaneId`／`follow`／一父多子／插槽分配／成環防護——pane2 的父永遠是 pane1。**`getEnabledPaneIds()` 由 mode 決定**；`pane1` 的 `when` 仍保留 `!codeFolderSpaces.layoutReady || codeFolderSpaces.pane1.enabled` 以維持冷啟動可達（S4R6 F-S4R6-1／D77 契約不變）；`pane2` 的 `when` 於 v2-R3 改為 `codeFolderSpaces.mode == dual`（目前仍用 `pane2.enabled`）。**狀態存 `codeFolderSpaces.layout.v1`**（`workspaceState`，無工作區退 `globalState`）；`preset` 僅為底層檢視組合的具名投影，**v2-R3 起從 UI 移除**。設計見 `dev/specs/folder-spaces-v2-redesign.md`（與 `pane-cascade-and-presets-design.md` 衝突時以 v2 spec 為準）。
 
 ## 指令與驗證
