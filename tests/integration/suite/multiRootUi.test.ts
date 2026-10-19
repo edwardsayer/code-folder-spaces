@@ -199,7 +199,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
 
   test('術語與命令契約：pane 專屬 view/title 項目使用 per-pane id（D47）', async () => {
     const pkg = vscode.extensions.getExtension('edwardsayer.code-folder-spaces')?.packageJSON as
-      { contributes?: { menus?: { 'view/title'?: Array<{ command?: string; when?: string }> } } } | undefined;
+      { contributes?: { menus?: { 'view/title'?: Array<{ command?: string; submenu?: string; when?: string }> } } } | undefined;
     const titleItems = pkg?.contributes?.menus?.['view/title'] ?? [];
     assert.ok(titleItems.length > 0, 'manifest 應有 view/title 項目');
 
@@ -212,20 +212,21 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
       const when = String(item.when ?? '');
       const match = /view == codeFolderSpaces\.(pane[1-8])/.exec(when);
       if (!match) return false;
+      if (item.submenu) return false;
       const command = String(item.command ?? '');
       if (globallyScoped.has(command)) return false;
       return !command.includes(`.${match[1]}.`);
     }).map(item => `${item.command} @ ${item.when}`);
     assert.deepEqual(offenders, [], `view/title 的 pane 專屬項目必須使用 per-pane id（D47）：${offenders.join('; ')}`);
 
-    // v2-redesign §5（v2-R3）：root 入口已從 title bar 收起，改由 pane1「…」聚合選單的
-    // `Add Folder Space…`（`codeFolderSpaces.addSpace`）與 `Switch Root…` 提供；
-    // `root.add`／`root.remove` 命令**仍存在於 manifest**（v2-R4 才清理宣告），只是不在 title。
-    // 此處僅驗證 D47（pane 專屬 title 項目必用 per-pane id），不再要求 root.add／remove 入 title。
+    // v2-R6：pane1 的檢視、排序與更多操作由原生 submenu 提供；pane2 沒有 more submenu。
     const commands = new Set(titleItems.map(item => String(item.command)));
+    const submenus = new Set(titleItems.map(item => String(item.submenu)));
     assert.ok(commands.has('codeFolderSpaces.pane1.addRoot'), 'pane1 應有 per-pane 的 addRoot 入口');
-    assert.ok(commands.has('codeFolderSpaces.pane1.more'), 'pane1 應有「…」聚合選單');
-    assert.ok(commands.has('codeFolderSpaces.pane2.more'), 'pane2 應有「…」聚合選單');
+    assert.ok(submenus.has('codeFolderSpaces.pane1.view'), 'pane1 應有原生 view submenu');
+    assert.ok(submenus.has('codeFolderSpaces.pane1.sort'), 'pane1 應有原生 sort submenu');
+    assert.ok(submenus.has('codeFolderSpaces.pane1.more'), 'pane1 應有原生 more submenu');
+    assert.ok(!submenus.has('codeFolderSpaces.pane2.more'), 'pane2 不應有 more submenu');
   });
 
   test('live 命令 pane2.root.remove 只操作 pane2（P1-1：不得錯路由到 pane1）', async () => {

@@ -129,5 +129,12 @@
   "command.pane1.viewMode.title": "View: Tree / Dual",
   "command.pane.more.title": "More...",
   "command.pane1.addRoot.title": "Add Folder...",
-  "command.pane1.toggleWorkspaceRoots.title": "Workspace Folders..."
+  "command.pane1.toggleWorkspaceRoots.title": "Workspace Folders...",
+  "submenu.pane1.view": "View",
+  "submenu.pane1.sort": "Sort",
+  "submenu.pane1.more": "More",
+  "command.pane1.mode.tree.title": "View: Tree",
+  "command.pane1.mode.dual.title": "View: Dual",
+  "command.pane1.toggleNested.title": "Toggle Nested Files",
+  "command.pane1.workspaceFolders.title": "Workspace Folders..."
 }

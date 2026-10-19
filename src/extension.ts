@@ -22,7 +22,6 @@ import { disposeLogChannel, getLogChannel } from './util/log';
 import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActiveFile';
 import { labelledValue, selectedQuickPickId, stableQuickPickItems } from './ui/stableQuickPick';
 import { clearLegacySpacesSetting } from './spaces/legacySpaces';
-import { applyPane2MenuChoice, pane1MenuItems, pane2MenuItems } from './spaces/paneMenu';
 
 const MAX_PANE_INDEX = 2;
 const REFRESH_DEBOUNCE_MS = 200;
@@ -1056,13 +1055,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await syncPaneContexts();
   };
 
-  const addPane = async (presetRoot?: string): Promise<void> => {
+  /**
+   * pane2 的 root 只能由 cascade 或 adoptChild（S4）改變；一般開啟／新增 root 一律寫入 pane1。
+   * 將指定資料夾加入 pane1 roots，不擅自切換 Dual 模式。
+   */
+  const openRootInPane1 = async (presetRoot?: string): Promise<void> => {
     const root = presetRoot ?? await browsePaneRoot('pane1');
     if (!root) return;
-    await viewState.setMode('dual');
-    await viewState.switchRoot('pane2', root);
-    syncPaneViews();
-    await paneChanged('pane2');
+    await viewState.addPaneRoot('pane1', root);
+    await paneChanged('pane1');
   };
 
   /** 將新增的 space root 加入 pane1；pane2 僅由 pane cascade 切換 root。 */
@@ -1184,81 +1185,43 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await syncWorkspaceDirectory();
   };
 
+  const setPane1Sort = async (key: 'name' | 'mtime' | 'ctime', direction: 'asc' | 'desc'): Promise<void> => {
+    await viewState.setSort('pane1', key, direction);
+    repaintPane('pane1');
+    await syncContext();
+  };
+
   context.subscriptions.push(
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.toggleWorkspaceRoots', () => toggleWorkspaceRoots()),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.viewMode', async () => {
-      const current = viewState.getMode();
-      const items = stableQuickPickItems<'tree' | 'dual'>([
-        { id: 'tree', label: vscode.l10n.t('View: Tree'), picked: current === 'tree' },
-        { id: 'dual', label: vscode.l10n.t('View: Dual'), picked: current === 'dual' },
-      ]);
-      const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
-        placeHolder: vscode.l10n.t('Select view layout'),
-      }));
-      if (!selected || selected === current) return;
-      await viewState.setMode(selected);
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.tree', async () => {
+      if (viewState.getMode() === 'tree') return;
+      await viewState.setMode('tree');
       syncPaneViews();
       await syncPaneContexts();
       await syncContext();
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.addRoot', () => addRootForPane('pane1')),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.more', async () => {
-      const labels: Record<string, string> = {
-        'view.tree': vscode.l10n.t('View: Tree'),
-        'view.dual': vscode.l10n.t('View: Dual'),
-        'add.space': vscode.l10n.t('Add Folder Space…'),
-        'workspace.folders': vscode.l10n.t('Workspace Folders…'),
-        'switch.root': vscode.l10n.t('Switch Root…'),
-        sort: labelledValue(vscode.l10n.t('Sort'), viewState.get('pane1').sort.key, vscode.l10n.t('N/A')),
-        'reset.layout': vscode.l10n.t('Reset Layout'),
-      };
-      const items = stableQuickPickItems(pane1MenuItems({ mode: viewState.getMode() }).map(item => ({
-        id: item.id, label: labels[item.id] ?? item.id, picked: item.picked,
-      })));
-      const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
-        placeHolder: vscode.l10n.t('Folder Space 1 actions'),
-      }));
-      if (!selected) return;
-      switch (selected) {
-        case 'view.tree': case 'view.dual': {
-          const mode = selected === 'view.tree' ? 'tree' : 'dual';
-          if (viewState.getMode() === mode) break;
-          await viewState.setMode(mode);
-          syncPaneViews();
-          await syncPaneContexts();
-          await syncContext();
-          break;
-        }
-        case 'add.space': await vscode.commands.executeCommand('codeFolderSpaces.addSpace'); break;
-        case 'workspace.folders': await toggleWorkspaceRoots(); break;
-        case 'switch.root': await switchRootForPane('pane1'); break;
-        case 'sort': await setSortForPane('pane1'); break;
-        case 'reset.layout': await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout'); break;
-      }
-    }),
-    vscode.commands.registerCommand('codeFolderSpaces.pane2.more', async () => {
-      const view = effectiveView(viewState.get('pane2'));
-      const labels: Record<string, string> = {
-        'folders.toggle': view.content === 'files' ? vscode.l10n.t('Show Folders') : vscode.l10n.t('Hide Folders'),
-        'nested.toggle': view.mode === 'flat' ? vscode.l10n.t('Hide Nested Files') : vscode.l10n.t('Show Nested Files'),
-        'switch.root': vscode.l10n.t('Switch Root…'),
-        close: vscode.l10n.t('Close Folder Space 2'),
-      };
-      const items = pane2MenuItems(view).filter(item => !item.disabled).map(item => ({
-        id: item.id, label: labels[item.id] ?? item.id,
-      }));
-      const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
-        placeHolder: vscode.l10n.t('Folder Space 2 actions'),
-      }));
-      if (!selected) return;
-      if (selected === 'switch.root') { await switchRootForPane('pane2'); return; }
-      if (selected === 'close') { await closePane('pane2'); return; }
-      const next = applyPane2MenuChoice(view, selected);
-      if (!next) return;
-      await viewState.setView('pane2', next);
-      repaintPane('pane2');
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.dual', async () => {
+      if (viewState.getMode() === 'dual') return;
+      await viewState.setMode('dual');
+      syncPaneViews();
+      await syncPaneContexts();
       await syncContext();
     }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.toggleNested', async () => {
+      const view = effectiveView(viewState.get('pane1'));
+      await viewState.setView('pane1', { ...view, mode: view.mode === 'tree' ? 'flat' : 'tree' });
+      repaintPane('pane1');
+      await syncContext();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.asc', () => setPane1Sort('name', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.desc', () => setPane1Sort('name', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.asc', () => setPane1Sort('mtime', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.desc', () => setPane1Sort('mtime', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.asc', () => setPane1Sort('ctime', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.desc', () => setPane1Sort('ctime', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.workspaceFolders', () => toggleWorkspaceRoots()),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.switchRoot', () => switchRootForPane('pane1')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.resetLayout', () => vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.addRoot', () => addRootForPane('pane1')),
     vscode.commands.registerCommand('codeFolderSpaces.focusMainPane', async () => {
       const runtime = paneRuntime.get(primaryPaneId());
       if (!runtime) return;
@@ -1355,10 +1318,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.drillUp`, paneCommand(() => drillUpForPane(id))),
       ];
     }).flat(),
-    vscode.commands.registerCommand('codeFolderSpaces.pane2.switchRoot', () => {
-      if (!viewState.getEnabledPaneIds().includes('pane2')) return;
-      return switchRootForPane('pane2');
-    }),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.close', () => {
       if (!viewState.getEnabledPaneIds().includes('pane2')) return;
       return closePane('pane2');
@@ -1402,7 +1361,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       } catch {
         return;
       }
-      await addPane(uri.fsPath);
+      await openRootInPane1(uri.fsPath);
     }),
     // 可選參數（資料夾路徑字串或 Uri）供自動化／其他命令略過原生對話框。
     vscode.commands.registerCommand('codeFolderSpaces.addSpace', async (target?: unknown) => {

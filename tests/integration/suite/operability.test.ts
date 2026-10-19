@@ -29,21 +29,21 @@ suite('可操作性（S4.1R5）', () => {
     const tree = createTempTree({ 'x/one.txt': '1' });
     try {
       const before = api.getPanes();
+      const beforeRoots = before[0]?.roots ?? [];
       await vscode.commands.executeCommand('codeFolderSpaces.addSpace', tree);
       const after = api.getPanes();
-      // P2-10：原 `opened = after.length - before.length; assert(opened > 0)` 近乎恆真；
-      // 改為直接斷言「新增的 pane」— 它必須是啟用中的 pane，且 root 指向該資料夾。
-      const openedPanes = after.filter(pane => !before.some(prior => prior.id === pane.id));
-      assert.ok(openedPanes.length > 0, '新增尚未存在的空間應開啟至少一個 pane');
-      assert.ok(openedPanes.every(pane => normalize(pane.root) === normalize(tree)),
-        `新增的 pane 必須以該資料夾為 root：${JSON.stringify(openedPanes)}`);
+      // v2-R6：`addSpace` 不再開新 pane（固定 2 pane），而是**加入 pane1 的 roots**。
+      // 驗證意圖不變：新增的 space 必須真的出現在 pane1 的 roots 裡。
+      const pane1After = after.find(pane => pane.id === 'pane1');
+      assert.ok(pane1After, 'pane1 必須存在');
+      assert.ok(pane1After.roots.some(root => normalize(root) === normalize(tree)),
+        `新增的 space 必須出現在 pane1 的 roots：${JSON.stringify(pane1After.roots)}`);
+      assert.ok(pane1After.roots.length > beforeRoots.length,
+        `pane1 的 roots 應增加：before=${beforeRoots.length} after=${pane1After.roots.length}`);
       await vscode.commands.executeCommand('codeFolderSpaces.addSpace', tree);
       assert.equal(api.getPanes().length, after.length, '重複新增不應再開窗格');
-      for (const pane of api.getPanes()) {
-        if (normalize(pane.root) === normalize(tree) && api.getPanes().length > 1) {
-          await vscode.commands.executeCommand('codeFolderSpaces.pane2.close');
-        }
-      }
+      const pane1Again = api.getPanes().find(pane => pane.id === 'pane1');
+      assert.equal(pane1Again?.roots.length, pane1After.roots.length, '重複新增不應重複加入 roots');
     } finally {
       removeTempTree(tree);
     }

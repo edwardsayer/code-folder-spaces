@@ -129,5 +129,12 @@
   "command.pane1.viewMode.title": "檢視：樹狀／雙窗格",
   "command.pane.more.title": "更多...",
   "command.pane1.addRoot.title": "新增資料夾...",
-  "command.pane1.toggleWorkspaceRoots.title": "工作區資料夾..."
+  "command.pane1.toggleWorkspaceRoots.title": "工作區資料夾...",
+  "submenu.pane1.view": "檢視",
+  "submenu.pane1.sort": "排序",
+  "submenu.pane1.more": "更多",
+  "command.pane1.mode.tree.title": "檢視：樹狀",
+  "command.pane1.mode.dual.title": "檢視：雙窗格",
+  "command.pane1.toggleNested.title": "切換巢狀檔案",
+  "command.pane1.workspaceFolders.title": "工作區資料夾..."
 }

@@ -274,10 +274,6 @@
         "title": "%command.paneAction.refresh.title%"
       },
       {
-        "command": "codeFolderSpaces.pane2.switchRoot",
-        "title": "%command.paneAction.switchRoot.title%"
-      },
-      {
         "command": "codeFolderSpaces.pane2.root.add",
         "title": "%command.paneAction.root.add.title%"
       },
@@ -359,24 +355,64 @@
         "category": "%category.folderSpaces%"
       },
       {
-        "command": "codeFolderSpaces.pane1.viewMode",
-        "title": "%command.pane1.viewMode.title%"
-      },
-      {
-        "command": "codeFolderSpaces.pane1.more",
-        "title": "%command.pane.more.title%"
-      },
-      {
         "command": "codeFolderSpaces.pane1.addRoot",
         "title": "%command.pane1.addRoot.title%"
       },
       {
-        "command": "codeFolderSpaces.pane2.more",
-        "title": "%command.pane.more.title%"
+        "command": "codeFolderSpaces.pane1.mode.tree",
+        "title": "%command.pane1.mode.tree.title%",
+        "toggled": "codeFolderSpaces.mode == tree"
       },
       {
-        "command": "codeFolderSpaces.pane1.toggleWorkspaceRoots",
-        "title": "%command.pane1.toggleWorkspaceRoots.title%"
+        "command": "codeFolderSpaces.pane1.mode.dual",
+        "title": "%command.pane1.mode.dual.title%",
+        "toggled": "codeFolderSpaces.mode == dual"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.toggleNested",
+        "title": "%command.pane1.toggleNested.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'name:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'name:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'mtime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'mtime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'ctime:asc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%",
+        "toggled": "codeFolderSpaces.pane1.sort == 'ctime:desc'"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.workspaceFolders",
+        "title": "%command.pane1.workspaceFolders.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.switchRoot",
+        "title": "%command.switchRoot.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane1.resetLayout",
+        "title": "%command.pane.resetLayout.title%"
       }
     ],
     "keybindings": [
@@ -789,10 +825,6 @@
           "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane2.switchRoot",
-          "when": "false"
-        },
-        {
           "command": "codeFolderSpaces.pane2.close",
           "when": "false"
         },
@@ -857,23 +889,55 @@
           "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane1.viewMode",
-          "when": "false"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.more",
-          "when": "false"
-        },
-        {
           "command": "codeFolderSpaces.pane1.addRoot",
           "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane2.more",
+          "command": "codeFolderSpaces.pane1.mode.tree",
           "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane1.toggleWorkspaceRoots",
+          "command": "codeFolderSpaces.pane1.mode.dual",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.toggleNested",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.workspaceFolders",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.switchRoot",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.resetLayout",
           "when": "false"
         }
       ],
@@ -894,11 +958,6 @@
           "group": "navigation@2"
         },
         {
-          "command": "codeFolderSpaces.pane1.viewMode",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "2_view@1"
-        },
-        {
           "command": "codeFolderSpaces.pane1.addRoot",
           "when": "view == codeFolderSpaces.pane1",
           "group": "3_root@1"
@@ -907,11 +966,6 @@
           "command": "codeFolderSpaces.pane1.refresh",
           "when": "view == codeFolderSpaces.pane1",
           "group": "3_root@2"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.more",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "4_more@1"
         },
         {
           "command": "codeFolderSpaces.pane2.filter",
@@ -937,11 +991,6 @@
           "command": "codeFolderSpaces.pane2.refresh",
           "when": "view == codeFolderSpaces.pane2",
           "group": "3_pane@1"
-        },
-        {
-          "command": "codeFolderSpaces.pane2.more",
-          "when": "view == codeFolderSpaces.pane2",
-          "group": "4_more@1"
         },
         {
           "command": "codeFolderSpaces.pane2.close",
@@ -977,6 +1026,21 @@
           "command": "codeFolderSpaces.pane.resetLayout",
           "when": "view == codeFolderSpaces.pane8",
           "group": "4_layout@3"
+        },
+        {
+          "submenu": "codeFolderSpaces.pane1.view",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "1_view@1"
+        },
+        {
+          "submenu": "codeFolderSpaces.pane1.sort",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "2_sort@1"
+        },
+        {
+          "submenu": "codeFolderSpaces.pane1.more",
+          "when": "view == codeFolderSpaces.pane1",
+          "group": "3_more@1"
         }
       ],
       "view/item/context": [
@@ -1076,6 +1140,56 @@
           "command": "codeFolderSpaces.openInFolderSpaces",
           "when": "resourceScheme == file && !explorerResourceIsRoot && explorerResourceIsFolder && !listMultiSelection",
           "group": "navigation@100"
+        }
+      ],
+      "codeFolderSpaces.pane1.view": [
+        {
+          "command": "codeFolderSpaces.pane1.mode.tree",
+          "when": "codeFolderSpaces.mode != tree"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.mode.dual",
+          "when": "codeFolderSpaces.mode != dual"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.toggleNested"
+        }
+      ],
+      "codeFolderSpaces.pane1.sort": [
+        {
+          "command": "codeFolderSpaces.pane1.sort.name.asc",
+          "toggled": "codeFolderSpaces.pane1.sort == 'name:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.name.desc",
+          "toggled": "codeFolderSpaces.pane1.sort == 'name:desc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.mtime.asc",
+          "toggled": "codeFolderSpaces.pane1.sort == 'mtime:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.mtime.desc",
+          "toggled": "codeFolderSpaces.pane1.sort == 'mtime:desc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.ctime.asc",
+          "toggled": "codeFolderSpaces.pane1.sort == 'ctime:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.sort.ctime.desc",
+          "toggled": "codeFolderSpaces.pane1.sort == 'ctime:desc'"
+        }
+      ],
+      "codeFolderSpaces.pane1.more": [
+        {
+          "command": "codeFolderSpaces.pane1.workspaceFolders"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.switchRoot"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.resetLayout"
         }
       ]
     },
@@ -1201,7 +1315,20 @@
         }
       }
     },
-    "submenus": []
+    "submenus": [
+      {
+        "id": "codeFolderSpaces.pane1.view",
+        "label": "%submenu.pane1.view%"
+      },
+      {
+        "id": "codeFolderSpaces.pane1.sort",
+        "label": "%submenu.pane1.sort%"
+      },
+      {
+        "id": "codeFolderSpaces.pane1.more",
+        "label": "%submenu.pane1.more%"
+      }
+    ]
   },
   "scripts": {
     "build": "node esbuild.mjs",
