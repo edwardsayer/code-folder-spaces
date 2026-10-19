@@ -373,6 +373,11 @@
         "title": "%command.pane1.toggleNested.title%"
       },
       {
+        "command": "codeFolderSpaces.pane1.adoptChild",
+        "title": "%command.pane1.adoptChild.title%",
+        "icon": "$(arrow-down)"
+      },
+      {
         "command": "codeFolderSpaces.pane1.sort.name.asc",
         "title": "%command.paneAction.sort.name.asc.title%",
         "toggled": "codeFolderSpaces.pane1.sort == 'name:asc'"
@@ -905,6 +910,10 @@
           "when": "false"
         },
         {
+          "command": "codeFolderSpaces.pane1.adoptChild",
+          "when": "false"
+        },
+        {
           "command": "codeFolderSpaces.pane1.sort.name.asc",
           "when": "false"
         },
@@ -944,7 +953,12 @@
       "view/title": [
         {
           "command": "codeFolderSpaces.pane1.drillUp",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.canDrillUp",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode == tree && codeFolderSpaces.pane1.canDrillUp",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.adoptChild",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode == dual",
           "group": "navigation@1"
         },
         {
@@ -1152,7 +1166,8 @@
           "when": "codeFolderSpaces.mode != dual"
         },
         {
-          "command": "codeFolderSpaces.pane1.toggleNested"
+          "command": "codeFolderSpaces.pane1.toggleNested",
+          "when": "codeFolderSpaces.mode == tree"
         }
       ],
       "codeFolderSpaces.pane1.sort": [

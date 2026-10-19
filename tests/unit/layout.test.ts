@@ -36,6 +36,46 @@ function sample(): LayoutDocument {
   return buildDefaultLayout({ primaryRoot: P('alpha') });
 }
 
+describe('dual mode view behavior', () => {
+  it('uses Navigate and Contents in dual mode, then Explorer in tree mode', async () => {
+    const store = new LayoutStore(new MemoryMemento({ [LAYOUT_KEY]: sample() }));
+    await store.initialize({});
+    await store.setMode('dual');
+    await store.setView('pane1', VIEW_PRESETS.Navigate);
+    await store.setView('pane2', VIEW_PRESETS.Contents);
+    expect(store.get('pane1').view).toEqual(VIEW_PRESETS.Navigate);
+    expect(store.get('pane2').view).toEqual(VIEW_PRESETS.Contents);
+
+    await store.setMode('tree');
+    await store.setView('pane1', VIEW_PRESETS.Explorer);
+    expect(store.get('pane1').view).toEqual(VIEW_PRESETS.Explorer);
+  });
+
+  it('adopts pane2 root into pane1 drill state and restores Explorer view', async () => {
+    const store = new LayoutStore(new MemoryMemento({ [LAYOUT_KEY]: sample() }));
+    await store.initialize({});
+    await store.setMode('dual');
+    const childRoot = P('alpha', 'child');
+    await store.setPaneRoots('pane2', [childRoot]);
+    await store.setMode('tree');
+    await store.drillDown('pane1', childRoot);
+    await store.setView('pane1', VIEW_PRESETS.Explorer);
+    expect(store.getMode()).toBe('tree');
+    expect(store.get('pane1').drillRoot).toBe(childRoot);
+    expect(store.get('pane1').view).toEqual(VIEW_PRESETS.Explorer);
+  });
+
+  it('closes dual mode without drilling when pane2 has no root', async () => {
+    const store = new LayoutStore(new MemoryMemento({ [LAYOUT_KEY]: sample() }));
+    await store.initialize({});
+    await store.setMode('dual');
+    const previousDrillRoot = store.get('pane1').drillRoot;
+    await store.setMode('tree');
+    expect(store.getMode()).toBe('tree');
+    expect(store.get('pane1').drillRoot).toBe(previousDrillRoot);
+  });
+});
+
 describe('layout normalization', () => {
   it.each([null, undefined, {}, { version: 2, mode: 'tree', primary: {}, secondary: {} }, { version: 1, mode: 'tree', primary: {}, secondary: [], panes: [] }, { version: 1, mode: 'tree', secondary: {} }])('rejects malformed documents %#', value => {
     expect(normalizeLayout(value)).toBeNull();

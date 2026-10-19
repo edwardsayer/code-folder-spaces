@@ -1195,6 +1195,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.tree', async () => {
       if (viewState.getMode() === 'tree') return;
       await viewState.setMode('tree');
+      // 切換 mode 刻意覆寫 pane1 檢視，讓 Tree 模式固定回到 Explorer。
+      await viewState.setView('pane1', VIEW_PRESETS.Explorer);
       syncPaneViews();
       await syncPaneContexts();
       await syncContext();
@@ -1202,8 +1204,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.dual', async () => {
       if (viewState.getMode() === 'dual') return;
       await viewState.setMode('dual');
+      // 切換 mode 刻意覆寫 pane1 檢視，讓 Dual 模式固定使用 Navigate。
+      await viewState.setView('pane1', VIEW_PRESETS.Navigate);
+      // pane2 的角色固定是 pane1 選取資料夾的鏡像，內容一律 Contents（flat/all/all）。
+      // pane2 目前沒有能改變顯示的 UI 入口（僅有 filter 操作，不改 view），故無條件設定安全且 idempotent；若未來新增 pane2 view 控制，須重新考慮自訂判定。
+      await viewState.setView('pane2', VIEW_PRESETS.Contents);
       syncPaneViews();
       await syncPaneContexts();
+      await syncContext();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.adoptChild', async () => {
+      const childRoot = activeRoot(viewState.get('pane2'));
+      await viewState.setMode('tree');
+      syncPaneViews();
+      if (childRoot) {
+        await viewState.drillDown('pane1', childRoot);
+        await viewState.setView('pane1', VIEW_PRESETS.Explorer);
+      }
+      await paneChanged('pane1');
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.toggleNested', async () => {
