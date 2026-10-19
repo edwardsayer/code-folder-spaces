@@ -29,7 +29,13 @@ export type PaneLinkMarkerProvider = (paneId: string, fsPath: string) => string 
  */
 export type ExplorerVisibilityProvider = (relativePath: string, isDirectory: boolean) => boolean;
 
-/** Apply an injected pane-link marker to a folder tree item without touching other item fields. */
+/**
+ * Apply an injected pane-link marker to a folder tree item without touching other item fields.
+ *
+ * v2-R2 修正：只有在 marker **確實有值**時才覆寫 description。
+ * 原寫法 `item.description = markerProvider(...)` 在 marker 回傳 `undefined` 時會把既有
+ * description（例如 global root 的 `$(globe)`）一併抹掉。
+ */
 export function applyPaneLinkMarker<T extends { description?: string | boolean }>(
   item: T,
   paneId: string,
@@ -37,7 +43,8 @@ export function applyPaneLinkMarker<T extends { description?: string | boolean }
   isFolder: boolean,
   markerProvider?: PaneLinkMarkerProvider,
 ): T {
-  if (isFolder && markerProvider) item.description = markerProvider(paneId, fsPath);
+  const marker = isFolder && markerProvider ? markerProvider(paneId, fsPath) : undefined;
+  if (marker !== undefined) item.description = marker;
   return item;
 }
 
@@ -101,8 +108,11 @@ export class SpaceRootNode extends vscode.TreeItem {
     this.contextValue = 'codeFolderSpaces.spaceRoot';
     this.tooltip = definition.basePath;
     if (originOf(definition) === 'global') {
+      // spec §3.4 允許 `$(globe)` 或前綴 `🌐`。實測（2026-10-19 EDH）：VS Code 的
+      // `TreeItem.description` **不解析 codicon 語法**，寫 `$(globe)` 會原樣顯示成字面文字，
+      // 故改用 Unicode 地球符號。
       const description = typeof this.description === 'string' ? this.description : '';
-      this.description = description ? `$(globe) ${description}` : '$(globe)';
+      this.description = description ? `🌐 ${description}` : '🌐';
     }
     this.iconPath = resolveIcon(definition.icon) ?? vscode.ThemeIcon.Folder;
   }

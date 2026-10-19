@@ -23,6 +23,18 @@ describe('space tree pane-link marker', () => {
     expect(file.description).toBeUndefined();
   });
 
+  // v2-R2 回歸：marker 回 `undefined` 時**不得**抹掉既有 description（例如 global root 的 $(globe)）。
+  // 原寫法 `item.description = markerProvider(...)` 會把 $(globe) 覆寫成 undefined。
+  it('preserves an existing description when the marker is undefined', () => {
+    const item: { description?: string } = { description: '$(globe)' };
+    applyPaneLinkMarker(item, 'pane1', '/global/root', true, () => undefined);
+    expect(item.description).toBe('$(globe)');
+
+    const noProvider: { description?: string } = { description: '$(globe)' };
+    applyPaneLinkMarker(noProvider, 'pane1', '/global/root', true, undefined);
+    expect(noProvider.description).toBe('$(globe)');
+  });
+
   // S4.1R16：label.highlights 已撤回（使用者認為不足以表現父子連動），label 不得被改動。
   it('never rewrites the label (highlights were withdrawn in S4.1R16)', () => {
     const item: { label?: string; description?: string } = { label: 'childA' };

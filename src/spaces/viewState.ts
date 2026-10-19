@@ -4,6 +4,7 @@ import { LAYOUT_KEY, LEGACY_PANE_STATE_KEY, LEGACY_PANE_STATE_V1_KEY, LayoutStor
 import type { ViewAxisChange, ViewPresetName, ViewSettings } from './viewPresets';
 import { VIEW_PRESETS, applyViewAxis, isViewSettings } from './viewPresets';
 import { fixedPaneLinks } from './paneRules';
+import { originOf } from './spaceConfig';
 
 export type { SortKey, SortDirection, SortState } from './layout';
 export type MementoLike = LayoutMementoLike;
@@ -35,12 +36,18 @@ export function rootForUri(roots: readonly string[], target: string): string | n
     .sort((a, b) => path.relative(path.normalize(a), path.normalize(target)).length - path.relative(path.normalize(b), path.normalize(target)).length)[0] ?? null;
 }
 
-/** Resolve each pane root into a pane-scoped definition. */
+/** Resolve each pane root into a pane-scoped definition.
+ *
+ * v2-R2：若 root 命中某個 space，必須**沿用該 space 的 `origin`**，否則 global root
+ * 會被降級成 workspace，導致 🌐 標記（與 Mark／Unmark Global 判定）永遠不成立。
+ * 僅在未命中（使用者手動加入的任意資料夾）時才預設 workspace。
+ */
 export function resolvePaneDefinitions(pane: PaneState, spaces: SpaceDefinition[]): SpaceDefinition[] {
   return pane.roots.map(root => {
     const hit = spaces.find(space => samePath(space.basePath, root));
     return { basePath: root, name: hit?.name ?? path.basename(root), icon: pane.icon ?? hit?.icon,
-      showFiles: true, include: pane.include, exclude: pane.exclude, sourceIndex: hit?.sourceIndex ?? -1, origin: 'workspace' };
+      showFiles: true, include: pane.include, exclude: pane.exclude, sourceIndex: hit?.sourceIndex ?? -1,
+      origin: hit ? originOf(hit) : 'workspace' };
   });
 }
 
