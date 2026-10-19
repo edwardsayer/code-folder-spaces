@@ -41,7 +41,7 @@ suite('可操作性（S4.1R5）', () => {
       assert.equal(api.getPanes().length, after.length, '重複新增不應再開窗格');
       for (const pane of api.getPanes()) {
         if (normalize(pane.root) === normalize(tree) && api.getPanes().length > 1) {
-          await vscode.commands.executeCommand('codeFolderSpaces.pane.remove', pane.id);
+          await vscode.commands.executeCommand('codeFolderSpaces.pane2.close');
         }
       }
     } finally {

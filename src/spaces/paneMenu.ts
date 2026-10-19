@@ -38,6 +38,7 @@ export function pane2MenuItems(view: ViewSettings): PaneMenuItem[] {
       labelKey: isFlat ? 'paneMenu.hideNested' : 'paneMenu.showNested',
     },
     { id: 'switch.root', labelKey: 'paneMenu.switchRoot' },
+    { id: 'close', labelKey: 'paneMenu.close' },
   ];
 }
 
@@ -51,6 +52,7 @@ export function applyPane2MenuChoice(view: ViewSettings, choiceId: string): View
         ? { ...view, mode: 'flat', content: 'files' }
         : { ...view, mode: 'tree' };
     case 'switch.root':
+    case 'close':
     default:
       return null;
   }

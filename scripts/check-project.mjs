@@ -160,13 +160,10 @@ if (!pkg) {
   // S4.1R4：pane 命令必須齊備且在 Command Palette 隱藏；view/title 依 v2 固定雙 pane 契約檢查。
   // 僅在 manifest 採用 per-pane 命令時啟用（避免誤判其他專案／測試 fixture）。
   if ([...contributedCommands].some((id) => id.startsWith('codeFolderSpaces.pane1.'))) {
-    const paneActions = [
-      'filter', 'clearFilter', 'drillUp', 'followOn', 'followOff', 'toggleFollow', 'mode', 'switchRoot', 'addChild', 'close', 'refresh',
-      'collapseAll', 'expandAll', 'root.add', 'root.remove',
-      // S4.1R20（方案 B）：原 4 個 submenu 的 per-value 命令（preset.*／level.*／content.*／sort.*）
-      // 已改為 4 個 QuickPick 命令；契約改檢查這四個。
-      'preset', 'level', 'content', 'sort',
-    ];
+    const paneCommandContract = {
+      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'viewMode', 'more', 'addRoot', 'toggleWorkspaceRoots'],
+      2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'more', 'switchRoot', 'close'],
+    };
     const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
     // 契約隨產品演進維護：v2 固定雙 pane 的 title 清單取代舊多窗格清單，並非放寬檢查。
@@ -175,7 +172,7 @@ if (!pkg) {
       2: ['filter', 'clearFilter', 'collapseAll', 'expandAll', 'more', 'refresh'],
     };
     for (const [pane, expected] of Object.entries(paneTitleContract)) {
-      for (const action of paneActions) {
+      for (const action of paneCommandContract[pane]) {
         const id = `codeFolderSpaces.pane${pane}.${action}`;
         if (!contributedCommands.has(id)) errors.push(`缺少 pane 命令：${id}`);
         if (!palette.has(id)) errors.push(`pane 命令未在 Command Palette 隱藏：${id}`);

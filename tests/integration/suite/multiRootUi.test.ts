@@ -124,12 +124,10 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     assert.ok(extension);
     const manifest = extension.packageJSON as { contributes?: { menus?: { 'view/item/context'?: Array<{ command?: string; when?: string; group?: string }> } } };
     const entries = manifest.contributes?.menus?.['view/item/context'] ?? [];
-    const rootRemove = entries.filter(item => item.command === 'codeFolderSpaces.root.remove');
-    assert.ok(rootRemove.length > 0, 'manifest 應註冊 root.remove inline action');
-    assert.ok(rootRemove.every(item => /viewItem == codeFolderSpaces\.(spaceRoot|folder)/.test(item.when ?? '')),
-      `inline when 必須限制在 root/folder context：${JSON.stringify(rootRemove)}`);
-    assert.ok(rootRemove.every(item => !/pane[1-8]/.test(item.command ?? '')),
-      'root.remove command id 不得內嵌 pane slot');
+    const rootRemove = entries.filter(item => /codeFolderSpaces\.pane[12]\.root\.remove/.test(item.command ?? ''));
+    assert.equal(rootRemove.length, 2, 'pane1／pane2 應各有 pane-scoped root.remove inline action');
+    assert.ok(rootRemove.every(item => /viewItem == codeFolderSpaces\.spaceRoot/.test(item.when ?? '')),
+      `inline when 必須限制在 root context：${JSON.stringify(rootRemove)}`);
 
     // P2-3：鎖住本輪 OP-20 真正的 manifest 改動（原本只驗 root.remove，未驗下鑽／加子）。
     const drillInline = entries.filter(item => item.command === 'codeFolderSpaces.drillDown' && item.group === 'inline@2');
@@ -139,13 +137,8 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     assert.match(drillInline[0].when ?? '', /viewItem == codeFolderSpaces\.folder/, '下鑽 inline when 仍須涵蓋資料夾列');
     assert.ok(!/codeFolderSpaces\.file/.test(drillInline[0].when ?? ''), '下鑽不得出現在檔案列');
 
-    const addChildInline = entries.filter(item => item.command === 'codeFolderSpaces.pane.addChild');
-    assert.equal(addChildInline.length, 1, '加子窗格應恰好一個項目（不得在根列重複貢獻）');
-    assert.equal(addChildInline[0].group, 'inline@3', '加子窗格排在移除與下鑽之後');
-    assert.match(addChildInline[0].when ?? '', /viewItem == codeFolderSpaces\.spaceRoot/,
-      '加子窗格 when 必須涵蓋根目錄列（OP-20）');
-    assert.ok(!/codeFolderSpaces\.file/.test(addChildInline[0].when ?? ''), '加子窗格不得出現在檔案列');
-    assert.ok(!/pane[1-8]/.test(addChildInline[0].command ?? ''), 'D47：command id 不得內嵌 pane slot');
+    assert.equal(entries.filter(item => item.command === 'codeFolderSpaces.pane.addChild').length, 0,
+      'v2 不再貢獻 Add Child Space inline action');
   });
 
   test('canRemoveRoot 條件＝roots.length > 1，與選單 gate 一致', async () => {
@@ -235,9 +228,8 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     assert.ok(commands.has('codeFolderSpaces.pane2.more'), 'pane2 應有「…」聚合選單');
   });
 
-  test('live 命令 codeFolderSpaces.root.remove 以節點 paneId 路由（P1-1：不得错路由到 pane1）', async () => {
-    // view/item/context 的 root 列 X 只用單一全域命令涵蓋所有 pane，
-    // handler **必須**以節點 paneId 為準；否則 pane2 的 X 會去動 pane1。
+  test('live 命令 pane2.root.remove 只操作 pane2（P1-1：不得錯路由到 pane1）', async () => {
+    // view/item/context 的 root 列 X 使用 pane 專屬命令，避免 pane2 操作錯路由到 pane1。
     const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
     assert.ok(extension);
     await extension.activate();
@@ -249,7 +241,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     const pane1Before = api.getPanes().find(pane => pane.id === 'pane1');
     assert.ok(pane1Before, '前置：pane1 應存在');
 
-    // 以 pane2 的節點呼叫【全域】命令——模擬使用者點 pane2 的 root 列 X。
+    // 以 pane2 的節點呼叫 pane 專屬命令——模擬使用者點 pane2 的 root 列 X。
     const clickNode = {
       uri: vscode.Uri.file(path.join(tempRoot, 'b')),
       paneId: 'pane2',
@@ -257,7 +249,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
       rootPath: path.join(tempRoot, 'b'),
       definition: { basePath: path.join(tempRoot, 'b'), name: 'b', showFiles: true, include: [], exclude: [], sourceIndex: -1 },
     };
-    await vscode.commands.executeCommand('codeFolderSpaces.root.remove', clickNode);
+    await vscode.commands.executeCommand('codeFolderSpaces.pane2.root.remove', clickNode);
 
     const pane1After = api.getPanes().find(pane => pane.id === 'pane1');
     assert.ok(pane1After, 'pane1 必須仍存在');

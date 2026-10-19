@@ -52,9 +52,11 @@ describe('pane menu logic', () => {
       .toEqual({ mode: 'tree', level: 'all', content: 'files' });
   });
 
-  it('does not implement root switching or unknown choices as view changes', () => {
+  it('includes close and does not implement root switching or close as view changes', () => {
     const view: ViewSettings = { mode: 'tree', level: 'all', content: 'all' };
+    expect(pane2MenuItems(view).some(item => item.id === 'close')).toBe(true);
     expect(applyPane2MenuChoice(view, 'switch.root')).toBeNull();
+    expect(applyPane2MenuChoice(view, 'close')).toBeNull();
     expect(applyPane2MenuChoice(view, 'unknown')).toBeNull();
   });
 
