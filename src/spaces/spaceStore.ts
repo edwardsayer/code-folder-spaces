@@ -1,11 +1,19 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import type { SpaceConfigEntry, SpaceDefinition } from '../types';
-import { normalizeSpaceEntries } from './spaceConfig';
+import type { SpaceConfigEntry, SpaceDefinition, SpaceOrigin } from '../types';
+import { mergeSpaceDefinitions, normalizeSpaceEntries, originOf } from './spaceConfig';
 
 const SECTION = 'codeFolderSpaces';
-const SPACES_KEY = 'spaces';
+
+type StoreTarget = vscode.ConfigurationTarget;
+
+/** 測試用設定介面；正式執行仍使用 VS Code configuration。 */
+export interface SpaceStoreConfigurationShim {
+  get(origin: SpaceOrigin): SpaceConfigEntry[];
+  update(origin: SpaceOrigin, entries: SpaceConfigEntry[], target: StoreTarget): Promise<void>;
+  hasWorkspace(): boolean;
+}
 
 function samePath(a: string, b: string): boolean {
   const left = path.normalize(a);
@@ -14,8 +22,8 @@ function samePath(a: string, b: string): boolean {
 }
 
 /**
- * Reads and writes the `codeFolderSpaces.spaces` setting and exposes resolved
- * space definitions. Fires `onDidChange` when the configuration changes.
+ * Reads and writes the workspace/global space settings and exposes resolved
+ * definitions. Fires `onDidChange` when either source changes.
  */
 export class SpaceStore implements vscode.Disposable {
   private readonly _onDidChange = new vscode.EventEmitter<void>();
@@ -23,85 +31,138 @@ export class SpaceStore implements vscode.Disposable {
 
   private readonly _configurationListener: vscode.Disposable;
 
-  constructor() {
+  constructor(private readonly shim?: SpaceStoreConfigurationShim) {
     this._configurationListener = vscode.workspace.onDidChangeConfiguration((event) => {
-      // S4.1R20：`view.showFiles` 設定已移除，僅監聽 spaces 清單變更。
-      if (event.affectsConfiguration(`${SECTION}.${SPACES_KEY}`)) {
+      if (
+        event.affectsConfiguration(`${SECTION}.spaces.workspace`) ||
+        event.affectsConfiguration(`${SECTION}.spaces.global`)
+      ) {
         this._onDidChange.fire();
       }
     });
   }
 
-  /** Raw entries exactly as stored in settings (used for edits). */
-  getRawEntries(): SpaceConfigEntry[] {
-    const value = vscode.workspace.getConfiguration(SECTION).get<SpaceConfigEntry[]>(SPACES_KEY, []);
+  /** 讀取指定來源的原始設定（sourceIndex 僅對應此陣列）。 */
+  getRawEntries(origin: SpaceOrigin): SpaceConfigEntry[] {
+    const value = this.shim
+      ? this.shim.get(origin)
+      : vscode.workspace.getConfiguration(SECTION).get<SpaceConfigEntry[]>(`spaces.${origin}`, []);
     return Array.isArray(value) ? [...value] : [];
   }
 
-  /** Resolved, validated definitions ready for the tree. */
-  getDefinitions(): SpaceDefinition[] {
-    const configuration = vscode.workspace.getConfiguration(SECTION);
-    const entries = configuration.get<SpaceConfigEntry[]>(SPACES_KEY, []);
-    // S4.1R20（使用者）：移除 `view.showFiles` 設定。顯示與否改由每個 pane 的 preset
-    // 的 content 維度（all / folders / files）決定；這裡固定 true 保留 legacy 欄位相容性。
-    const showFiles = true;
+  /** 取得單一來源的正規化定義。 */
+  getDefinitionsByOrigin(origin: SpaceOrigin): SpaceDefinition[] {
     return normalizeSpaceEntries(
-      entries,
+      this.getRawEntries(origin),
       {
         workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
         userHome: os.homedir(),
       },
-      showFiles
+      true,
+      origin,
     );
   }
 
-  /** Adds a folder; no-op when the path is already present. */
-  async addSpace(basePath: string, name?: string): Promise<boolean> {
-    if (this.getDefinitions().some((definition) => samePath(definition.basePath, basePath))) {
-      return false;
-    }
+  /** 解析後依 workspace、global 順序合併定義。 */
+  getDefinitions(): SpaceDefinition[] {
+    return mergeSpaceDefinitions(this.getDefinitionsByOrigin('workspace'), this.getDefinitionsByOrigin('global'));
+  }
+
+  /** 新增資料夾；未指定來源時，有 workspace 寫入 workspace，否則寫入 global。 */
+  async addSpace(basePath: string, name?: string, origin?: SpaceOrigin): Promise<boolean> {
+    if (this.getDefinitions().some((definition) => samePath(definition.basePath, basePath))) return false;
+    const targetOrigin = origin ?? (this.hasWorkspace() ? 'workspace' : 'global');
     const entry: SpaceConfigEntry = name ? { path: basePath, name } : basePath;
-    await this._writeEntries([...this.getRawEntries(), entry]);
+    await this.writeEntries(targetOrigin, [...this.getRawEntries(targetOrigin), entry]);
     return true;
   }
 
   /** Explicitly updates a renamed space root after user confirmation. */
   async updateSpacePath(oldPath: string, newPath: string): Promise<boolean> {
-    const target = this.getDefinitions().find(definition => samePath(definition.basePath, oldPath));
+    const target = this.getDefinitions().find((definition) => samePath(definition.basePath, oldPath));
     if (!target) return false;
-    const entries = this.getRawEntries();
+    const origin = originOf(target);
+    const entries = this.getRawEntries(origin);
     const entry = entries[target.sourceIndex];
     entries[target.sourceIndex] = typeof entry === 'string' ? newPath : { ...entry, path: newPath };
-    await this._writeEntries(entries);
+    await this.writeEntries(origin, entries);
     return true;
   }
 
   /** Updates only the configured display name, preserving the path and other entry fields. */
   async renameSpace(basePath: string, name: string): Promise<boolean> {
-    const target = this.getDefinitions().find(definition => samePath(definition.basePath, basePath));
+    const target = this.getDefinitions().find((definition) => samePath(definition.basePath, basePath));
     if (!target) return false;
-    const entries = this.getRawEntries();
+    const origin = originOf(target);
+    const entries = this.getRawEntries(origin);
     const entry = entries[target.sourceIndex];
     entries[target.sourceIndex] = typeof entry === 'string' ? { path: entry, name } : { ...entry, name };
-    await this._writeEntries(entries);
+    await this.writeEntries(origin, entries);
     return true;
   }
 
-  /** Removes a folder by resolved path; returns whether an entry was removed. */
+  /** 移除定義所屬來源中的資料夾。 */
   async removeSpace(basePath: string): Promise<boolean> {
-    const entries = this.getRawEntries();
     const target = this.getDefinitions().find((definition) => samePath(definition.basePath, basePath));
-    if (!target) {
-      return false;
-    }
-    await this._writeEntries(entries.filter((_, index) => index !== target.sourceIndex));
+    if (!target) return false;
+    const origin = originOf(target);
+    const entries = this.getRawEntries(origin);
+    await this.writeEntries(origin, entries.filter((_, index) => index !== target.sourceIndex));
     return true;
   }
 
-  private async _writeEntries(entries: SpaceConfigEntry[]): Promise<void> {
-    const hasWorkspace = Boolean(vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length);
-    const target = hasWorkspace ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
-    await vscode.workspace.getConfiguration(SECTION).update(SPACES_KEY, entries, target);
+  /** 將 workspace 定義搬至 global 設定。 */
+  async markAsGlobal(basePath: string): Promise<boolean> {
+    return this.moveSpace(basePath, 'workspace', 'global');
+  }
+
+  /** 將 global 定義搬回 workspace 設定。 */
+  async unmarkGlobal(basePath: string): Promise<boolean> {
+    return this.moveSpace(basePath, 'global', 'workspace');
+  }
+
+  isGlobal(basePath: string): boolean {
+    const definition = this.getDefinitions().find((item) => samePath(item.basePath, basePath));
+    return definition ? originOf(definition) === 'global' : false;
+  }
+
+  private async moveSpace(basePath: string, from: SpaceOrigin, to: SpaceOrigin): Promise<boolean> {
+    const definition = this.getDefinitionsByOrigin(from).find((item) => samePath(item.basePath, basePath));
+    if (!definition) return false;
+    const snapshots = { [from]: this.getRawEntries(from), [to]: this.getRawEntries(to) } as Record<SpaceOrigin, SpaceConfigEntry[]>;
+    const source = [...snapshots[from]];
+    const destination = [...snapshots[to]];
+    const moved = source.splice(definition.sourceIndex, 1)[0];
+    if (moved === undefined) return false;
+    destination.push(moved);
+    const completed: SpaceOrigin[] = [];
+    try {
+      await this.writeEntries(from, source);
+      completed.push(from);
+      await this.writeEntries(to, destination);
+      completed.push(to);
+    } catch (error) {
+      for (const origin of completed.reverse()) {
+        try { await this.writeEntries(origin, snapshots[origin]); } catch { /* 保留原始失敗並繼續回復其他來源。 */ }
+      }
+      throw error;
+    }
+    return true;
+  }
+
+  private hasWorkspace(): boolean {
+    return this.shim
+      ? this.shim.hasWorkspace()
+      : Boolean(vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length);
+  }
+
+  private async writeEntries(origin: SpaceOrigin, entries: SpaceConfigEntry[]): Promise<void> {
+    const target = origin === 'workspace' ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+    if (this.shim) {
+      await this.shim.update(origin, entries, target);
+    } else {
+      await vscode.workspace.getConfiguration(SECTION).update(`spaces.${origin}`, entries, target);
+    }
   }
 
   dispose(): void {
