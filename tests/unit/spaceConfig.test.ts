@@ -6,6 +6,7 @@ import {
   isVisibleFile,
   matchesAnyPattern,
   normalizeSpaceEntries,
+  originOf,
   resolveSpacePath,
 } from '../../src/spaces/spaceConfig';
 
@@ -55,6 +56,7 @@ describe('normalizeSpaceEntries', () => {
     expect(definitions).toHaveLength(2);
     expect(definitions[0]).toMatchObject({ basePath: path.normalize(path.resolve('/repo/src')), name: 'src', showFiles: true, sourceIndex: 0 });
     expect(definitions[1]).toMatchObject({ basePath: path.normalize(path.resolve('/repo/docs')), name: 'Docs', showFiles: false, exclude: ['draft/**'], sourceIndex: 1 });
+    expect(definitions.map(definition => definition.origin)).toEqual(['workspace', 'workspace']);
   });
 
   it('skips invalid, unresolvable and duplicate entries', () => {
@@ -67,8 +69,17 @@ describe('normalizeSpaceEntries', () => {
     expect(definitions[0].sourceIndex).toBe(2);
   });
 
+  it('marks every definition with the requested origin', () => {
+    const definitions = normalizeSpaceEntries(['/repo/a', '/repo/b'], context, true, 'global');
+    expect(definitions.map(definition => definition.origin)).toEqual(['global', 'global']);
+  });
+
   it('tolerates non-array input', () => {
     expect(normalizeSpaceEntries(undefined, context, true)).toEqual([]);
+  });
+
+  it('defaults missing literal origins to workspace', () => {
+    expect(originOf({ basePath: '/repo', name: 'repo', showFiles: true, include: [], exclude: [], sourceIndex: 0 })).toBe('workspace');
   });
 });
 

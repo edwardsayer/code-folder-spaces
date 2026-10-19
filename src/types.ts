@@ -22,6 +22,8 @@ export interface SpaceConfigObject {
 
 export type SpaceConfigEntry = string | SpaceConfigObject;
 
+export type SpaceOrigin = 'workspace' | 'global';
+
 /** A validated, resolved space ready for the tree provider. */
 export interface SpaceDefinition {
   /** Normalized absolute folder path. */
@@ -38,4 +40,6 @@ export interface SpaceDefinition {
   exclude: string[];
   /** Index in the raw configuration array (stable identity for edits). */
   sourceIndex: number;
+  /** Which settings layer this definition came from; missing means workspace. */
+  origin?: SpaceOrigin;
 }

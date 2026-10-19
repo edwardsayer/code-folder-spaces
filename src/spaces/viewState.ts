@@ -40,7 +40,7 @@ export function resolvePaneDefinitions(pane: PaneState, spaces: SpaceDefinition[
   return pane.roots.map(root => {
     const hit = spaces.find(space => samePath(space.basePath, root));
     return { basePath: root, name: hit?.name ?? path.basename(root), icon: pane.icon ?? hit?.icon,
-      showFiles: true, include: pane.include, exclude: pane.exclude, sourceIndex: hit?.sourceIndex ?? -1 };
+      showFiles: true, include: pane.include, exclude: pane.exclude, sourceIndex: hit?.sourceIndex ?? -1, origin: 'workspace' };
   });
 }
 

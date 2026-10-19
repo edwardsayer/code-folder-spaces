@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import type { SpaceConfigEntry, SpaceDefinition } from '../types';
+import type { SpaceConfigEntry, SpaceDefinition, SpaceOrigin } from '../types';
 
 /** Values available for `${...}` interpolation in configured paths. */
 export interface VariableContext {
@@ -73,7 +73,8 @@ export function resolveSpacePath(rawPath: string, context: VariableContext): str
 export function normalizeSpaceEntries(
   entries: readonly SpaceConfigEntry[] | undefined,
   context: VariableContext,
-  defaultShowFiles: boolean
+  defaultShowFiles: boolean,
+  origin: SpaceOrigin = 'workspace'
 ): SpaceDefinition[] {
   if (!Array.isArray(entries)) {
     return [];
@@ -103,9 +104,34 @@ export function normalizeSpaceEntries(
       include: toStringArray(object.include),
       exclude: toStringArray(object.exclude),
       sourceIndex,
+      origin,
     });
   });
   return definitions;
+}
+
+/** 缺少來源標記的舊定義視為 workspace 層。 */
+export function originOf(definition: SpaceDefinition): SpaceOrigin {
+  return definition.origin ?? 'workspace';
+}
+
+/** 合併兩個來源的定義：workspace 在前，重複路徑由 workspace 優先。 */
+export function mergeSpaceDefinitions(
+  workspace: readonly SpaceDefinition[],
+  global: readonly SpaceDefinition[],
+): SpaceDefinition[] {
+  const seen = new Set<string>();
+  const result: SpaceDefinition[] = [];
+  for (const definition of [...workspace, ...global]) {
+    const basePath = normalizeBasePath(definition.basePath);
+    const key = process.platform === 'win32' ? basePath.toLowerCase() : basePath;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(definition);
+  }
+  return result;
 }
 
 function toStringArray(value: unknown): string[] {
