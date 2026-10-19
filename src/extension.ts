@@ -1065,21 +1065,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await paneChanged('pane2');
   };
 
-  /**
-   * S4.1R5（OP-9）：Palette「Add Folder Space」寫入 spaces 設定後，同時讓該資料夾在窗格中可見——
-   * 已有窗格以此為根則不重複；有空窗格（root 為 null）則填入；否則開新頂層窗格（滿 8 提示）。
-   */
+  /** 將新增的 space root 加入 pane1；pane2 僅由 pane cascade 切換 root。 */
   const showRootInPane = async (root: string): Promise<void> => {
-    const enabled = viewState.getEnabledPaneIds();
-    if (enabled.some(id => rootOf(id) && isSamePath(rootOf(id) as string, root))) return;
-    // 只填入頂層（無父窗格）的空窗格：鏈結子窗格的 root 會被父選取覆寫（D61/D74），新空間會看似消失。
-    const emptyId = viewState.getEnabledPaneIds().find(id => !rootOf(id));
-    if (emptyId) {
-      await viewState.switchRoot(emptyId, root);
-      await paneChanged(emptyId);
-      return;
-    }
-    await addPane(root);
+    const roots = viewState.get('pane1').roots;
+    if (roots.some(existing => isSamePath(existing, root))) return;
+    await viewState.addPaneRoot('pane1', root);
+    await paneChanged('pane1');
   };
 
   const clearFilterForPane = async (paneId: string): Promise<void> => {
@@ -1312,6 +1303,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.root.markAsGlobal', async (node?: unknown) => {
       if (!(node instanceof SpaceRootNode)) return;
       if (!await store.markAsGlobal(node.definition.basePath)) return;
+      for (const runtime of paneRuntime.values()) applyPaneScope(runtime.id);
       for (const runtime of paneRuntime.values()) runtime.provider.refresh();
       await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal', true);
       await syncContext();
@@ -1319,6 +1311,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.root.unmarkGlobal', async (node?: unknown) => {
       if (!(node instanceof SpaceRootNode)) return;
       if (!await store.unmarkGlobal(node.definition.basePath)) return;
+      for (const runtime of paneRuntime.values()) applyPaneScope(runtime.id);
       for (const runtime of paneRuntime.values()) runtime.provider.refresh();
       await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal', false);
       await syncContext();

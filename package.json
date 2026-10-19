@@ -885,23 +885,13 @@
         },
         {
           "command": "codeFolderSpaces.pane1.filter",
-          "when": "view == codeFolderSpaces.pane1",
+          "when": "view == codeFolderSpaces.pane1 && !codeFolderSpaces.pane1.hasFilter",
           "group": "navigation@2"
         },
         {
           "command": "codeFolderSpaces.pane1.clearFilter",
           "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.hasFilter",
-          "group": "navigation@3"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.collapseAll",
-          "when": "view == codeFolderSpaces.pane1 && !codeFolderSpaces.pane1.collapsed",
-          "group": "navigation@4"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.expandAll",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.collapsed",
-          "group": "navigation@4"
+          "group": "navigation@2"
         },
         {
           "command": "codeFolderSpaces.pane1.viewMode",
@@ -925,23 +915,23 @@
         },
         {
           "command": "codeFolderSpaces.pane2.filter",
-          "when": "view == codeFolderSpaces.pane2",
+          "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.hasFilter",
           "group": "navigation@1"
         },
         {
           "command": "codeFolderSpaces.pane2.clearFilter",
           "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.hasFilter",
-          "group": "navigation@2"
+          "group": "navigation@1"
         },
         {
           "command": "codeFolderSpaces.pane2.collapseAll",
           "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.collapsed",
-          "group": "navigation@3"
+          "group": "navigation@2"
         },
         {
           "command": "codeFolderSpaces.pane2.expandAll",
           "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.collapsed",
-          "group": "navigation@3"
+          "group": "navigation@2"
         },
         {
           "command": "codeFolderSpaces.pane2.refresh",
@@ -952,6 +942,11 @@
           "command": "codeFolderSpaces.pane2.more",
           "when": "view == codeFolderSpaces.pane2",
           "group": "4_more@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.close",
+          "when": "view == codeFolderSpaces.pane2",
+          "group": "4_close@1"
         },
         {
           "command": "codeFolderSpaces.pane.resetLayout",
