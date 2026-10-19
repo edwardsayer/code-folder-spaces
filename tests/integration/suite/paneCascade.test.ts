@@ -55,14 +55,14 @@ suite('pane cascade integration', () => {
       const selectedNested = await directoryNode(provider('pane1'), nested);
       emit('pane1', selectedNested);
       await waitFor(() => runtimes.get('pane2')!.scope!.root === nested);
-      assert.equal(state.getPaneLinks().pane2.root, nested);
-      assert.equal(state.getPaneLinks().pane2?.follow, true);
+      assert.equal(state.get('pane2').roots[0], nested);
+      assert.equal(state.getMode(), 'dual');
       assert.deepEqual((await provider('pane2').getChildren()).map(node => node.label), ['deeper', 'deep.md']);
 
       const selectedDeeper = await directoryNode(provider('pane2'), deeper);
       emit('pane2', selectedDeeper);
       await waitFor(() => runtimes.get('pane3')!.scope!.root === deeper);
-      assert.equal(state.getPaneLinks().pane3.root, deeper);
+      assert.equal(state.getMode(), 'dual');
 
       // 檔案選取不連動。
       const file = (await provider('pane1').getChildren())
@@ -78,7 +78,7 @@ suite('pane cascade integration', () => {
       await settle();
       assert.equal(runtimes.get('pane2')!.scope!.root, beforeFile);
       await state.setMode('dual');
-      assert.equal(state.getPaneLinks().pane2?.follow, true);
+      assert.equal(state.getMode(), 'dual');
 
       // 下鑽只改該 pane 自己的 root（v2 無 bySpace 共用）；未發出 selection event 故不連動。
       const pane2RootBefore = runtimes.get('pane2')!.scope!.root;
@@ -111,13 +111,13 @@ suite('pane cascade integration', () => {
       await state.switchRoot('pane2', betaNested);
       sync('pane2');
       assert.equal(state.get('pane2').roots[0], betaNested);
-      assert.equal(state.getPaneLinks().pane2?.follow, true, '手動換根不得關閉 follow（D61）');
+      assert.equal(state.getMode(), 'dual', '手動換根後仍維持 dual 模式（D61）');
 
       // 父 pane 下次選取不同資料夾 → 子 pane 再次跟隨父（父焦點事件為最終權威，D74）。
       emit('pane1', { uri: vscode.Uri.file(deeper), isDirectory: true });
       await waitFor(() => runtimes.get('pane2')!.scope!.root === deeper);
       assert.equal(state.get('pane2').roots[0], deeper);
-      assert.equal(state.getPaneLinks().pane2?.follow, true);
+      assert.equal(state.getMode(), 'dual');
     }
   ));
 
@@ -132,7 +132,7 @@ suite('pane cascade integration', () => {
       await settle(200);
       assert.equal(runtimes.get('pane2')!.scope!.root, beta);
       assert.equal(state.get('pane2').roots[0], beta);
-      assert.equal(state.getPaneLinks().pane2?.follow, true);
+      assert.equal(state.getMode(), 'dual');
     }
   ));
 
@@ -178,7 +178,7 @@ suite('pane cascade integration', () => {
           const result = adapter.getMode();
           if (secondStatComplete && !notifiedQueued) {
             notifiedQueued = true;
-            // getPaneLinks 在 enqueue 操作之前呼叫；microtask 令同步 enqueue 完成後再解鎖首筆寫入。
+            // 讀取模式在 enqueue 操作之前；microtask 令同步 enqueue 完成後再解鎖首筆寫入。
             queueMicrotask(secondCascadeQueued);
           }
           return result;
@@ -215,7 +215,7 @@ suite('pane cascade integration', () => {
       releaseFirstWrite();
       await waitFor(() => writeRoots.length === 2 && runtimes.get('pane2')!.scope!.root === deeper);
       assert.deepEqual(writeRoots, [nested, deeper]);
-      assert.equal(state.getPaneLinks().pane2.root, deeper);
+      assert.equal(state.get('pane2').roots[0], deeper);
       assert.equal(runtimes.get('pane2')!.scope!.root, deeper);
       channel.dispose();
       raceSafe.dispose();
@@ -227,7 +227,7 @@ suite('pane cascade integration', () => {
     chainSeeds,
     async ({ state, controller, provider, runtimes, createController, makeChannel }) => {
       controller.dispose();
-      const originalChildRoot = state.getPaneLinks().pane2.root;
+      const originalChildRoot = state.get('pane2').roots[0];
       // v2 scope 只有 paneId／root：root 被改、paneId 不符都是「快照過期」。
       for (const changedField of ['root', 'paneId'] as const) {
         const parent = runtimes.get('pane1')!;
@@ -254,7 +254,7 @@ suite('pane cascade integration', () => {
         else parent.scope!.paneId = 'pane9';
         releaseStat();
         await new Promise<void>(resolve => setImmediate(resolve));
-        assert.equal(state.getPaneLinks().pane2.root, originalChildRoot);
+        assert.equal(state.get('pane2').roots[0], originalChildRoot);
         assert.equal(runtimes.get('pane2')!.scope!.root, alpha);
         if (changedField === 'root') parent.scope!.root = alpha;
         else parent.scope!.paneId = 'pane1';
@@ -297,7 +297,7 @@ suite('pane cascade integration', () => {
       releaseStat();
       await new Promise<void>(resolve => setImmediate(resolve));
       assert.equal(controllerWrites, 0);
-      assert.equal(state.getPaneLinks().pane2, undefined);
+      assert.equal(state.getMode(), 'tree');
       assert.equal(removedScope.root, alpha);
       channel.dispose();
       removable.dispose();
@@ -327,8 +327,8 @@ suite('pane cascade integration', () => {
       assert.ok(selectedInBeta, `Expected directory node ${betaNested}`);
       emit('pane1', selectedInBeta);
       await waitFor(() => runtimes.get('pane2')!.scope!.root === betaNested);
-      assert.equal(state.getPaneLinks().pane2.root, betaNested);
-      assert.equal(state.getPaneLinks().pane2?.follow, true);
+      assert.equal(state.get('pane2').roots[0], betaNested);
+      assert.equal(state.getMode(), 'dual');
 
       // 另一個根（roots[0]）內的選取同樣必須能驅動。
       const alphaRootRow = (await provider('pane1').getChildren())
@@ -338,7 +338,7 @@ suite('pane cascade integration', () => {
       assert.ok(selectedInAlpha, `Expected directory node ${nested}`);
       emit('pane1', selectedInAlpha);
       await waitFor(() => runtimes.get('pane2')!.scope!.root === nested);
-      assert.equal(state.getPaneLinks().pane2.root, nested);
+      assert.equal(state.get('pane2').roots[0], nested);
 
       // 根之外的資料夾仍應被守門拒絕（不得因改為多 root 而失去邊界）。
       const before = runtimes.get('pane2')!.scope!.root;

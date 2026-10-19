@@ -10,8 +10,7 @@ import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { VIEW_PRESETS, matchPresetName, resolveConfiguredDefaultPreset } from './spaces/viewPresets';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
-import { describePaneLinkEdgeGroups, isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
-import { createLinkStatusSummaryFromEdges, LinkStatusBar } from './spaces/linkStatusBar';
+import { isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { normalizeExcludeSetting, parseGitIgnore, shouldHideLikeExplorer, type GitIgnoreRule } from './spaces/explorerVisibility';
 import { matchesAnyPattern } from './spaces/spaceConfig';
@@ -455,7 +454,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canAddPane', false);
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canRemovePane', false);
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.layoutReady', true);
-    linkStatusBar?.update();
   };
 
   const reconcilePaneRoots = async (): Promise<void> => {
@@ -545,28 +543,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   // S4.1R3：pane1 可關閉，原本寫死 pane1 的全域命令／follow 改以「主 pane」（最低編號啟用窗格）為標的。
   const primaryPaneId = (): string => viewState.getEnabledPaneIds()[0] ?? 'pane1';
   const pane1 = (): PaneRuntime | undefined => paneRuntime.get(primaryPaneId());
-  // S4.1R13：以 let 宣告，允許 syncPaneContexts（定義於上方）在賦值前呼叫時安全跳過（避免 TDZ）。
-  let linkStatusBar: LinkStatusBar | undefined;
-  linkStatusBar = new LinkStatusBar(() => {
-    const links: Record<string, { parentPaneId: string | null; follow: boolean }> = viewState.getMode() === 'dual'
-      ? { pane1: { parentPaneId: null, follow: false }, pane2: { parentPaneId: 'pane1', follow: true } }
-      : { pane1: { parentPaneId: null, follow: false } };
-    // v2 R1 暫時保留的雙窗格狀態列；tree 模式不顯示鏈結。
-    const groups = describePaneLinkEdgeGroups(links);
-    return createLinkStatusSummaryFromEdges(
-      groups,
-      index => String(index),
-      {
-        prefix: vscode.l10n.t('Folder Spaces:'),
-        separator: ', ',
-        childJoiner: '/',
-        arrow: '→',
-        followOff: line => vscode.l10n.t('{0} (follow off)', line),
-      },
-    );
-  }, 'codeFolderSpaces.focusMainPane');
-  context.subscriptions.push(linkStatusBar);
-
   /**
    * D84：reveal 前等待已開始的列舉收斂。whenSettled 內部已吸收 rejection，理論不 reject；
    * 防御性 try/catch 確保 settle 失敗不會讓 follow／命令抛出。

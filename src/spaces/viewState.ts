@@ -3,7 +3,6 @@ import type { SpaceDefinition } from '../types';
 import { LAYOUT_KEY, LEGACY_PANE_STATE_KEY, LEGACY_PANE_STATE_V1_KEY, LayoutStore, type LayoutInitContext, type LayoutPaneState, type MementoLike as LayoutMementoLike } from './layout';
 import type { ViewAxisChange, ViewPresetName, ViewSettings } from './viewPresets';
 import { VIEW_PRESETS, applyViewAxis, isViewSettings } from './viewPresets';
-import { fixedPaneLinks } from './paneRules';
 import { originOf } from './spaceConfig';
 
 export type { SortKey, SortDirection, SortState } from './layout';
@@ -65,10 +64,6 @@ export function classifySpaceRename(basePaths: string[], oldPath: string): Renam
 }
 
 export class PaneStateStore extends LayoutStore {
-  getPaneLinks(): Record<string, { root: string | null; parentPaneId: string | null; follow: boolean }> {
-    return fixedPaneLinks(id => activeRoot(this.get(id)), this.getMode());
-  }
-
   getEnabledPaneIds(): string[] { return this.getMode() === 'dual' ? ['pane1', 'pane2'] : ['pane1']; }
 
   async setPreset(paneId: string, name: ViewPresetName): Promise<void> {

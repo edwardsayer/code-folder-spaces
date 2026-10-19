@@ -35,7 +35,8 @@ describe('viewState compatibility layer', () => {
     await store.setMode('dual');
     expect(store.getEnabledPaneIds()).toEqual(['pane1', 'pane2']);
     await store.switchRoot('pane2', '/secondary');
-    expect(store.getPaneLinks()).toMatchObject({ pane2: { parentPaneId: 'pane1', follow: true } });
+    expect(store.getMode()).toBe('dual');
+    expect(store.get('pane2').roots).toEqual([normalize('/secondary')]);
     await store.addPaneRoot('pane1', '/extra');
     expect(store.get('pane1').roots).toEqual([normalize('/workspace'), normalize('/extra')]);
     await store.removePaneRoot('pane1', '/extra');
