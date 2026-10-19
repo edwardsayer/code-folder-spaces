@@ -135,5 +135,9 @@
   "configuration.spaces.global.description": "全域設定的資料夾空間。",
   "command.root.markAsGlobal.title": "標記為全域",
   "command.root.unmarkGlobal.title": "取消全域標記",
-  "command.toggleWorkspaceRoots.title": "工作區資料夾…"
+  "command.toggleWorkspaceRoots.title": "工作區資料夾…",
+  "command.pane1.viewMode.title": "檢視：樹狀／雙窗格",
+  "command.pane.more.title": "更多...",
+  "command.pane1.addRoot.title": "新增資料夾...",
+  "command.pane1.toggleWorkspaceRoots.title": "工作區資料夾..."
 }

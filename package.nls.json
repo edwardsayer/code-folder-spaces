@@ -135,5 +135,9 @@
   "configuration.spaces.global.description": "Folder spaces configured globally.",
   "command.root.markAsGlobal.title": "Mark as Global",
   "command.root.unmarkGlobal.title": "Unmark Global",
-  "command.toggleWorkspaceRoots.title": "Workspace Folders..."
+  "command.toggleWorkspaceRoots.title": "Workspace Folders...",
+  "command.pane1.viewMode.title": "View: Tree / Dual",
+  "command.pane.more.title": "More...",
+  "command.pane1.addRoot.title": "Add Folder...",
+  "command.pane1.toggleWorkspaceRoots.title": "Workspace Folders..."
 }

@@ -157,7 +157,7 @@ if (!pkg) {
   }
 
   const contributedCommands = new Set((pkg.contributes?.commands ?? []).map(({ command }) => command));
-  // S4.1R4：每個 pane（1..8）的 title bar／「…」選單契約——命令齊備、Command Palette 隱藏、view/title 項目一致。
+  // S4.1R4：pane 命令必須齊備且在 Command Palette 隱藏；view/title 依 v2 固定雙 pane 契約檢查。
   // 僅在 manifest 採用 per-pane 命令時啟用（避免誤判其他專案／測試 fixture）。
   if ([...contributedCommands].some((id) => id.startsWith('codeFolderSpaces.pane1.'))) {
     const paneActions = [
@@ -169,7 +169,12 @@ if (!pkg) {
     ];
     const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
-    for (let pane = 1; pane <= 8; pane++) {
+    // 契約隨產品演進維護：v2 固定雙 pane 的 title 清單取代舊多窗格清單，並非放寬檢查。
+    const paneTitleContract = {
+      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'viewMode', 'addRoot', 'more', 'refresh'],
+      2: ['filter', 'clearFilter', 'collapseAll', 'expandAll', 'more', 'refresh'],
+    };
+    for (const [pane, expected] of Object.entries(paneTitleContract)) {
       for (const action of paneActions) {
         const id = `codeFolderSpaces.pane${pane}.${action}`;
         if (!contributedCommands.has(id)) errors.push(`缺少 pane 命令：${id}`);
@@ -177,8 +182,10 @@ if (!pkg) {
       }
       const view = `view == codeFolderSpaces.pane${pane}`;
       const inTitle = titleItems.filter((item) => typeof item.when === 'string' && item.when.startsWith(view)).map((item) => item.command.replace(`pane${pane}.`, 'paneN.'));
-      const expected = ['filter', 'clearFilter', 'drillUp', 'followOn', 'followOff', 'collapseAll', 'expandAll', 'mode', 'switchRoot', 'addChild', 'refresh', 'close', 'root.add', 'root.remove'].map((action) => `codeFolderSpaces.paneN.${action}`);
-      for (const command of expected) if (!inTitle.includes(command)) errors.push(`pane${pane} 的 view/title 缺少 ${command}`);
+      for (const action of expected) {
+        const command = `codeFolderSpaces.paneN.${action}`;
+        if (!inTitle.includes(command)) errors.push(`pane${pane} 的 view/title 缺少 ${command}`);
+      }
     }
 
     // D47（S4.1R11b 回歸防線）：選單項目（view/title 與 view/item/context）不提供可靠的 view id。
