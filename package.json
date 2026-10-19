@@ -1085,6 +1085,10 @@
       {
         "command": "codeFolderSpaces.pane8.sort",
         "title": "%command.paneAction.sort.title%"
+      },
+      {
+        "command": "codeFolderSpaces.toggleWorkspaceRoots",
+        "title": "%command.toggleWorkspaceRoots.title%"
       }
     ],
     "keybindings": [
@@ -1480,8 +1484,14 @@
     ],
     "menus": {
       "commandPalette": [
-        { "command": "codeFolderSpaces.root.markAsGlobal", "when": "false" },
-        { "command": "codeFolderSpaces.root.unmarkGlobal", "when": "false" },
+        {
+          "command": "codeFolderSpaces.root.markAsGlobal",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.root.unmarkGlobal",
+          "when": "false"
+        },
         {
           "command": "codeFolderSpaces.focusMainPane",
           "when": "false"
@@ -2097,6 +2107,9 @@
         {
           "command": "codeFolderSpaces.pane8.sort",
           "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.toggleWorkspaceRoots"
         }
       ],
       "view/title": [

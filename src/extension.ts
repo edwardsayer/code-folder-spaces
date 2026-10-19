@@ -5,6 +5,7 @@ import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider, setLeafFolderIcon
 import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { originOf } from './spaces/spaceConfig';
+import { visibleWorkspaceRoots } from './spaces/workspaceRoots';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { VIEW_PRESETS, isViewPresetName, matchPresetName, resolveConfiguredDefaultPreset, type ViewAxisChange } from './spaces/viewPresets';
@@ -78,6 +79,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const hasWorkspace = Boolean(vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length);
   const viewState = new PaneStateStore(hasWorkspace ? context.workspaceState : context.globalState);
   const settings = () => vscode.workspace.getConfiguration('codeFolderSpaces');
+  const hiddenWorkspaceRoots = (): string[] => {
+    const hidden = context.workspaceState.get<unknown>('codeFolderSpaces.hiddenWorkspaceRoots', []);
+    return Array.isArray(hidden) ? hidden.filter((root): root is string => typeof root === 'string') : [];
+  };
   const paneInitContext = () => ({
     primaryRoot: store.getDefinitions()[0]?.basePath,
     primaryView: VIEW_PRESETS[resolveConfiguredDefaultPreset(settings().get<string>('defaultPreset'))],
@@ -394,11 +399,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
    * 的根目錄自動同步對齊目前工作區的第一個資料夾。
    */
     const syncWorkspaceDirectory = async (): Promise<void> => {
-    const roots = (vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri.fsPath);
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    const hidden = hiddenWorkspaceRoots();
+    const visible = visibleWorkspaceRoots(folders.map(folder => folder.uri.fsPath), hidden);
     const current = viewState.get('pane1').roots;
     if (settings().get<boolean>('followWorkspaceDirectory', true) &&
-        (current.length !== roots.length || current.some((root, index) => !isSamePath(root, roots[index])))) {
-      await viewState.setPaneRoots('pane1', roots);
+        (current.length !== visible.length || current.some((root, index) => !isSamePath(root, visible[index])))) {
+      if (visible.length === 0 && current.length > 0) {
+        getLogChannel().info('All workspace roots are hidden; keeping current pane1 roots.');
+        return;
+      }
+      await viewState.setPaneRoots('pane1', visible);
       await paneChanged('pane1');
     }
   };
@@ -1283,6 +1294,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   context.subscriptions.push(
     // S4.1R13：狀態列點擊目標（manifest 已註冊並在 commandPalette 隱藏）。
+    vscode.commands.registerCommand('codeFolderSpaces.toggleWorkspaceRoots', async () => {
+      const folders = vscode.workspace.workspaceFolders ?? [];
+      if (folders.length === 0) {
+        void vscode.window.showInformationMessage(vscode.l10n.t('There are no workspace folders to display.'));
+        return;
+      }
+      const hidden = hiddenWorkspaceRoots();
+      const items = folders.map(folder => ({
+        label: folder.name,
+        description: folder.uri.fsPath,
+        picked: !hidden.some(root => isSamePath(root, folder.uri.fsPath)),
+        path: folder.uri.fsPath,
+      }));
+      const picked = await vscode.window.showQuickPick(items, {
+        canPickMany: true,
+        placeHolder: vscode.l10n.t('Select workspace folders to display'),
+      });
+      if (!picked) return;
+      const visible = new Set(picked.map(item => item.path));
+      await context.workspaceState.update('codeFolderSpaces.hiddenWorkspaceRoots',
+        folders.map(folder => folder.uri.fsPath).filter(root => !visible.has(root)));
+      await syncWorkspaceDirectory();
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.focusMainPane', async () => {
       const runtime = paneRuntime.get(primaryPaneId());
       if (!runtime) return;

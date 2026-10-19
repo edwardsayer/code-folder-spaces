@@ -90,5 +90,7 @@
   "Tree": "Tree",
   "Flat": "Flat",
   "Preset": "Preset",
-  "Sort": "Sort"
+  "Sort": "Sort",
+  "There are no workspace folders to display.": "There are no workspace folders to display.",
+  "Select workspace folders to display": "Select workspace folders to display"
 }

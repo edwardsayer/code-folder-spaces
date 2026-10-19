@@ -134,5 +134,6 @@
   "configuration.spaces.workspace.description": "為此工作區設定的資料夾空間。",
   "configuration.spaces.global.description": "全域設定的資料夾空間。",
   "command.root.markAsGlobal.title": "標記為全域",
-  "command.root.unmarkGlobal.title": "取消全域標記"
+  "command.root.unmarkGlobal.title": "取消全域標記",
+  "command.toggleWorkspaceRoots.title": "工作區資料夾…"
 }

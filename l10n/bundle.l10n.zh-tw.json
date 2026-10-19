@@ -90,5 +90,7 @@
   "Tree": "樹狀",
   "Flat": "扁平",
   "Preset": "預設集",
-  "Sort": "排序"
+  "Sort": "排序",
+  "There are no workspace folders to display.": "沒有可顯示的工作區資料夾。",
+  "Select workspace folders to display": "選擇要顯示的工作區資料夾"
 }
