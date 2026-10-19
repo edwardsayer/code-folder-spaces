@@ -92,5 +92,18 @@
   "Preset": "預設集",
   "Sort": "排序",
   "There are no workspace folders to display.": "沒有可顯示的工作區資料夾。",
-  "Select workspace folders to display": "選擇要顯示的工作區資料夾"
+  "Select workspace folders to display": "選擇要顯示的工作區資料夾",
+  "View: Tree": "檢視：樹狀",
+  "View: Dual": "檢視：雙窗格",
+  "Select view layout": "選擇檢視配置",
+  "Add Folder Space…": "新增資料夾空間…",
+  "Workspace Folders…": "工作區資料夾…",
+  "Switch Root…": "切換根目錄…",
+  "Reset Layout": "重設配置",
+  "Folder Space 1 actions": "資料夾空間 1 動作",
+  "Show Folders": "顯示資料夾",
+  "Hide Folders": "隱藏資料夾",
+  "Show Nested Files": "顯示巢狀檔案",
+  "Hide Nested Files": "隱藏巢狀檔案",
+  "Folder Space 2 actions": "資料夾空間 2 動作"
 }

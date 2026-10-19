@@ -92,5 +92,18 @@
   "Preset": "Preset",
   "Sort": "Sort",
   "There are no workspace folders to display.": "There are no workspace folders to display.",
-  "Select workspace folders to display": "Select workspace folders to display"
+  "Select workspace folders to display": "Select workspace folders to display",
+  "View: Tree": "View: Tree",
+  "View: Dual": "View: Dual",
+  "Select view layout": "Select view layout",
+  "Add Folder Space…": "Add Folder Space…",
+  "Workspace Folders…": "Workspace Folders…",
+  "Switch Root…": "Switch Root…",
+  "Reset Layout": "Reset Layout",
+  "Folder Space 1 actions": "Folder Space 1 actions",
+  "Show Folders": "Show Folders",
+  "Hide Folders": "Hide Folders",
+  "Show Nested Files": "Show Nested Files",
+  "Hide Nested Files": "Hide Nested Files",
+  "Folder Space 2 actions": "Folder Space 2 actions"
 }

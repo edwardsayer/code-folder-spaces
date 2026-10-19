@@ -24,6 +24,7 @@ import { resolveActiveTabUri, shouldFollowActiveFile } from './spaces/followActi
 import { labelledValue, selectedQuickPickId, stableQuickPickItems } from './ui/stableQuickPick';
 import { belongsToWorkspace, normalizeExpandModeProvenance, resolveAlignedProvenance, resolveExpandModeRestore, resolveExpandModeTarget, resolveWorkspaceIdentity, shouldWriteExpandModeRestore, type ExpandModeProvenance } from './spaces/clickBehavior';
 import { clearLegacySpacesSetting } from './spaces/legacySpaces';
+import { applyPane2MenuChoice, pane1MenuItems, pane2MenuItems } from './spaces/paneMenu';
 
 const MAX_PANE_INDEX = 8;
 const REFRESH_DEBOUNCE_MS = 200;
@@ -1301,30 +1302,104 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   // --- commands --------------------------------------------------------------
 
+  const toggleWorkspaceRoots = async (): Promise<void> => {
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    if (folders.length === 0) {
+      void vscode.window.showInformationMessage(vscode.l10n.t('There are no workspace folders to display.'));
+      return;
+    }
+    const hidden = hiddenWorkspaceRoots();
+    const items = folders.map(folder => ({
+      label: folder.name,
+      description: folder.uri.fsPath,
+      picked: !hidden.some(root => isSamePath(root, folder.uri.fsPath)),
+      path: folder.uri.fsPath,
+    }));
+    const picked = await vscode.window.showQuickPick(items, {
+      canPickMany: true,
+      placeHolder: vscode.l10n.t('Select workspace folders to display'),
+    });
+    if (!picked) return;
+    const visible = new Set(picked.map(item => item.path));
+    await context.workspaceState.update('codeFolderSpaces.hiddenWorkspaceRoots',
+      folders.map(folder => folder.uri.fsPath).filter(root => !visible.has(root)));
+    await syncWorkspaceDirectory();
+  };
+
   context.subscriptions.push(
     // S4.1R13：狀態列點擊目標（manifest 已註冊並在 commandPalette 隱藏）。
-    vscode.commands.registerCommand('codeFolderSpaces.toggleWorkspaceRoots', async () => {
-      const folders = vscode.workspace.workspaceFolders ?? [];
-      if (folders.length === 0) {
-        void vscode.window.showInformationMessage(vscode.l10n.t('There are no workspace folders to display.'));
-        return;
-      }
-      const hidden = hiddenWorkspaceRoots();
-      const items = folders.map(folder => ({
-        label: folder.name,
-        description: folder.uri.fsPath,
-        picked: !hidden.some(root => isSamePath(root, folder.uri.fsPath)),
-        path: folder.uri.fsPath,
+    vscode.commands.registerCommand('codeFolderSpaces.toggleWorkspaceRoots', () => toggleWorkspaceRoots()),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.toggleWorkspaceRoots', () => toggleWorkspaceRoots()),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.viewMode', async () => {
+      const current = viewState.getMode();
+      const items = stableQuickPickItems<'tree' | 'dual'>([
+        { id: 'tree', label: vscode.l10n.t('View: Tree'), picked: current === 'tree' },
+        { id: 'dual', label: vscode.l10n.t('View: Dual'), picked: current === 'dual' },
+      ]);
+      const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
+        placeHolder: vscode.l10n.t('Select view layout'),
       }));
-      const picked = await vscode.window.showQuickPick(items, {
-        canPickMany: true,
-        placeHolder: vscode.l10n.t('Select workspace folders to display'),
-      });
-      if (!picked) return;
-      const visible = new Set(picked.map(item => item.path));
-      await context.workspaceState.update('codeFolderSpaces.hiddenWorkspaceRoots',
-        folders.map(folder => folder.uri.fsPath).filter(root => !visible.has(root)));
-      await syncWorkspaceDirectory();
+      if (!selected || selected === current) return;
+      await viewState.setMode(selected);
+      syncPaneViews();
+      await syncPaneContexts();
+      await syncContext();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.addRoot', () => addRootForPane('pane1')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.more', async () => {
+      const labels: Record<string, string> = {
+        'view.tree': vscode.l10n.t('View: Tree'),
+        'view.dual': vscode.l10n.t('View: Dual'),
+        'add.space': vscode.l10n.t('Add Folder Space…'),
+        'workspace.folders': vscode.l10n.t('Workspace Folders…'),
+        'switch.root': vscode.l10n.t('Switch Root…'),
+        sort: labelledValue(vscode.l10n.t('Sort'), viewState.get('pane1').sort.key, vscode.l10n.t('N/A')),
+        'reset.layout': vscode.l10n.t('Reset Layout'),
+      };
+      const items = stableQuickPickItems(pane1MenuItems({ mode: viewState.getMode() }).map(item => ({
+        id: item.id, label: labels[item.id] ?? item.id, picked: item.picked,
+      })));
+      const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
+        placeHolder: vscode.l10n.t('Folder Space 1 actions'),
+      }));
+      if (!selected) return;
+      switch (selected) {
+        case 'view.tree': case 'view.dual': {
+          const mode = selected === 'view.tree' ? 'tree' : 'dual';
+          if (viewState.getMode() === mode) break;
+          await viewState.setMode(mode);
+          syncPaneViews();
+          await syncPaneContexts();
+          await syncContext();
+          break;
+        }
+        case 'add.space': await vscode.commands.executeCommand('codeFolderSpaces.addSpace'); break;
+        case 'workspace.folders': await toggleWorkspaceRoots(); break;
+        case 'switch.root': await switchRootForPane('pane1'); break;
+        case 'sort': await setSortForPane('pane1'); break;
+        case 'reset.layout': await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout'); break;
+      }
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.more', async () => {
+      const view = effectiveView(viewState.get('pane2'));
+      const labels: Record<string, string> = {
+        'folders.toggle': view.content === 'files' ? vscode.l10n.t('Show Folders') : vscode.l10n.t('Hide Folders'),
+        'nested.toggle': view.mode === 'flat' ? vscode.l10n.t('Hide Nested Files') : vscode.l10n.t('Show Nested Files'),
+        'switch.root': vscode.l10n.t('Switch Root…'),
+      };
+      const items = pane2MenuItems(view).filter(item => !item.disabled).map(item => ({
+        id: item.id, label: labels[item.id] ?? item.id,
+      }));
+      const selected = selectedQuickPickId(await vscode.window.showQuickPick(items, {
+        placeHolder: vscode.l10n.t('Folder Space 2 actions'),
+      }));
+      if (!selected) return;
+      if (selected === 'switch.root') { await switchRootForPane('pane2'); return; }
+      const next = applyPane2MenuChoice(view, selected);
+      if (!next) return;
+      await viewState.setView('pane2', next);
+      repaintPane('pane2');
+      await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.focusMainPane', async () => {
       const runtime = paneRuntime.get(primaryPaneId());
