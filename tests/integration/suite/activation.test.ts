@@ -26,13 +26,15 @@ suite('擴充套件啟用', () => {
     const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
     assert.ok(extension);
     const views = Object.values(extension.packageJSON.contributes.views as Record<string, Array<{ id: string; when?: string }>> ?? {}).flat();
-    assert.equal(views.length, 8, 'manifest 應貢獻 8 個固定 pane 插槽');
-    assert.deepEqual(views.map(view => view.id), Array.from({ length: 8 }, (_, index) => `codeFolderSpaces.pane${index + 1}`));
-    // S4R6（審查 F-01）：pane1 必須在啟動前**恆可見**（S4.1R3：以 `!layoutReady` 達成），否則新 profile／reload 時 8 個 view 全被隱藏，
-    // Activity Bar 容器不出現、`onView` 無從觸發 → 冷啟動不可達。pane2..8 仍以 context key 控制。
+    // v2-redesign（v2-R4）：固定 2 pane，不再有 pane3..8。
+    assert.equal(views.length, 2, 'manifest 應貢獻 2 個固定 pane 插槽（v2 固定雙 pane）');
+    assert.deepEqual(views.map(view => view.id), ['codeFolderSpaces.pane1', 'codeFolderSpaces.pane2']);
+    // S4R6（審查 F-01）：pane1 必須在啟動前**恆可見**（S4.1R3：以 `!layoutReady` 達成），否則新 profile／reload 時
+    // view 全被隱藏，Activity Bar 容器不出現、`onView` 無從觸發 → 冷啟動不可達。
     // S4.1R3（pane1 可關閉）：when 為 `!layoutReady || pane1.enabled`——未啟動前（key 未設）恆可見，維持冷啟動可達性（D77）。
     assert.equal(views[0].when, '!codeFolderSpaces.layoutReady || codeFolderSpaces.pane1.enabled', 'pane1 的 when 須保證冷啟動可見');
-    for (const [index, view] of views.slice(1).entries()) assert.equal(view.when, `codeFolderSpaces.pane${index + 2}.enabled`);
+    // v2：pane2 只在 dual 模式顯示（取代舊的 paneN.enabled）。
+    assert.equal(views[1].when, 'codeFolderSpaces.mode == dual', 'pane2 僅在 dual 模式顯示');
     const commands = await vscode.commands.getCommands(true);
     for (const view of views) {
       const focusCommand = `${view.id}.focus`;

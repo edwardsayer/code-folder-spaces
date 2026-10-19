@@ -26,7 +26,7 @@ import { belongsToWorkspace, normalizeExpandModeProvenance, resolveAlignedProven
 import { clearLegacySpacesSetting } from './spaces/legacySpaces';
 import { applyPane2MenuChoice, pane1MenuItems, pane2MenuItems } from './spaces/paneMenu';
 
-const MAX_PANE_INDEX = 8;
+const MAX_PANE_INDEX = 2;
 const REFRESH_DEBOUNCE_MS = 200;
 const FOLLOW_DEBOUNCE_MS = 250;
 // S4R7-D85 啟動事件合併與 S4R7-D81 快照持久化的時間常數。

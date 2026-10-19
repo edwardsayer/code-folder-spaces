@@ -198,9 +198,9 @@ if (!pkg) {
       'codeFolderSpaces.pane.add',
       'codeFolderSpaces.pane.resetLayout',
     ]);
-    const explicitPanesOf = (when) => [...new Set([...when.matchAll(/view == codeFolderSpaces\.(pane[1-8])/g)].map((match) => match[1]))];
+    const explicitPanesOf = (when) => [...new Set([...when.matchAll(/view == codeFolderSpaces\.(pane[1-2])/g)].map((match) => match[1]))];
     const coversAllPanes = (when) => /view =~ \/\^codeFolderSpaces\.pane\[1-8\]\$\//.test(when);
-    const embeddedPaneOf = (command) => (/codeFolderSpaces\.(pane[1-8])\./.exec(command) ?? [])[1];
+    const embeddedPaneOf = (command) => (/codeFolderSpaces\.(pane[1-2])\./.exec(command) ?? [])[1];
     const checkPaneScoped = (items, where, hasNode) => {
       for (const item of items ?? []) {
         const when = typeof item.when === 'string' ? item.when : '';
