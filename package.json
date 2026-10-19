@@ -3111,7 +3111,7 @@
     "test:unit:watch": "vitest",
     "package:vsix": "node esbuild.mjs --production && vsce package --no-rewrite-relative-links",
     "check:project": "node scripts/check-project.mjs",
-    "check": "npm run typecheck && npm run test:unit && npm run build && npm run check:project"
+    "check": "npm run typecheck && npm run test:unit && npm run build && npm run check:project && node scripts/check-command-parity.mjs"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
