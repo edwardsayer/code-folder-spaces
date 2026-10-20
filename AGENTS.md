@@ -72,6 +72,15 @@ node tools/vscode-debug.mjs close
 - 此打包**僅為試用**：不 bump 版本、不打 tag、不上傳，**不取代** pre-release gate；任何發布仍須依 `.agents/skills/pre-release-check/SKILL.md`。打包失敗須於 Handoff 揭露並不得宣稱已提供試用版。
 - 純規劃／文件輪（無產品 runtime 或 manifest 變更）可在 Handoff 明載「無新產物、沿用前一份 VSIX」並附其 SHA256，不重打包。
 
+## 規劃檔治理（TODO／Stage／Handoff）— 唯一權威
+
+- **流程權威**：全域 `/todo-ingest`、`/todo-feat`、`/todo-handoff` 三個 prompt（`E:\apps\pi\agent\prompts\`）。本節只寫本產品的落地規則，不重複 prompt 的步驟清單。
+- **規劃路徑**：`dev/planning/TODO.md` 為**唯一 canonical Stage 主控**（實體 `dev/code-folder-spaces/planning/`）；歸檔為 `dev/archive/handoffs/`、`dev/archive/stages/`；逐輪索引為 `dev/archive/handoffs/README.md`。
+- **TODO 內容規則**：只放現況與未完成事項；已完成輪次的交付細節、測試數字、hash、實測值**不回寫**；每輪必同步「最近完成輪次／active Stage 與狀態／Handoff `N/M`」；**硬性上限 150 行**，超過即違規，規劃 reviewer gate 應判 BLOCK。
+- **輪次與結案**：Handoff 上限 **6**，追加輪須**逐次**取得使用者核准（`v2-redesign` 用 8 輪為既有例外先例）；**純文件／規劃輪不計 Stage 輪次**；Stage 須工項全完成＋結案 gate 通過才可 `[done]` 改名歸檔，啟動下一個 Stage 須另取核准。
+- **耐久決策落 `dev/specs/`**：對話中定案的架構方向、使用者口頭指示、架構圖須在該輪 Handoff 前寫入 spec；spec 維護 `status` 與 `history`（異動摘要 ≤40 個中文字）。
+- **本節與 `dev/planning/TODO.md` 的關係**：TODO 只寫操作步驟與現況，規則條文以本節為準；兩者不得各自發展不同措辭。
+
 ## Definition of Done
 
 - 每個 Stage：`npm run check` 全綠（typecheck + unit + build + check:project）。
