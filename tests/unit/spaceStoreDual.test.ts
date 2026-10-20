@@ -126,3 +126,18 @@ describe('SpaceStore dual-source behavior', () => {
     ]);
   });
 });
+
+describe('markAsGlobal fallback（v2-R6 #7）', () => {
+  it('adds an ad-hoc root to the global layer when it is not in any settings layer', async () => {
+    // 使用者的 root 可能是 pane 手動加入的任意資料夾（不在 spaces 設定中，sourceIndex = -1）。
+    // 舊版 store.markAsGlobal 找不到來源就回 false，命令靜默失敗 → 使用者看到「點了沒反應」。
+    const { store } = createStore([], []);
+    const adhoc = abs('/adhoc/folder');
+    // markAsGlobal 對不存在的來源應回 false（store 層語意不變）
+    expect(await store.markAsGlobal(adhoc)).toBe(false);
+    // 命令層的 fallback 改呼叫 addSpace(..., 'global')
+    expect(await store.addSpace(adhoc, 'adhoc', 'global')).toBe(true);
+    expect(store.getDefinitions().find(d => d.basePath === adhoc)?.origin).toBe('global');
+    expect(store.isGlobal(adhoc)).toBe(true);
+  });
+});

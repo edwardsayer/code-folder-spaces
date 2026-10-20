@@ -168,10 +168,12 @@ if (!pkg) {
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
     // 契約隨產品演進維護：v2 固定雙 pane 的 title 清單取代舊多窗格清單，並非放寬檢查。
     const paneTitleContract = {
-      1: ['filter', 'clearFilter', 'drillUp', 'adoptChild', 'addRoot', 'refresh'],
-      2: ['filter', 'clearFilter', 'collapseAll', 'expandAll', 'refresh', 'close'],
+      1: ['filter', 'clearFilter', 'drillUp', 'adoptChild', 'addRoot', 'refresh', 'workspaceFolders', 'switchRoot', 'resetLayout'],
+      2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'close'],
     };
-    const expectedSubmenus = ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort', 'codeFolderSpaces.pane1.more'];
+    // v2-R6（使用者）：移除 pane1.more 這一層 submenu，其項目直接掛進「...」下拉。
+    const expectedSubmenus = ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort'];
+    const directTitleActions = ['workspaceFolders', 'switchRoot', 'resetLayout'];
     const submenus = new Set((pkg.contributes?.submenus ?? []).map(({ id }) => id));
     const referencedSubmenus = new Set(Object.values(pkg.contributes?.menus ?? {}).flatMap((items) =>
       (items ?? []).map((item) => item.submenu).filter((id) => typeof id === 'string')));

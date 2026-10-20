@@ -219,13 +219,18 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     }).map(item => `${item.command} @ ${item.when}`);
     assert.deepEqual(offenders, [], `view/title 的 pane 專屬項目必須使用 per-pane id（D47）：${offenders.join('; ')}`);
 
-    // v2-R6：pane1 的檢視、排序與更多操作由原生 submenu 提供；pane2 沒有 more submenu。
+    // v2-R6：pane1 的檢視與排序由原生 submenu 提供；「更多」
+    // **不再有一層 more submenu**（使用者 2026-10-20：把 more 的項目直接放進「...」下拉），
+    // 因此改驗證那三個動作直接掛在 view/title。pane2 沒有任何 submenu。
     const commands = new Set(titleItems.map(item => String(item.command)));
     const submenus = new Set(titleItems.map(item => String(item.submenu)));
     assert.ok(commands.has('codeFolderSpaces.pane1.addRoot'), 'pane1 應有 per-pane 的 addRoot 入口');
     assert.ok(submenus.has('codeFolderSpaces.pane1.view'), 'pane1 應有原生 view submenu');
     assert.ok(submenus.has('codeFolderSpaces.pane1.sort'), 'pane1 應有原生 sort submenu');
-    assert.ok(submenus.has('codeFolderSpaces.pane1.more'), 'pane1 應有原生 more submenu');
+    assert.ok(!submenus.has('codeFolderSpaces.pane1.more'), 'pane1 不應再有 more submenu（項目已直接進入「...」）');
+    for (const action of ['workspaceFolders', 'switchRoot', 'resetLayout']) {
+      assert.ok(commands.has(`codeFolderSpaces.pane1.${action}`), `pane1 的 ${action} 應直接掛在 view/title`);
+    }
     assert.ok(!submenus.has('codeFolderSpaces.pane2.more'), 'pane2 不應有 more submenu');
   });
 

@@ -10,7 +10,7 @@ import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { VIEW_PRESETS, matchPresetName } from './spaces/viewPresets';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
-import { isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
+import { isDrillDownNoop, isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { normalizeExcludeSetting, parseGitIgnore, shouldHideLikeExplorer, type GitIgnoreRule } from './spaces/explorerVisibility';
 import { matchesAnyPattern } from './spaces/spaceConfig';
@@ -1283,7 +1283,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     // 故必須用 pane 無關的全域 id 並由**被點擊節點**解析 paneId（D47；審查 P1-1）。
     vscode.commands.registerCommand('codeFolderSpaces.root.markAsGlobal', async (node?: unknown) => {
       if (!(node instanceof SpaceRootNode)) return;
-      if (!await store.markAsGlobal(node.definition.basePath)) return;
+      if (!await store.markAsGlobal(node.definition.basePath)) {
+        // v2-R6：root 可能只是 pane 手動加入的任意資料夾（不在 spaces 設定的任何一層，
+        // sourceIndex 為 -1），此時 store.moveSpace 找不到來源而回 false。
+        // 補 fallback：直接把它加入 spaces.global，否則使用者點了「Mark as Global」毫無反應。
+        if (!await store.addSpace(node.definition.basePath, node.definition.name, 'global')) return;
+      }
       for (const runtime of paneRuntime.values()) applyPaneScope(runtime.id);
       for (const runtime of paneRuntime.values()) runtime.provider.refresh();
       await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal', true);
@@ -1345,8 +1350,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (!info?.isDirectory || !info.paneId) return;
       // D67：下鑽以該 pane 自己的 root 為界（節點本質上在 pane root 內）。
       if (!isAllowedSpaceRoot(info.definition.basePath, info.uri.fsPath)) return;
-      // 根列對自身下鑽為 no-op，避免幽靈歷史。
-      if (isSamePath(activeRoot(viewState.get(info.paneId)) ?? '', info.uri.fsPath)) return;
+      // v2-R6 修正：no-op 守門只看「目前的下鑽根」，不可用 activeRoot（= drillRoot ?? roots[0]）。
+      // 舊寫法在多 root 時會把 roots[0] 誤判為「已在該根」而擋掉下鑽，造成第一個 root 無法 drill down。
+      if (isDrillDownNoop(viewState.get(info.paneId).drillRoot, info.uri.fsPath, isSamePath)) return;
       // v2-redesign D4（使用者 2026-10-18）：就地下鑽只做root 切換＋返回堆疊，**不再切換 preset/view**。
       // 舊行為（S4.1R8／OP-12 自動套用 `Contents`）已由 spec §8「就地導航 ✅ 保留（不再動 preset）」推翻。
       await viewState.drillDown(info.paneId, info.uri.fsPath);
