@@ -1163,12 +1163,10 @@
       ],
       "codeFolderSpaces.pane1.view": [
         {
-          "command": "codeFolderSpaces.pane1.mode.tree",
-          "when": "codeFolderSpaces.mode != tree"
+          "command": "codeFolderSpaces.pane1.mode.tree"
         },
         {
-          "command": "codeFolderSpaces.pane1.mode.dual",
-          "when": "codeFolderSpaces.mode != dual"
+          "command": "codeFolderSpaces.pane1.mode.dual"
         },
         {
           "command": "codeFolderSpaces.pane1.toggleNested",
