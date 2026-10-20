@@ -11,7 +11,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 ## Tree 與 Dual 模式
 
 - **Tree** 僅顯示 pane1 的單一資料夾樹。
-- **Dual** 顯示上下排列的 pane1 與 pane2。pane1 是控制中心：可透過標題列操作與 **More（…）** 選單管理版面、根目錄、工作區資料夾、排序及其他導覽。pane2 的選單較精簡，只提供基本操作（顯示資料夾或巢狀清單、過濾、收合／展開、重新整理及關閉）。
+- **Dual** 顯示上下排列的 pane1 與 pane2。pane1 是控制中心：可透過標題列操作與原生子選單（**View:**、**Sort:**）管理版面、根目錄、工作區資料夾、排序及其他導覽。pane2 的選單較精簡，只提供基本操作（資料夾樹與扁平清單之間的切換、過濾、收合／展開、重新整理及關閉）。
 - 代表目前狀態的選單項目會打勾：pane1 的 **View:**／**Sort:** 子選單與 pane2 的檢視子選單都會標示目前選擇。
 - 兩個窗格刻意設計為**可特化且不對稱**；pane2 並非完整複製 pane1 的控制項。pane1 不可關閉；關閉 pane2 會回到 Tree 模式。
 - 在 Dual 模式中，pane1 選取資料夾會讓 pane2 導覽至該資料夾。pane2 沒有自己的根目錄切換器，其根目錄來自上述連動或 pane1 的 **Activate Child Space**。
@@ -69,15 +69,14 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 
 ## 常用命令
 
-可從命令選擇區與窗格標題選單使用命令。常用操作包括：
+窗格專屬操作位於各窗格的標題列、子選單與右鍵選單；大部分刻意不在命令選擇區顯示。常用操作包括：
 
-- **Folder Spaces: Add Root**／**Remove Root**（新增／移除根目錄）
-- **Folder Spaces: Tree View**／**Dual View**（Tree／Dual 檢視）
-- **Folder Spaces: Filter**／**Clear Filter**／**Drill Up**（過濾／清除／返回上層）
-- **Folder Spaces: Switch Root**／**Refresh**（切換根目錄／重新整理）
-- **Folder Spaces: Activate Child Space**（Dual 模式、pane1：把選取的資料夾設為 pane2 根目錄）
-- **Folder Spaces: More…**（各窗格專屬操作）
-- **Folder Spaces: Mark as Global**／**Unmark Global**（空間根目錄右鍵選單）
+- **Add Folder…**／**Remove Root**（新增資料夾／移除根目錄）
+- **View: Tree**／**View: Dual**（pane1 子選單）
+- **Filter by Path…**／**Clear Filter**／**Return to Parent**（過濾／清除／返回上層）
+- **Switch Root…**／**Refresh**／**Reset Pane Layout**（切換根目錄／重新整理／重設版面）
+- **Activate Child Space**（Dual 模式、pane1：把選取的資料夾設為 pane2 根目錄）
+- **Mark as Global**／**Unmark Global**（空間根目錄右鍵選單）
 
 目前 manifest 共提供 63 個命令。
 
@@ -88,7 +87,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 ## 已知限制
 
 - pane1 不可關閉；關閉 pane2 會回到 Tree 模式。
-- Dual 模式中，pane2 在部分檢視組合採扁平清單；扁平／巢狀清單不會顯示資料夾列。
+- Dual 模式中，pane2 預設採扁平的 Contents 清單，資料夾僅以分組標題呈現；可用 **Toggle Nested Files** 切回資料夾樹。
 - 工作區根目錄可隱藏，但來源仍是目前 VS Code 工作區。
 - Glob 支援 `*`、`**`、`**/`、`?` 與跳脫字元；不支援 brace pattern 與字元類別。`src/**` 不匹配 `src` 目錄本身。
 - 檔案嵌套只比對同目錄兄弟檔，每個檔案最多指派給一個父項；啟用路徑過濾時會停用嵌套。

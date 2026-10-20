@@ -1328,10 +1328,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         // S4.1R11b：per-pane id 路由（D47——view/title 不提供 view id，全域 id 會操作錯 pane）。
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.add`, paneCommand((given?: unknown) => addRootForPane(id, typeof given === 'string' ? given : undefined))),
         // 兩個呼叫情境：
-        //  (a) view/title 的「…」——**不帶節點**，以閉包 `id` 為 pane。
+        //  (a) view/title 的按鈕／子選單——**不帶節點**，以閉包 `id` 為 pane。
         //  (b) view/item/context 的 root 列 X——帶被點擊節點，**必須**以節點為準：
-        //      該 menu 項目只有單一命令 id（pane1.root.remove）卻涵蓋 pane1..8，
-        //      若用閉包 id 會讓 pane2..8 的 X 错路由到 pane1（審查 P1-1）。
+        //      該 menu 項目只有單一命令 id（pane1.root.remove）卻涵蓋 pane1／pane2，
+        //      若用閉包 id 會讓 pane2 的 X 错路由到 pane1（審查 P1-1）。
         // 注意：不可改用 `targetPaneId(node)`——無節點時它會退化成主 pane，反而破壞 (a)。
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.remove`, paneCommand((node?: unknown) => {
           const candidate = node && typeof node === 'object' ? node as { paneId?: unknown; rootPath?: unknown } : undefined;

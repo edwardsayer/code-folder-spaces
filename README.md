@@ -11,7 +11,7 @@ VS Code's built-in Explorer always shows the entire workspace. Folder Spaces pro
 ## Tree and Dual modes
 
 - **Tree** shows pane1 as a single folder tree.
-- **Dual** shows pane1 above pane2. Pane1 is the control center: its title-bar actions and **More (…)** menu manage layout, roots, workspace folders, sorting and other navigation. Pane2 has a smaller, basic-operation menu (showing folders or a nested listing, filtering, collapse/expand, refresh and close).
+- **Dual** shows pane1 above pane2. Pane1 is the control center: its title-bar actions and native submenus (**View:**, **Sort:**) manage layout, roots, workspace folders, sorting and other navigation. Pane2 has a smaller, basic-operation menu (switching between the folder tree and a flat listing, filtering, collapse/expand, refresh and close).
 - Menu items that represent a current state are checked: the **View:** and **Sort:** submenus in pane1 and the pane2 view submenu mark the active choice.
 - The panes are deliberately **specialized and asymmetric**; pane2 is not a duplicate control surface. Pane1 cannot be closed. Closing pane2 returns to Tree mode.
 - In Dual mode, selecting a folder in pane1 navigates pane2 into that folder. Pane2 has no root switcher of its own; its root comes from that cascade or from **Activate Child Space** in pane1.
@@ -69,15 +69,14 @@ Example:
 
 ## Common commands
 
-Commands are available from the Command Palette and pane title menus. Common actions include:
+Pane-specific actions live in each pane's title bar, submenus and context menus, and most of them are intentionally hidden from the Command Palette. Common actions include:
 
-- **Folder Spaces: Add Root** / **Remove Root**
-- **Folder Spaces: Tree View** / **Dual View**
-- **Folder Spaces: Filter** / **Clear Filter** / **Drill Up**
-- **Folder Spaces: Switch Root** / **Refresh**
-- **Folder Spaces: Activate Child Space** (Dual mode, pane1: use the selected folder as pane2's root)
-- **Folder Spaces: More…** (pane-specific actions)
-- **Folder Spaces: Mark as Global** / **Unmark Global** (space-root context menu)
+- **Add Folder…** / **Remove Root**
+- **View: Tree** / **View: Dual** (pane1 submenu)
+- **Filter by Path…** / **Clear Filter** / **Return to Parent**
+- **Switch Root…** / **Refresh** / **Reset Pane Layout**
+- **Activate Child Space** (Dual mode, pane1: use the selected folder as pane2's root)
+- **Mark as Global** / **Unmark Global** (space-root context menu)
 
 The full manifest currently contributes 63 commands.
 
@@ -88,7 +87,7 @@ Version 0.1.0 replaces the former multi-pane/preset model with fixed Tree and Du
 ## Known limitations
 
 - Pane1 cannot be closed; closing pane2 returns to Tree mode.
-- In Dual mode, pane2 uses a flat listing in some view configurations. Folders are not displayed as rows in that flat/nested listing.
+- In Dual mode, pane2 defaults to a flat Content listing in which folders appear only as grouping headings; use **Toggle Nested Files** to switch it back to the folder tree.
 - Workspace roots may be hidden, but are sourced from the current VS Code workspace.
 - Glob support includes `*`, `**`, `**/`, `?` and escaping; brace patterns and character classes are not supported. `src/**` does not match the `src` directory itself.
 - File nesting applies to sibling files in the same directory, with each file assigned to at most one parent. A path filter disables nesting.
