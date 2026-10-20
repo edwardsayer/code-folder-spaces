@@ -11,20 +11,24 @@ All notable changes to Folder Spaces are documented in this file.
 3. Removed the preset UI and its commands: `Preset:`, `Level`, `Content`, `Mode` and `Sort` are no longer available as preset controls. The `VIEW_PRESETS` definitions in `viewPresets.ts` remain as an internal source of view combinations only.
 4. Removed four settings: `codeFolderSpaces.defaultPreset`, `codeFolderSpaces.defaultChildPreset`, `codeFolderSpaces.adaptiveCascadeParent` and `codeFolderSpaces.cascadeParentPreset`.
 5. Removed the status bar item; Folder Spaces no longer displays `Folder Spaces: 1→2`.
-6. Reduced the contributed command count from the v1 peak of **321 to 55**.
+6. Reduced the contributed command count from the v1 peak of **321 to 63**.
 
 ### Added
 
 - Added separate workspace-level (`codeFolderSpaces.spaces.workspace`) and profile-level (`codeFolderSpaces.spaces.global`) root lists.
 - Added Mark as Global / Unmark Global actions and a 🌐 marker for profile-level roots.
 - Added fixed Tree and Dual layouts with intentionally asymmetric, independently specialized pane controls.
+- Added **Activate Child Space** (pane1, Dual mode): uses the folder selected in pane1 as pane2's root (a selected file uses its parent folder; no selection falls back to pane1's current root).
+- Added native submenus (**View:**, **Sort:**, pane2 view) whose items show check marks for the current choice.
+- Added a nested/flat toggle for pane2.
 - Added command/handler parity validation to `npm run check`.
 
 ### Changed
 
 - Pane1 is the control center for layout and root management; pane2 provides a smaller set of basic operations.
 - Workspace roots are available automatically and can be hidden from the root list.
-- Pane2 may use its own root and view configuration; in Dual mode pane1 folder selection can navigate pane2.
+- Pane2 root is driven by pane1: folder selection in Dual mode cascades into pane2, and **Activate Child Space** sets it explicitly. Pane2 keeps its own view and filter state but has no root switcher of its own.
+- In Dual mode pane1 hides **Return to Parent** and returns to its configured roots when switching from Tree to Dual; pane2 keeps its own drill-down state.
 - Updated architecture and user documentation for the v2 model.
 
 ### Removed

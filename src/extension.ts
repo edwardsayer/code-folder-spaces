@@ -1210,7 +1210,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       // 切換 mode 刻意覆寫 pane1 檢視，讓 Dual 模式固定使用 Navigate。
       await viewState.setView('pane1', VIEW_PRESETS.Navigate);
       // pane2 的角色固定是 pane1 選取資料夾的鏡像，內容一律 Contents（flat/all/all）。
-      // pane2 目前沒有能改變顯示的 UI 入口（僅有 filter 操作，不改 view），故無條件設定安全且 idempotent；若未來新增 pane2 view 控制，須重新考慮自訂判定。
+      // v2-R7 起 pane2 已有 `pane2.toggleNested` 可改顯示，故這行只是「進入 Dual 時的初始檢視」；
+      // cascade 只換 root 不改 view，使用者本次 session 的扁平／巢狀選擇不會被覆寫。
       await viewState.setView('pane2', VIEW_PRESETS.Contents);
       syncPaneViews();
       await syncPaneContexts();

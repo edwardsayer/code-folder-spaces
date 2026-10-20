@@ -11,9 +11,11 @@ VS Code's built-in Explorer always shows the entire workspace. Folder Spaces pro
 ## Tree and Dual modes
 
 - **Tree** shows pane1 as a single folder tree.
-- **Dual** shows pane1 above pane2. Pane1 is the control center: its title-bar actions and **More (…)** menu manage layout, roots, workspace folders, sorting and other navigation. Pane2 has a smaller, basic-operation menu (such as toggling folders/nested listing, switching its root and closing it).
+- **Dual** shows pane1 above pane2. Pane1 is the control center: its title-bar actions and **More (…)** menu manage layout, roots, workspace folders, sorting and other navigation. Pane2 has a smaller, basic-operation menu (showing folders or a nested listing, filtering, collapse/expand, refresh and close).
+- Menu items that represent a current state are checked: the **View:** and **Sort:** submenus in pane1 and the pane2 view submenu mark the active choice.
 - The panes are deliberately **specialized and asymmetric**; pane2 is not a duplicate control surface. Pane1 cannot be closed. Closing pane2 returns to Tree mode.
-- In Dual mode, selecting a folder in pane1 can navigate pane2 into that folder. Pane2 can also use its own root and view settings.
+- In Dual mode, selecting a folder in pane1 navigates pane2 into that folder. Pane2 has no root switcher of its own; its root comes from that cascade or from **Activate Child Space** in pane1.
+- Because Dual makes pane1 the navigation source, pane1 hides **Return to Parent** in Dual mode and returns to its configured roots when you switch from Tree to Dual. Pane2 keeps its own drill-down state and **Return to Parent**.
 
 ## Where spaces come from
 
@@ -73,10 +75,11 @@ Commands are available from the Command Palette and pane title menus. Common act
 - **Folder Spaces: Tree View** / **Dual View**
 - **Folder Spaces: Filter** / **Clear Filter** / **Drill Up**
 - **Folder Spaces: Switch Root** / **Refresh**
+- **Folder Spaces: Activate Child Space** (Dual mode, pane1: use the selected folder as pane2's root)
 - **Folder Spaces: More…** (pane-specific actions)
 - **Folder Spaces: Mark as Global** / **Unmark Global** (space-root context menu)
 
-The full manifest currently contributes 55 commands.
+The full manifest currently contributes 63 commands.
 
 ## Breaking changes from v1.x
 
