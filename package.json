@@ -953,23 +953,23 @@
       "view/title": [
         {
           "command": "codeFolderSpaces.pane1.drillUp",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode == tree && codeFolderSpaces.pane1.canDrillUp",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.canDrillUp",
           "group": "navigation@1"
         },
         {
           "command": "codeFolderSpaces.pane1.adoptChild",
           "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode == dual",
-          "group": "navigation@1"
+          "group": "navigation@2"
         },
         {
           "command": "codeFolderSpaces.pane1.filter",
           "when": "view == codeFolderSpaces.pane1 && !codeFolderSpaces.pane1.hasFilter",
-          "group": "navigation@2"
+          "group": "navigation@3"
         },
         {
           "command": "codeFolderSpaces.pane1.clearFilter",
           "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.hasFilter",
-          "group": "navigation@2"
+          "group": "navigation@3"
         },
         {
           "command": "codeFolderSpaces.pane1.addRoot",
@@ -980,6 +980,11 @@
           "command": "codeFolderSpaces.pane1.refresh",
           "when": "view == codeFolderSpaces.pane1",
           "group": "3_root@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.drillUp",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.canDrillUp",
+          "group": "navigation@0"
         },
         {
           "command": "codeFolderSpaces.pane2.filter",
