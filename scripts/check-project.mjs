@@ -161,18 +161,18 @@ if (!pkg) {
   // 僅在 manifest 採用 per-pane 命令時啟用（避免誤判其他專案／測試 fixture）。
   if ([...contributedCommands].some((id) => id.startsWith('codeFolderSpaces.pane1.'))) {
     const paneCommandContract = {
-      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'addRoot', 'mode.tree', 'mode.dual', 'toggleNested', 'adoptChild', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc', 'workspaceFolders', 'switchRoot', 'resetLayout'],
-      2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'close'],
+      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'addRoot', 'mode.tree', 'mode.dual', 'activateChild', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc', 'workspaceFolders', 'switchRoot', 'resetLayout'],
+      2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'toggleNested', 'close'],
     };
     const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
     // 契約隨產品演進維護：v2 固定雙 pane 的 title 清單取代舊多窗格清單，並非放寬檢查。
     const paneTitleContract = {
-      1: ['filter', 'clearFilter', 'drillUp', 'adoptChild', 'addRoot', 'refresh', 'workspaceFolders', 'switchRoot', 'resetLayout'],
+      1: ['filter', 'clearFilter', 'drillUp', 'activateChild', 'addRoot', 'refresh', 'workspaceFolders', 'switchRoot', 'resetLayout'],
       2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'close'],
     };
     // v2-R6（使用者）：移除 pane1.more 這一層 submenu，其項目直接掛進「...」下拉。
-    const expectedSubmenus = ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort'];
+    const expectedSubmenus = ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort', 'codeFolderSpaces.pane2.view'];
     const directTitleActions = ['workspaceFolders', 'switchRoot', 'resetLayout'];
     const submenus = new Set((pkg.contributes?.submenus ?? []).map(({ id }) => id));
     const referencedSubmenus = new Set(Object.values(pkg.contributes?.menus ?? {}).flatMap((items) =>
@@ -183,6 +183,9 @@ if (!pkg) {
     }
     for (const id of submenus) {
       if (!referencedSubmenus.has(id)) errors.push(`submenu 未被任何 menus 項目引用：${id}`);
+      for (const item of pkg.contributes?.menus?.[id] ?? []) {
+        if (!item.toggled) errors.push(`submenu 項目缺少 toggled：${id} → ${item.command ?? '(unknown)'}`);
+      }
     }
     for (const [menuId, items] of Object.entries(pkg.contributes?.menus ?? {})) {
       if (!submenus.has(menuId)) continue;
@@ -203,10 +206,11 @@ if (!pkg) {
         const command = `codeFolderSpaces.paneN.${action}`;
         if (!inTitle.includes(command)) errors.push(`pane${pane} 的 view/title 缺少 ${command}`);
       }
-      if (pane === '1') {
-        for (const submenu of expectedSubmenus) {
-          if (!paneTitle.some((item) => item.submenu === submenu)) errors.push(`pane1 的 view/title 缺少 submenu ${submenu}`);
-        }
+      const paneSubmenus = pane === '1'
+        ? ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort']
+        : ['codeFolderSpaces.pane2.view'];
+      for (const submenu of paneSubmenus) {
+        if (!paneTitle.some((item) => item.submenu === submenu)) errors.push(`pane${pane} 的 view/title 缺少 submenu ${submenu}`);
       }
     }
 

@@ -132,10 +132,11 @@
   "command.pane1.toggleWorkspaceRoots.title": "工作區資料夾...",
   "submenu.pane1.view": "檢視",
   "submenu.pane1.sort": "排序",
+  "submenu.pane2.view": "檢視：",
   "submenu.pane1.more": "更多",
   "command.pane1.mode.tree.title": "檢視：樹狀",
   "command.pane1.mode.dual.title": "檢視：雙窗格",
-  "command.pane1.toggleNested.title": "切換巢狀檔案",
-  "command.pane1.adoptChild.title": "帶入 Folder Space 1",
+  "command.pane2.toggleNested.title": "切換巢狀檔案",
+  "command.pane1.activateChild.title": "啟用子空間",
   "command.pane1.workspaceFolders.title": "工作區資料夾..."
 }

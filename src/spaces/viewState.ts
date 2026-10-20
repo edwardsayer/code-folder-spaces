@@ -27,6 +27,10 @@ export function effectiveView(pane: Pick<PaneState, 'view'>): ViewSettings {
   return pane.view && isViewSettings(pane.view) ? pane.view : VIEW_PRESETS.Explorer;
 }
 
+export function toggleViewMode(view: ViewSettings): ViewSettings {
+  return { ...view, mode: view.mode === 'tree' ? 'flat' : 'tree' };
+}
+
 export function activeRoot(pane: PaneState): string | null { return pane.drillRoot ?? pane.roots[0] ?? null; }
 
 /** 以最長前綴選出包含目標 URI 的根目錄。 */

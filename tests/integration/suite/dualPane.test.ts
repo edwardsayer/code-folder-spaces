@@ -87,6 +87,27 @@ suite('dual pane integration', () => {
     }
   ));
 
+  test('resetting pane1 drill before dual preserves roots and pane2 drill', async () => withPaneProviders(
+    [{ path: alpha, name: 'alpha' }], [
+      { paneId: 'pane1', root: alpha }, { paneId: 'pane2', root: alpha },
+    ], async ({ state }) => {
+      const rootsBefore = [...state.get('pane1').roots];
+      await state.setMode('dual');
+      await state.drillDown('pane2', nested, VIEW_PRESETS.Files);
+      const pane2DrillStack = [...state.get('pane2').drillStack];
+      await state.setMode('tree');
+      await state.drillDown('pane1', nested, VIEW_PRESETS.Files);
+      assert.equal(state.get('pane1').drillRoot, nested);
+      await state.resetRoot('pane1');
+      await state.setMode('dual');
+      assert.equal(state.get('pane1').drillRoot, null);
+      assert.deepEqual(state.get('pane1').drillStack, []);
+      assert.deepEqual(state.get('pane1').roots, rootsBefore);
+      assert.equal(state.get('pane2').drillRoot, nested);
+      assert.deepEqual(state.get('pane2').drillStack, pane2DrillStack);
+    }
+  ));
+
   test('getEnabledPaneIds reflects mode after close/add', async () => withPaneProviders(
     [{ path: alpha, name: 'alpha' }], [{ paneId: 'pane1', root: alpha }], async ({ state }) => {
       await state.setMode('dual');

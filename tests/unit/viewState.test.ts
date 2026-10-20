@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, PANE_STATE_KEY, resolvePaneDefinitions, rootForUri } from '../../src/spaces/viewState';
+import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, PANE_STATE_KEY, resolvePaneDefinitions, rootForUri, toggleViewMode } from '../../src/spaces/viewState';
 import type { MementoLike } from '../../src/spaces/viewState';
 
 class MemoryMemento implements MementoLike {
@@ -16,6 +16,13 @@ describe('viewState compatibility layer', () => {
     expect(normalizeSpaceKey('/a/../b')).toBe(normalize('/b'));
     expect(rootForUri(['/a', '/a/b'], '/a/b/file.txt')).toBe('/a/b');
     expect(rootForUri(['/a'], '/other/file.txt')).toBeNull();
+  });
+
+  it('toggles a pane view between tree and flat without changing its other axes', () => {
+    const tree = { mode: 'tree' as const, level: 'all' as const, content: 'all' as const };
+    const flat = toggleViewMode(tree);
+    expect(flat).toEqual({ ...tree, mode: 'flat' });
+    expect(toggleViewMode(flat)).toEqual(tree);
   });
 
   it('classifies configured root renames', () => {

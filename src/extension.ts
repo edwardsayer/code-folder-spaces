@@ -9,7 +9,7 @@ import { visibleWorkspaceRoots } from './spaces/workspaceRoots';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { VIEW_PRESETS, matchPresetName } from './spaces/viewPresets';
-import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
+import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions, toggleViewMode } from './spaces/viewState';
 import { isDrillDownNoop, isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { normalizeExcludeSetting, parseGitIgnore, shouldHideLikeExplorer, type GitIgnoreRule } from './spaces/explorerVisibility';
@@ -1203,6 +1203,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.dual', async () => {
       if (viewState.getMode() === 'dual') return;
+      // R6 曾因 pane2 drillUp 未顯示而放寬 pane1 條件；本輪按最新指示，dual 的 pane1 不顯示 drillUp（pane2 保留）。
+      // 使用者要求：切入 dual 時 pane1 回到原 roots；pane2 保留自己的 drill 狀態。
+      if (viewState.get('pane1').drillStack.length > 0) await viewState.resetRoot('pane1');
       await viewState.setMode('dual');
       // 切換 mode 刻意覆寫 pane1 檢視，讓 Dual 模式固定使用 Navigate。
       await viewState.setView('pane1', VIEW_PRESETS.Navigate);
@@ -1213,21 +1216,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await syncPaneContexts();
       await syncContext();
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.adoptChild', async () => {
-      const childRoot = activeRoot(viewState.get('pane2'));
-      await viewState.setMode('tree');
-      syncPaneViews();
-      if (childRoot) {
-        await viewState.drillDown('pane1', childRoot);
-        await viewState.setView('pane1', VIEW_PRESETS.Explorer);
-      }
-      await paneChanged('pane1');
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.activateChild', async () => {
+      const runtime = paneRuntime.get('pane1');
+      if (!runtime) return;
+      // 選取資料夾用自身，選取檔案用父目錄；沒有選取時使用 pane1 目前的 root。
+      const info = nodeInfo(runtime.treeView.selection[0]);
+      const target = info?.isDirectory ? info.uri.fsPath
+        : info?.uri ? path.dirname(info.uri.fsPath)
+        : activeRoot(viewState.get('pane1'));
+      if (!target) return;
+      await viewState.switchRoot('pane2', target);
+      applyPaneScope('pane2');
+      paneRuntime.get('pane2')?.provider.refresh();
+      await syncPaneContexts();
       await syncContext();
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.toggleNested', async () => {
-      const view = effectiveView(viewState.get('pane1'));
-      await viewState.setView('pane1', { ...view, mode: view.mode === 'tree' ? 'flat' : 'tree' });
-      repaintPane('pane1');
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested', async () => {
+      const view = effectiveView(viewState.get('pane2'));
+      await viewState.setView('pane2', toggleViewMode(view));
+      repaintPane('pane2');
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.asc', () => setPane1Sort('name', 'asc')),

@@ -22,6 +22,29 @@ suite('擴充套件啟用', () => {
     }
   });
 
+  test('v2-R7 命令、pane 子選單打勾與標題貢獻符合契約', async () => {
+    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    assert.ok(extension);
+    const manifest = extension.packageJSON.contributes;
+    const commands = new Set((manifest.commands ?? []).map((item: { command: string }) => item.command));
+    assert.ok(commands.has('codeFolderSpaces.pane1.activateChild'));
+    assert.ok(!commands.has('codeFolderSpaces.pane1.adoptChild'));
+    assert.ok(!commands.has('codeFolderSpaces.pane1.toggleNested'));
+    assert.ok(commands.has('codeFolderSpaces.pane2.toggleNested'));
+    const menus = manifest.menus as Record<string, Array<{ command?: string; toggled?: string }>>;
+    assert.equal(menus['codeFolderSpaces.pane1.view'].length, 2);
+    assert.equal(menus['codeFolderSpaces.pane1.sort'].length, 6);
+    assert.equal(menus['codeFolderSpaces.pane2.view'].length, 1);
+    for (const id of ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort', 'codeFolderSpaces.pane2.view']) {
+      assert.ok(menus[id].every(item => Boolean(item.toggled)), `${id} 每個項目均需 toggled`);
+    }
+    const title = manifest.menus['view/title'] as Array<{ command?: string; submenu?: string; when?: string; group?: string }>;
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.activateChild' && item.group === 'navigation@1'));
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.drillUp' && item.when?.includes('mode == tree')));
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.drillUp' && item.group === 'navigation@0'));
+    assert.ok(title.some(item => item.submenu === 'codeFolderSpaces.pane2.view' && item.group === '3_view@1'));
+  });
+
   test('manifest 包含 view 且已註冊 focus 命令', async () => {
     const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
     assert.ok(extension);
