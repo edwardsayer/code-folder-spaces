@@ -23,11 +23,11 @@ const rootKey = (root: string): string => {
  * 舊行為把 pane roots **整個取代** 成可見工作區根，會讓使用者設定（含 Mark as Global
  * 的 profile 層 root）在切換專案後遺失且不再回來。新規則：
  *  - 先放可見工作區根（順序依工作區）；
- *  - 再放**使用者設定**的 roots（`spaces.workspace`／`spaces.global`，含 Mark as Global 的 profile 層 root）
- *    ——即使目前 pane 還沒有它（切換到別的專案時 global root 仍應出現）；
- *  - 丟掉其餘 roots（例如前一個專案自動帶入、既非工作區根也非設定值的目錄）。
+ *  - 再放**全域 roots**（使用者層級檔案 `~/.code-folder-spaces/global-roots.json` ＋ legacy
+ *    `spaces.global` 設定，含 Mark as Global）——即使目前 pane 還沒有它（切換到別的專案時仍應出現）；
+ *  - 丟掉其餘 roots（例如前一個專案自動帶入、既非工作區根也非全域 roots 的目錄）。
  *
- * 這讓「三種來源（工作區根／spaces.workspace／spaces.global）都是 pane 的根」與文件語意一致。
+ * 注意：`spaces.workspace` 屬專案清單，**不**在此自動併入（呼叫端只傳全域 roots）。
  */
 export function mergeFollowedWorkspaceRoots(current: string[], visible: string[], configured: string[]): string[] {
   const result: string[] = [];
@@ -47,7 +47,7 @@ export function mergeFollowedWorkspaceRoots(current: string[], visible: string[]
     if (!configuredKeys.has(key) || visibleKeys.has(key)) continue;
     push(root);
   }
-  // ……其餘設定根（例如剛 Mark as Global、或別的專案設定的）接在後面，依設定順序。
+  // ……其餘全域根（例如剛 Mark as Global、或別的專案設定的）接在後面，依設定順序。
   for (const root of configured) push(root);
   return result;
 }
