@@ -72,13 +72,13 @@
   "command.pane2.toggleNested.title": "Toggle Nested Files",
   "command.pane1.activateChild.title": "Activate Child Space",
   "command.pane1.workspaceFolders.title": "Workspace Folders...",
-  "command.pane1.mode.tree.checked.title": "✓ View: Tree",
-  "command.pane1.mode.dual.checked.title": "✓ View: Dual",
-  "command.paneAction.sort.name.asc.checked.title": "✓ Name (Ascending)",
-  "command.paneAction.sort.name.desc.checked.title": "✓ Name (Descending)",
-  "command.paneAction.sort.mtime.asc.checked.title": "✓ Modified (Ascending)",
-  "command.paneAction.sort.mtime.desc.checked.title": "✓ Modified (Descending)",
-  "command.paneAction.sort.ctime.asc.checked.title": "✓ Created (Ascending)",
-  "command.paneAction.sort.ctime.desc.checked.title": "✓ Created (Descending)",
-  "command.pane2.toggleNested.checked.title": "✓ Toggle Nested Files"
+  "command.pane1.mode.tree.checked.title": "View: Tree ✓",
+  "command.pane1.mode.dual.checked.title": "View: Dual ✓",
+  "command.paneAction.sort.name.asc.checked.title": "Name (Ascending) ✓",
+  "command.paneAction.sort.name.desc.checked.title": "Name (Descending) ✓",
+  "command.paneAction.sort.mtime.asc.checked.title": "Modified (Ascending) ✓",
+  "command.paneAction.sort.mtime.desc.checked.title": "Modified (Descending) ✓",
+  "command.paneAction.sort.ctime.asc.checked.title": "Created (Ascending) ✓",
+  "command.paneAction.sort.ctime.desc.checked.title": "Created (Descending) ✓",
+  "command.pane2.toggleNested.checked.title": "Toggle Nested Files ✓"
 }

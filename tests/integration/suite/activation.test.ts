@@ -47,7 +47,9 @@ suite('擴充套件啟用', () => {
       }
     }
     const title = manifest.menus['view/title'] as Array<{ command?: string; submenu?: string; when?: string; group?: string }>;
-    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.activateChild' && item.group === 'navigation@1'));
+    // v21-R2（使用者）：Activate Child Space 不再出現在 pane1 的 view/title（文字按鈕會擠壓標題列）。
+    assert.ok(!title.some(item => item.command === 'codeFolderSpaces.pane1.activateChild'));
+    assert.ok(commands.has('codeFolderSpaces.pane1.activateChild'), '命令本身仍需保留');
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.drillUp' && item.when?.includes('mode == tree')));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.drillUp' && item.group === 'navigation@0'));
     // v2.1：Toggle Nested Files 直接掛在 pane2 的 view/title（成對），不再走子選單。

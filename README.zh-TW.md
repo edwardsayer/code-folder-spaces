@@ -12,10 +12,10 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 
 - **Tree** 僅顯示 pane1 的單一資料夾樹。
 - **Dual** 顯示上下排列的 pane1 與 pane2。pane1 是控制中心：可透過標題列操作與原生子選單（**View:**、**Sort:**）管理版面、根目錄、工作區資料夾、排序及其他導覽。pane2 的選單較精簡，只提供基本操作（巢狀檔案清單切換、過濾、收合／展開、重新整理及關閉）。
-- 代表目前狀態的選單項目會加上 **✓** 前綴：pane1 的 **View:**／**Sort:** 子選單與 pane2 的 **Toggle Nested Files**（VS Code 不為擴充套件子選單繪製勾號，故以標題前綴呈現）。
+- 代表目前狀態的選單項目會加上**尾綴 ✓**：pane1 的 **View:**／**Sort:** 子選單與 pane2 的 **Toggle Nested Files**（VS Code 未提供擴充套件原生勾號 API，故標記是標題的一部分；放在文字之後，標題起點不會被推擠）。
 - pane2 預設是扁平的**第一層檔案清單**；按標題列的 **Toggle Nested Files** 會展開為所有層級的檔案（仍是扁平清單）。
 - 兩個窗格刻意設計為**可特化且不對稱**；pane2 並非完整複製 pane1 的控制項。pane1 不可關閉；關閉 pane2 會回到 Tree 模式。
-- 在 Dual 模式中，pane1 選取資料夾會讓 pane2 導覽至該資料夾。pane2 沒有自己的根目錄切換器，其根目錄來自上述連動或 pane1 的 **Activate Child Space**。
+- 在 Dual 模式中，pane1 選取資料夾會讓 pane2 導覽至該資料夾。pane2 沒有自己的根目錄切換器，其根目錄來自上述連動（`Activate Child Space` 命令仍保留，但不再顯示於標題列）。
 - 由於 Dual 讓 pane1 成為導覽來源，pane1 在 Dual 模式不顯示**返回上層**，且從 Tree 切到 Dual 時會退回原設定的根目錄；pane2 則保留自己的下鑽狀態與**返回上層**。
 
 ## 空間根目錄來源
@@ -24,7 +24,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 
 1. **工作區根目錄**會自動取自目前 VS Code 工作區。可從空間清單隱藏，並透過 pane1 選單還原。
 2. **`codeFolderSpaces.spaces.workspace`** 是專案／工作區層級清單，適合與專案共用的根目錄。
-3. **`codeFolderSpaces.spaces.global`** 是使用者 profile 層級清單，可跨工作區使用。全域根目錄會以 **🌐** 標記，並出現在每個工作區的 Folder Spaces 窗格。
+3. **全域根目錄**存於使用者層級檔案（`~/.code-folder-spaces/global-roots.json`），**同一個作業系統使用者在任何 VS Code profile、任何工作區／視窗都看得到**，並以 **🌐** 標記。舊的 `codeFolderSpaces.spaces.global` 設定仍會被讀取（合併），但新的全域根目錄會寫入使用者層級檔案。
 
 在空間根目錄的右鍵選單使用 **Mark as Global**，可將該根目錄從工作區清單移至全域清單；使用 **Unmark Global** 可移回。此操作會變更根目錄的來源；🌐 標記代表它屬於 profile 層級清單。
 
@@ -45,7 +45,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 | 設定 | 型別 | 預設值 | 說明 |
 | --- | --- | --- | --- |
 | `codeFolderSpaces.spaces.workspace` | array | `[]` | 專案／工作區層級的空間根目錄清單；項目可為路徑或物件。 |
-| `codeFolderSpaces.spaces.global` | array | `[]` | 使用者 profile 層級、可跨工作區使用的根目錄。 |
+| `codeFolderSpaces.spaces.global` | array | `[]` | 舊的 profile 層級根目錄（會與使用者層級檔案合併；寫入全域根目錄後會被清空）。 |
 | `codeFolderSpaces.followActiveFile` | boolean | `true` | 在空間樹中跟隨目前作用中的編輯器檔案。 |
 | `codeFolderSpaces.maxDepth` | integer（1–100） | `10` | 扁平清單列舉資料夾時使用的最大深度。 |
 | `codeFolderSpaces.followWorkspaceDirectory` | boolean | `true` | 讓 pane1 根目錄與工作區資料夾保持同步；設定值中的根目錄（含全域）會保留並接在工作區根目錄之後。 |
@@ -77,7 +77,6 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 - **Filter by Path…**／**Clear Filter**／**Return to Parent**（過濾／清除／返回上層）
 - **Switch Root…**／**Refresh**／**Reset Pane Layout**（切換根目錄／重新整理／重設版面）
 - **Toggle Nested Files**（pane2 標題列）
-- **Activate Child Space**（Dual 模式、pane1：把選取的資料夾設為 pane2 根目錄）
 - **Mark as Global**／**Unmark Global**（空間根目錄右鍵選單）
 
 目前 manifest 共提供 72 個命令。

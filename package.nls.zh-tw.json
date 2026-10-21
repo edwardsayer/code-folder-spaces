@@ -72,13 +72,13 @@
   "command.pane2.toggleNested.title": "切換巢狀檔案",
   "command.pane1.activateChild.title": "啟用子空間",
   "command.pane1.workspaceFolders.title": "工作區資料夾...",
-  "command.pane1.mode.tree.checked.title": "✓ 檢視：樹狀",
-  "command.pane1.mode.dual.checked.title": "✓ 檢視：雙窗格",
-  "command.paneAction.sort.name.asc.checked.title": "✓ 名稱（遞增）",
-  "command.paneAction.sort.name.desc.checked.title": "✓ 名稱（遞減）",
-  "command.paneAction.sort.mtime.asc.checked.title": "✓ 修改時間（遞增）",
-  "command.paneAction.sort.mtime.desc.checked.title": "✓ 修改時間（遞減）",
-  "command.paneAction.sort.ctime.asc.checked.title": "✓ 建立時間（遞增）",
-  "command.paneAction.sort.ctime.desc.checked.title": "✓ 建立時間（遞減）",
-  "command.pane2.toggleNested.checked.title": "✓ 切換巢狀檔案"
+  "command.pane1.mode.tree.checked.title": "檢視：樹狀 ✓",
+  "command.pane1.mode.dual.checked.title": "檢視：雙窗格 ✓",
+  "command.paneAction.sort.name.asc.checked.title": "名稱（遞增）✓",
+  "command.paneAction.sort.name.desc.checked.title": "名稱（遞減）✓",
+  "command.paneAction.sort.mtime.asc.checked.title": "修改時間（遞增）✓",
+  "command.paneAction.sort.mtime.desc.checked.title": "修改時間（遞減）✓",
+  "command.paneAction.sort.ctime.asc.checked.title": "建立時間（遞增）✓",
+  "command.paneAction.sort.ctime.desc.checked.title": "建立時間（遞減）✓",
+  "command.pane2.toggleNested.checked.title": "切換巢狀檔案 ✓"
 }

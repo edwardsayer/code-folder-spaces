@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { SpaceConfigEntry, SpaceDefinition, SpaceOrigin } from '../types';
 import { mergeSpaceDefinitions, normalizeSpaceEntries, originOf } from './spaceConfig';
+import { createUserGlobalRootsIO, mergeUserGlobalRoots, type UserGlobalRootsIO } from './userGlobalRoots';
 
 const SECTION = 'codeFolderSpaces';
 
@@ -30,8 +31,12 @@ export class SpaceStore implements vscode.Disposable {
   readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
 
   private readonly _configurationListener: vscode.Disposable;
+  private readonly userGlobalRoots: UserGlobalRootsIO;
+  private userGlobalRootsCache: SpaceConfigEntry[];
 
-  constructor(private readonly shim?: SpaceStoreConfigurationShim) {
+  constructor(private readonly shim?: SpaceStoreConfigurationShim, userGlobalRoots?: UserGlobalRootsIO) {
+    this.userGlobalRoots = userGlobalRoots ?? createUserGlobalRootsIO();
+    this.userGlobalRootsCache = this.userGlobalRoots.read();
     this._configurationListener = vscode.workspace.onDidChangeConfiguration((event) => {
       if (
         event.affectsConfiguration(`${SECTION}.spaces.workspace`) ||
@@ -42,12 +47,17 @@ export class SpaceStore implements vscode.Disposable {
     });
   }
 
-  /** 讀取指定來源的原始設定（sourceIndex 僅對應此陣列）。 */
+  /**
+   * 讀取指定來源的原始設定（sourceIndex 僅對應此陣列）。
+   * v2.1：global 來源＝舊設定 `spaces.global` ∪ 使用者層級檔案（跨 profile／跨專案）。
+   */
   getRawEntries(origin: SpaceOrigin): SpaceConfigEntry[] {
     const value = this.shim
       ? this.shim.get(origin)
       : vscode.workspace.getConfiguration(SECTION).get<SpaceConfigEntry[]>(`spaces.${origin}`, []);
-    return Array.isArray(value) ? [...value] : [];
+    const entries = Array.isArray(value) ? [...value] : [];
+    if (origin !== 'global') return entries;
+    return mergeUserGlobalRoots(entries, this.userGlobalRootsCache);
   }
 
   /** 取得單一來源的正規化定義。 */
@@ -157,12 +167,37 @@ export class SpaceStore implements vscode.Disposable {
   }
 
   private async writeEntries(origin: SpaceOrigin, entries: SpaceConfigEntry[]): Promise<void> {
-    const target = origin === 'workspace' ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
+    if (origin === 'global') {
+      // v2.1：global 寫入使用者層級檔案（跨 profile／跨專案可見），並把舊設定清空避免雙來源復活。
+      this.userGlobalRoots.write(entries);
+      this.userGlobalRootsCache = [...entries];
+      const legacy = this.shim
+        ? this.shim.get('global')
+        : vscode.workspace.getConfiguration(SECTION).get<SpaceConfigEntry[]>('spaces.global', []);
+      if (Array.isArray(legacy) && legacy.length > 0) {
+        const target = vscode.ConfigurationTarget.Global;
+        if (this.shim) await this.shim.update('global', [], target);
+        else await vscode.workspace.getConfiguration(SECTION).update('spaces.global', [], target);
+      }
+      return;
+    }
+    const target = vscode.ConfigurationTarget.Workspace;
     if (this.shim) {
       await this.shim.update(origin, entries, target);
     } else {
       await vscode.workspace.getConfiguration(SECTION).update(`spaces.${origin}`, entries, target);
     }
+  }
+
+  /** 重新載入使用者層級 global roots（例如另一個 profile 剛改過檔案）。 */
+  reloadUserGlobalRoots(): void {
+    this.userGlobalRootsCache = this.userGlobalRoots.read();
+    this._onDidChange.fire();
+  }
+
+  /** 使用者層級 global roots 檔案位置（供診斷／文件）。 */
+  get userGlobalRootsPath(): string {
+    return this.userGlobalRoots.filePath;
   }
 
   dispose(): void {

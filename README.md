@@ -12,10 +12,10 @@ VS Code's built-in Explorer always shows the entire workspace. Folder Spaces pro
 
 - **Tree** shows pane1 as a single folder tree.
 - **Dual** shows pane1 above pane2. Pane1 is the control center: its title-bar actions and native submenus (**View:**, **Sort:**) manage layout, roots, workspace folders, sorting and other navigation. Pane2 has a smaller, basic-operation menu (switching the nested-file listing, filtering, collapse/expand, refresh and close).
-- Menu items that represent a current state are prefixed with **✓**: the **View:** and **Sort:** submenus in pane1 and **Toggle Nested Files** in pane2 mark the active choice (VS Code does not render checkboxes for extension submenus, so the check is part of the label).
+- Menu items that represent a current state are marked with a trailing **✓**: the **View:** and **Sort:** submenus in pane1 and **Toggle Nested Files** in pane2 (VS Code offers no native checkmark API for extension menus, so the marker is part of the label and sits after the text so labels stay aligned).
 - Pane2 starts as a flat **first-level file list**; **Toggle Nested Files** in its title bar expands it to files from all levels (still a flat listing).
 - The panes are deliberately **specialized and asymmetric**; pane2 is not a duplicate control surface. Pane1 cannot be closed. Closing pane2 returns to Tree mode.
-- In Dual mode, selecting a folder in pane1 navigates pane2 into that folder. Pane2 has no root switcher of its own; its root comes from that cascade or from **Activate Child Space** in pane1.
+- In Dual mode, selecting a folder in pane1 navigates pane2 into that folder. Pane2 has no root switcher of its own; its root comes from that cascade (the `Activate Child Space` command remains available but is not shown in the title bar).
 - Because Dual makes pane1 the navigation source, pane1 hides **Return to Parent** in Dual mode and returns to its configured roots when you switch from Tree to Dual. Pane2 keeps its own drill-down state and **Return to Parent**.
 
 ## Where spaces come from
@@ -24,7 +24,7 @@ Folder roots can come from three sources:
 
 1. **Workspace roots** are available automatically from the current VS Code workspace. They can be hidden from the space list and restored from pane1's menu.
 2. **`codeFolderSpaces.spaces.workspace`** is the project/workspace-level list, suitable for roots shared with a project.
-3. **`codeFolderSpaces.spaces.global`** is the user-profile-level list, available across workspaces. Global roots are marked with a **🌐** indicator and appear in every workspace's Folder Spaces pane.
+3. **Global roots** live in a user-level file (`~/.code-folder-spaces/global-roots.json`), so the same OS user sees them in **every VS Code profile, workspace and window**. They are marked with a **🌐** indicator. The legacy `codeFolderSpaces.spaces.global` setting is still read (and merged) but new global roots are written to the user-level file.
 
 Use **Mark as Global** from a space root's context menu to move that root from the workspace list to the global list. Use **Unmark Global** to move it back. This changes the source of the root; the 🌐 marker identifies roots that belong to the profile-level list.
 
@@ -45,7 +45,7 @@ Each entry may be a path string or an object with `path`, `name`, `icon`, `showF
 | Setting | Type | Default | Description |
 | --- | --- | --- | --- |
 | `codeFolderSpaces.spaces.workspace` | array | `[]` | Project/workspace-level space roots. Entries are paths or objects. |
-| `codeFolderSpaces.spaces.global` | array | `[]` | User-profile-level roots shared across workspaces. |
+| `codeFolderSpaces.spaces.global` | array | `[]` | Legacy profile-level roots (merged with the user-level file; cleared once a global root is written). |
 | `codeFolderSpaces.followActiveFile` | boolean | `true` | Follow the active editor file in the space tree. |
 | `codeFolderSpaces.maxDepth` | integer (1–100) | `10` | Maximum folder depth enumerated by flat listings. |
 | `codeFolderSpaces.followWorkspaceDirectory` | boolean | `true` | Keep pane1's workspace roots synchronized with workspace folders. Configured roots (including global ones) are preserved and added after the workspace roots. |
@@ -77,7 +77,6 @@ Pane-specific actions live in each pane's title bar, submenus and context menus,
 - **Filter by Path…** / **Clear Filter** / **Return to Parent**
 - **Switch Root…** / **Refresh** / **Reset Pane Layout**
 - **Toggle Nested Files** (pane2 title bar)
-- **Activate Child Space** (Dual mode, pane1: use the selected folder as pane2's root)
 - **Mark as Global** / **Unmark Global** (space-root context menu)
 
 The full manifest currently contributes 72 commands.

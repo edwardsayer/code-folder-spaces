@@ -1,9 +1,11 @@
 import * as assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { SpaceStore } from '../../../src/spaces/spaceStore';
+import { parseUserGlobalRoots, serializeUserGlobalRoots } from '../../../src/spaces/userGlobalRoots';
 import type { SpaceConfigEntry } from '../../../src/types';
 import { clearGlobalSettings } from './helpers';
 
@@ -55,14 +57,20 @@ suite('Workspace Trust 與 SpaceStore 設定範圍', () => {
       assert.equal(await store.markAsGlobal(tempPath), true);
       current = vscode.workspace.getConfiguration('codeFolderSpaces');
       assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue, []);
-      assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue, [tempPath]);
+      // v21-R2：global 改存使用者層級檔案，legacy 設定會被清空。
+      assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue ?? [], []);
+      const userGlobalRoots = parseUserGlobalRoots(readFileSync(store.userGlobalRootsPath, 'utf8'));
+      assert.deepEqual(userGlobalRoots, [tempPath]);
+      assert.equal(store.getDefinitions().find((definition) => definition.basePath === tempPath)?.origin, 'global');
       assert.equal(await store.removeSpace(tempPath), true);
       current = vscode.workspace.getConfiguration('codeFolderSpaces');
       assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue, []);
-      assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue, []);
+      assert.deepEqual(parseUserGlobalRoots(readFileSync(store.userGlobalRootsPath, 'utf8')), []);
     } finally {
       store.dispose();
       try {
+        // v21-R2：global 存使用者層級檔案；測試結束一律清空，避免殘留污染後續案例。
+        try { fs.writeFileSync(store.userGlobalRootsPath, serializeUserGlobalRoots([])); } catch { /* 檔案可能尚未建立 */ }
         await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.workspace', originalWorkspace, vscode.ConfigurationTarget.Workspace);
         await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.global', originalGlobal, vscode.ConfigurationTarget.Global);
       } finally { restoreFixtureSettings(); }

@@ -417,7 +417,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }
     // v2.1：只替換「工作區自動帶入」的 roots，保留使用者設定的 roots（含 Mark as Global 的 profile 層 root），
     // 否則切換專案會把 global root 永久丟掉，切回原專案也回不來。
-    const configuredRoots = store.getDefinitions().map(definition => definition.basePath);
+    // 只合併「全域」roots（使用者層級檔案＋legacy spaces.global）；spaces.workspace 屬專案清單，不自動塞進 pane。
+    const configuredRoots = store.getDefinitionsByOrigin('global').map(definition => definition.basePath);
     const next = mergeFollowedWorkspaceRoots(current, visible, configuredRoots);
     if (current.length !== next.length || current.some((root, index) => !isSamePath(root, next[index]))) {
       await viewState.setPaneRoots('pane1', next);

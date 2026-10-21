@@ -19,7 +19,7 @@ All notable changes to Folder Spaces are documented in this file.
 - Added Mark as Global / Unmark Global actions and a 🌐 marker for profile-level roots.
 - Added fixed Tree and Dual layouts with intentionally asymmetric, independently specialized pane controls.
 - Added **Activate Child Space** (pane1, Dual mode): uses the folder selected in pane1 as pane2's root (a selected file uses its parent folder; no selection falls back to pane1's current root).
-- Added native submenus (**View:**, **Sort:**) whose current choice is marked with a **✓** prefix, implemented as paired commands (`<id>.checked`) because VS Code does not render checkboxes for extension submenus.
+- Added native submenus (**View:**, **Sort:**) whose current choice is marked with a trailing **✓**, implemented as paired commands (`<id>.checked`) because VS Code exposes no native checkmark for extension menus (`toggled` is core-only; item icons do not render in submenus).
 - Added a **Toggle Nested Files** title-bar action for pane2 (replacing the former pane2 view submenu): the pane2 listing stays flat and switches between first-level files and files from all levels.
 - Added command/handler parity validation to `npm run check`.
 
@@ -34,6 +34,8 @@ All notable changes to Folder Spaces are documented in this file.
 
 ### Fixed
 
+- Global roots (`Mark as Global`) moved to a **user-level file** (`~/.code-folder-spaces/global-roots.json`) so the same OS user sees them in every VS Code profile, workspace and window. The legacy `codeFolderSpaces.spaces.global` setting is merged on read and cleared once a global root is written.
+- Removed the **Activate Child Space** text button from pane1's title bar (the command remains registered); pane2's root is driven by the pane1 folder-selection cascade.
 - Follow Workspace Directory no longer overwrites pane1 roots with the workspace roots only: configured roots (`codeFolderSpaces.spaces.workspace` / `.global`, including **Mark as Global** roots) are preserved and appear in every workspace, so a global root no longer disappears after switching projects or reloading.
 
 ### Removed

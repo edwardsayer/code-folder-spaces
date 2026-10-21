@@ -990,11 +990,6 @@
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane1.activateChild",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode == dual",
-          "group": "navigation@1"
-        },
-        {
           "command": "codeFolderSpaces.pane1.filter",
           "when": "view == codeFolderSpaces.pane1 && !codeFolderSpaces.pane1.hasFilter",
           "group": "navigation@3"

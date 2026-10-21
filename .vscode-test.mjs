@@ -27,6 +27,12 @@ console.log(fromPath
   ? `[vscode-test] 使用本機 VS Code：${fromPath}`
   : `[vscode-test] 使用 test-electron 下載 VS Code：${process.env.VSCODE_TEST_VERSION ?? 'stable'}`);
 
+// v21-R2：global roots 改存使用者層級檔案（預設 ~/.code-folder-spaces/global-roots.json）。
+// 整合測試以環境變數把它導到暫存路徑，避免污染使用者真實設定，也避免跨次執行殘留。
+const userGlobalRootsFile = path.resolve(root, './.vscode-test/global-roots.json');
+fs.rmSync(userGlobalRootsFile, { force: true });
+process.env.CODEFOLDERSPACES_GLOBAL_ROOTS_FILE = userGlobalRootsFile;
+
 export default {
   tests: [{
     label: 'desktop',
@@ -37,5 +43,6 @@ export default {
       ? { useInstallation: { fromPath } }
       : { version: process.env.VSCODE_TEST_VERSION ?? 'stable' }),
     mocha: { timeout: 60000, color: true },
+    env: { ...process.env, CODEFOLDERSPACES_GLOBAL_ROOTS_FILE: userGlobalRootsFile },
   }],
 };

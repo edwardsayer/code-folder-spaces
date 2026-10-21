@@ -168,7 +168,8 @@ if (!pkg) {
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
     // 契約隨產品演進維護：v2 固定雙 pane 的 title 清單取代舊多窗格清單，並非放寬檢查。
     const paneTitleContract = {
-      1: ['filter', 'clearFilter', 'drillUp', 'activateChild', 'addRoot', 'refresh', 'workspaceFolders', 'switchRoot', 'resetLayout'],
+      // v21-R2（使用者）：activateChild 不再放進 pane1 的 view/title（文字按鈕會擠壓標題列），命令本身保留。
+      1: ['filter', 'clearFilter', 'drillUp', 'addRoot', 'refresh', 'workspaceFolders', 'switchRoot', 'resetLayout'],
       2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'toggleNested', 'close'],
     };
     // v2-R6（使用者）：移除 pane1.more 這一層 submenu，其項目直接掛進「...」下拉。
