@@ -23,8 +23,8 @@ const rootKey = (root: string): string => {
  * 舊行為把 pane roots **整個取代** 成可見工作區根，會讓使用者設定（含 Mark as Global
  * 的 profile 層 root）在切換專案後遺失且不再回來。新規則：
  *  - 先放可見工作區根（順序依工作區）；
- *  - 再放**全域 roots**（使用者層級檔案 `~/.code-folder-spaces/global-roots.json` ＋ legacy
- *    `spaces.global` 設定，含 Mark as Global）——即使目前 pane 還沒有它（切換到別的專案時仍應出現）；
+ *  - 再放**全域 roots**（標準 user settings 的 `codeFolderSpaces.spaces.global`，含 Mark as Global）
+ *    ——即使目前 pane 還沒有它（切換到別的專案時仍應出現）；
  *  - 丟掉其餘 roots（例如前一個專案自動帶入、既非工作區根也非全域 roots 的目錄）。
  *
  * 注意：`spaces.workspace` 屬專案清單，**不**在此自動併入（呼叫端只傳全域 roots）。

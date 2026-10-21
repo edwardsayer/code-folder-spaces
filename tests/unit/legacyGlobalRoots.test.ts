@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  legacyGlobalRootsExists,
   parseLegacyGlobalRoots,
   readLegacyGlobalRoots,
   resolveLegacyGlobalRootsPath,
@@ -64,5 +65,26 @@ describe('舊 global roots 檔案（一次性遷移後退役）', () => {
   it('重複退役不拋錯（檔案已不存在回 undefined）', () => {
     const dir = makeDir();
     expect(retireLegacyGlobalRoots(path.join(dir, 'nope.json'))).toBeUndefined();
+  });
+
+  it('既有備份不被覆寫：目標已存在時改存時間戳檔名', () => {
+    const dir = makeDir();
+    const file = path.join(dir, 'global-roots.json');
+    const previous = path.join(dir, 'global-roots.migrated.json');
+    fs.writeFileSync(previous, JSON.stringify({ version: 1, roots: ['D:/old'] }));
+    fs.writeFileSync(file, JSON.stringify({ version: 1, roots: ['D:/new'] }));
+    const retired = retireLegacyGlobalRoots(file);
+    expect(retired).not.toBe(previous);
+    expect(retired).toMatch(/global-roots\.migrated-.+\.json$/);
+    expect(JSON.parse(fs.readFileSync(previous, 'utf8')).roots).toEqual(['D:/old']);
+    expect(JSON.parse(fs.readFileSync(retired!, 'utf8')).roots).toEqual(['D:/new']);
+  });
+
+  it('legacyGlobalRootsExists 只對既有檔案回 true（空檔也算存在）', () => {
+    const dir = makeDir();
+    const empty = path.join(dir, 'empty.json');
+    expect(legacyGlobalRootsExists(empty)).toBe(false);
+    fs.writeFileSync(empty, '');
+    expect(legacyGlobalRootsExists(empty)).toBe(true);
   });
 });

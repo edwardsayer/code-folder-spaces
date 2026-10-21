@@ -56,11 +56,26 @@ export function readLegacyGlobalRoots(filePath: string = resolveLegacyGlobalRoot
  * 回傳退役後的路徑；檔案不存在或改名失敗時回 undefined。
  */
 export function retireLegacyGlobalRoots(filePath: string = resolveLegacyGlobalRootsPath()): string | undefined {
-  const retired = filePath.replace(/\.json$/i, LEGACY_GLOBAL_ROOTS_RETIRED_SUFFIX);
+  const base = filePath.replace(/\.json$/i, LEGACY_GLOBAL_ROOTS_RETIRED_SUFFIX);
+  // 不覆寫既有備份：目標已存在時加時間戳，保留每一次遷移的內容。
+  let retired = base;
+  if (fs.existsSync(retired)) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    retired = base.replace(/\.migrated\.json$/i, `.migrated-${stamp}.json`);
+  }
   try {
     fs.renameSync(filePath, retired);
     return retired;
   } catch {
     return undefined;
+  }
+}
+
+/** 舊檔是否存在（供啟動時的遷移判斷；空檔／壞檔也算存在，會被退役）。 */
+export function legacyGlobalRootsExists(filePath: string = resolveLegacyGlobalRootsPath()): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
   }
 }
