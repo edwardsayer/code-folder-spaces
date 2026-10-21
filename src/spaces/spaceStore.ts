@@ -47,15 +47,22 @@ export class SpaceStore implements vscode.Disposable {
     });
   }
 
-  /**
-   * 讀取指定來源的原始設定（sourceIndex 僅對應此陣列）。
-   * v2.1：global 來源＝舊設定 `spaces.global` ∪ 使用者層級檔案（跨 profile／跨專案）。
-   */
-  getRawEntries(origin: SpaceOrigin): SpaceConfigEntry[] {
+  /** 只讀 VS Code 設定（不含使用者層級檔案）。 */
+  private getSettingEntries(origin: SpaceOrigin): SpaceConfigEntry[] {
     const value = this.shim
       ? this.shim.get(origin)
       : vscode.workspace.getConfiguration(SECTION).get<SpaceConfigEntry[]>(`spaces.${origin}`, []);
-    const entries = Array.isArray(value) ? [...value] : [];
+    return Array.isArray(value) ? [...value] : [];
+  }
+
+  /**
+   * 讀取指定來源的原始設定（sourceIndex 僅對應此陣列）。
+   *
+   * v21-R3：global 來源＝**標準 user settings 的 `spaces.global`（正本，可在 settings.json 看到）**
+   * ∪ 使用者層級檔案（跨 profile 鏡像）。兩者同路徑去重、設定優先。
+   */
+  getRawEntries(origin: SpaceOrigin): SpaceConfigEntry[] {
+    const entries = this.getSettingEntries(origin);
     if (origin !== 'global') return entries;
     return mergeUserGlobalRoots(entries, this.userGlobalRootsCache);
   }
@@ -168,16 +175,24 @@ export class SpaceStore implements vscode.Disposable {
 
   private async writeEntries(origin: SpaceOrigin, entries: SpaceConfigEntry[]): Promise<void> {
     if (origin === 'global') {
-      // v2.1：global 寫入使用者層級檔案（跨 profile／跨專案可見），並把舊設定清空避免雙來源復活。
-      this.userGlobalRoots.write(entries);
-      this.userGlobalRootsCache = [...entries];
-      const legacy = this.shim
-        ? this.shim.get('global')
-        : vscode.workspace.getConfiguration(SECTION).get<SpaceConfigEntry[]>('spaces.global', []);
-      if (Array.isArray(legacy) && legacy.length > 0) {
-        const target = vscode.ConfigurationTarget.Global;
-        if (this.shim) await this.shim.update('global', [], target);
-        else await vscode.workspace.getConfiguration(SECTION).update('spaces.global', [], target);
+      // v21-R3：正本寫入**標準 user settings**（`codeFolderSpaces.spaces.global`），
+      // 同時鏡像到使用者層級檔案，讓同一 OS 使用者的其他 profile 也看得到。
+      // 鏡像失敗時把 settings 還原回寫入前的內容，避免兩層不同步。
+      const target = vscode.ConfigurationTarget.Global;
+      const previousSettings = this.getSettingEntries('global');
+      const previousFile = [...this.userGlobalRootsCache];
+      const updateSettings = async (value: SpaceConfigEntry[]): Promise<void> => {
+        if (this.shim) await this.shim.update('global', value, target);
+        else await vscode.workspace.getConfiguration(SECTION).update('spaces.global', value, target);
+      };
+      await updateSettings(entries);
+      try {
+        this.userGlobalRoots.write(entries);
+        this.userGlobalRootsCache = [...entries];
+      } catch (error) {
+        this.userGlobalRootsCache = previousFile;
+        try { await updateSettings(previousSettings); } catch { /* 保留原始錯誤，回滾失敗由呼叫端揭露 */ }
+        throw error;
       }
       return;
     }

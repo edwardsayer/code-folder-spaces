@@ -57,14 +57,15 @@ suite('Workspace Trust 與 SpaceStore 設定範圍', () => {
       assert.equal(await store.markAsGlobal(tempPath), true);
       current = vscode.workspace.getConfiguration('codeFolderSpaces');
       assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue, []);
-      // v21-R2：global 改存使用者層級檔案，legacy 設定會被清空。
-      assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue ?? [], []);
+      // v21-R3：global 以標準 user settings 為正本，並鏡像到使用者層級檔案。
+      assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue ?? [], [tempPath]);
       const userGlobalRoots = parseUserGlobalRoots(readFileSync(store.userGlobalRootsPath, 'utf8'));
       assert.deepEqual(userGlobalRoots, [tempPath]);
       assert.equal(store.getDefinitions().find((definition) => definition.basePath === tempPath)?.origin, 'global');
       assert.equal(await store.removeSpace(tempPath), true);
       current = vscode.workspace.getConfiguration('codeFolderSpaces');
       assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue, []);
+      assert.deepEqual(current.inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue ?? [], []);
       assert.deepEqual(parseUserGlobalRoots(readFileSync(store.userGlobalRootsPath, 'utf8')), []);
     } finally {
       store.dispose();

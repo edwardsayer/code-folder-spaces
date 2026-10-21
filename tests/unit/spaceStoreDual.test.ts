@@ -91,25 +91,29 @@ describe('SpaceStore dual-source behavior（v2.1：global 存使用者層級檔�
     expect(file).toEqual([abs('/global-2')]);
   });
 
-  it('moves workspace definitions to the user-level file', async () => {
+  it('moves workspace definitions to user settings and mirrors them to the user-level file', async () => {
     const { store, data, file } = createStore([abs('/ws'), { path: abs('/move'), name: 'Move' }], [abs('/already')]);
     expect(await store.markAsGlobal(abs('/move'))).toBe(true);
     expect(data.workspace).toEqual([abs('/ws')]);
+    // v21-R3：settings 為正本，檔案為跨 profile 鏡像
+    expect(data.global).toEqual([abs('/already'), { path: abs('/move'), name: 'Move' }]);
     expect(file).toEqual([abs('/already'), { path: abs('/move'), name: 'Move' }]);
   });
 
-  it('rolls back the workspace layer when the file write fails', async () => {
+  it('rolls back both layers when the mirror write fails', async () => {
     const { store, data, file, failFile } = createStore([abs('/move')], [abs('/existing')]);
     failFile();
     await expect(store.markAsGlobal(abs('/move'))).rejects.toThrow('file write failed');
     expect(data.workspace).toEqual([abs('/move')]);
+    expect(data.global).toEqual([]);
     expect(file).toEqual([abs('/existing')]);
   });
 
-  it('moves global definitions from the file back to the workspace', async () => {
+  it('moves global definitions back to the workspace (both layers)', async () => {
     const { store, data, file } = createStore([abs('/ws')], [abs('/move')]);
     expect(await store.unmarkGlobal(abs('/move'))).toBe(true);
     expect(data.workspace).toEqual([abs('/ws'), abs('/move')]);
+    expect(data.global).toEqual([]);
     expect(file).toEqual([]);
   });
 
@@ -121,22 +125,24 @@ describe('SpaceStore dual-source behavior（v2.1：global 存使用者層級檔�
     expect(file).toEqual([abs('/move')]);
   });
 
-  it('adds to workspace when available and to the file otherwise', async () => {
+  it('adds to workspace when available and to settings+file otherwise', async () => {
     const withWorkspace = createStore([], [], true);
     await withWorkspace.store.addSpace(abs('/ws-added'));
     expect(withWorkspace.updates[0]).toMatchObject({ origin: 'workspace', target: 2 });
 
     const withoutWorkspace = createStore([], [], false);
     await withoutWorkspace.store.addSpace(abs('/global-added'));
+    expect(withoutWorkspace.data.global).toEqual([abs('/global-added')]);
     expect(withoutWorkspace.file).toEqual([abs('/global-added')]);
   });
 
-  it('merges the legacy spaces.global setting with the file and clears it on write', async () => {
-    const { store, data, file } = createStore([abs('/ws')], [abs('/from-file')], true, [abs('/legacy-global')]);
-    expect(store.getDefinitions().map(({ basePath }) => basePath)).toEqual([abs('/ws'), abs('/legacy-global'), abs('/from-file')]);
+  it('merges settings and the cross-profile file without duplicates', async () => {
+    const { store, data, file } = createStore([abs('/ws')], [abs('/from-file')], true, [abs('/in-settings')]);
+    expect(store.getDefinitions().map(({ basePath }) => basePath)).toEqual([abs('/ws'), abs('/in-settings'), abs('/from-file')]);
     await store.markAsGlobal(abs('/ws'));
-    expect(file.sort()).toEqual([abs('/from-file'), abs('/legacy-global'), abs('/ws')].sort());
-    expect(data.global).toEqual([]);
+    // 兩邊都保留全部全域 roots（去重後）
+    expect([...data.global].sort()).toEqual([abs('/from-file'), abs('/in-settings'), abs('/ws')].sort());
+    expect([...file].sort()).toEqual([abs('/from-file'), abs('/in-settings'), abs('/ws')].sort());
   });
 
   it('returns workspace definitions before global, with workspace winning duplicate paths', () => {
@@ -149,12 +155,13 @@ describe('SpaceStore dual-source behavior（v2.1：global 存使用者層級檔�
 
 describe('markAsGlobal fallback（v2-R6 #7）', () => {
   it('adds an ad-hoc root to the global layer when it is not in any settings layer', async () => {
-    const { store, file } = createStore([], []);
+    const { store, file, data } = createStore([], []);
     const adhoc = abs('/adhoc/folder');
     expect(await store.markAsGlobal(adhoc)).toBe(false);
     expect(await store.addSpace(adhoc, 'adhoc', 'global')).toBe(true);
     expect(store.getDefinitions().find(d => d.basePath === adhoc)?.origin).toBe('global');
     expect(store.isGlobal(adhoc)).toBe(true);
     expect(file).toEqual([{ path: adhoc, name: 'adhoc' }]);
+    expect(data.global).toEqual([{ path: adhoc, name: 'adhoc' }]);
   });
 });

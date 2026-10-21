@@ -34,7 +34,7 @@ All notable changes to Folder Spaces are documented in this file.
 
 ### Fixed
 
-- Global roots (`Mark as Global`) moved to a **user-level file** (`~/.code-folder-spaces/global-roots.json`) so the same OS user sees them in every VS Code profile, workspace and window. The legacy `codeFolderSpaces.spaces.global` setting is merged on read and cleared once a global root is written.
+- Global roots (`Mark as Global`) are stored in the standard user settings (`codeFolderSpaces.spaces.global`) and mirrored to a **user-level file** (`~/.code-folder-spaces/global-roots.json`) so the same OS user sees them in every VS Code profile, workspace and window (a single profile's settings cannot be shared across profiles).
 - Removed the **Activate Child Space** text button from pane1's title bar (the command remains registered); pane2's root is driven by the pane1 folder-selection cascade.
 - Follow Workspace Directory no longer overwrites pane1 roots with the workspace roots only: configured roots (`codeFolderSpaces.spaces.workspace` / `.global`, including **Mark as Global** roots) are preserved and appear in every workspace, so a global root no longer disappears after switching projects or reloading.
 

@@ -24,7 +24,7 @@ Folder roots can come from three sources:
 
 1. **Workspace roots** are available automatically from the current VS Code workspace. They can be hidden from the space list and restored from pane1's menu.
 2. **`codeFolderSpaces.spaces.workspace`** is the project/workspace-level list, suitable for roots shared with a project.
-3. **Global roots** live in a user-level file (`~/.code-folder-spaces/global-roots.json`), so the same OS user sees them in **every VS Code profile, workspace and window**. They are marked with a **🌐** indicator. The legacy `codeFolderSpaces.spaces.global` setting is still read (and merged) but new global roots are written to the user-level file.
+3. **Global roots** are stored in the standard user settings (`codeFolderSpaces.spaces.global`, i.e. your profile's `settings.json`) and mirrored to `~/.code-folder-spaces/global-roots.json` so the same OS user sees them in **every VS Code profile, workspace and window**. They are marked with a **🌐** indicator.
 
 Use **Mark as Global** from a space root's context menu to move that root from the workspace list to the global list. Use **Unmark Global** to move it back. This changes the source of the root; the 🌐 marker identifies roots that belong to the profile-level list.
 
@@ -45,7 +45,7 @@ Each entry may be a path string or an object with `path`, `name`, `icon`, `showF
 | Setting | Type | Default | Description |
 | --- | --- | --- | --- |
 | `codeFolderSpaces.spaces.workspace` | array | `[]` | Project/workspace-level space roots. Entries are paths or objects. |
-| `codeFolderSpaces.spaces.global` | array | `[]` | Legacy profile-level roots (merged with the user-level file; cleared once a global root is written). |
+| `codeFolderSpaces.spaces.global` | array | `[]` | Global roots (written by **Mark as Global**; mirrored to `~/.code-folder-spaces/global-roots.json` for cross-profile visibility). |
 | `codeFolderSpaces.followActiveFile` | boolean | `true` | Follow the active editor file in the space tree. |
 | `codeFolderSpaces.maxDepth` | integer (1–100) | `10` | Maximum folder depth enumerated by flat listings. |
 | `codeFolderSpaces.followWorkspaceDirectory` | boolean | `true` | Keep pane1's workspace roots synchronized with workspace folders. Configured roots (including global ones) are preserved and added after the workspace roots. |
