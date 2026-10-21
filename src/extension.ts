@@ -6,6 +6,7 @@ import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { originOf } from './spaces/spaceConfig';
 import { mergeFollowedWorkspaceRoots, visibleWorkspaceRoots } from './spaces/workspaceRoots';
+import { readLegacyGlobalRoots, resolveLegacyGlobalRootsPath, retireLegacyGlobalRoots } from './spaces/legacyGlobalRoots';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
 import { VIEW_PRESETS, isPane2Nested, matchPresetName, togglePane2Nested } from './spaces/viewPresets';
@@ -80,6 +81,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   );
 
   const store = new SpaceStore();
+  // v21-R4：舊的 global roots 自訂檔（v21-R2／R3）一次性併入標準 user settings 後退役。
+  {
+    const legacyPath = resolveLegacyGlobalRootsPath();
+    const legacyEntries = readLegacyGlobalRoots(legacyPath);
+    if (legacyEntries.length > 0) {
+      try {
+        const imported = await store.importGlobalEntries(legacyEntries);
+        const retired = retireLegacyGlobalRoots(legacyPath);
+        getLogChannel().info(`Migrated ${imported} legacy global root(s) into settings${retired ? `; retired ${retired}` : ''}.`);
+      } catch (error) {
+        getLogChannel().warn(`Failed to migrate legacy global roots: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
   // S4.1R19（使用者要求：全部 per-workspace）：
   // pane 狀態（layout／preset／filter／root）**存在 workspaceState**（每個資料夾／專案各自保留）；
   // 無工作區（開啟單一檔案或空視窗）時才退回 globalState，避免狀態無處可存。

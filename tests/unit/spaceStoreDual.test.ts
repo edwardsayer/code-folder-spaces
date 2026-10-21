@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SpaceConfigEntry, SpaceOrigin } from '../../src/types';
-import type { UserGlobalRootsIO } from '../../src/spaces/userGlobalRoots';
 
 const vscodeMock = vi.hoisted(() => ({
   workspaceFolders: [] as Array<{ uri: { fsPath: string } }> | undefined,
@@ -33,23 +32,14 @@ import { SpaceStore } from '../../src/spaces/spaceStore';
 const abs = (value: string): string => path.resolve(value);
 
 /**
- * v2.1：global 來源改為「使用者層級檔案」（跨 profile／跨專案），舊 `spaces.global` 設定仍會被合併。
- * 測試以 `file` 代表該檔案內容、`data.global` 代表舊設定。
+ * v21-R4（使用者決策）：global roots **只**存在標準 user settings
+ * （`ConfigurationTarget.Global` 的 `spaces.global`）；舊的自訂鏡像檔已退役，
+ * 只保留一次性遷移（`importGlobalEntries`）。
  */
-function createStore(workspace: SpaceConfigEntry[] = [], file: SpaceConfigEntry[] = [], hasWorkspace = true, legacyGlobal: SpaceConfigEntry[] = []) {
-  const data: Record<SpaceOrigin, SpaceConfigEntry[]> = { workspace: [...workspace], global: [...legacyGlobal] };
+function createStore(workspace: SpaceConfigEntry[] = [], global: SpaceConfigEntry[] = [], hasWorkspace = true) {
+  const data: Record<SpaceOrigin, SpaceConfigEntry[]> = { workspace: [...workspace], global: [...global] };
   const updates: Array<{ origin: SpaceOrigin; entries: SpaceConfigEntry[]; target: number }> = [];
   let failOn: SpaceOrigin | undefined;
-  let failFileWrite = false;
-  const fileStore = {
-    filePath: '/tmp/global-roots.json',
-    read: () => [...file],
-    write: (entries: readonly SpaceConfigEntry[]) => {
-      if (failFileWrite) throw new Error('file write failed');
-      file.length = 0;
-      file.push(...entries);
-    },
-  } satisfies UserGlobalRootsIO;
   const store = new SpaceStore({
     get: (origin) => [...data[origin]],
     hasWorkspace: () => hasWorkspace,
@@ -58,13 +48,13 @@ function createStore(workspace: SpaceConfigEntry[] = [], file: SpaceConfigEntry[
       if (origin === failOn) throw new Error('update failed');
       data[origin] = [...entries];
     },
-  }, fileStore);
-  return {
-    store, data, file, updates,
-    fail: (origin: SpaceOrigin) => { failOn = origin; },
-    failFile: () => { failFileWrite = true; },
-  };
+  });
+  return { store, data, updates, fail: (origin: SpaceOrigin) => { failOn = origin; } };
 }
+
+/** global 一律寫 User（Global）target：ConfigurationTarget.Global === 1。 */
+const globalUpdates = (updates: Array<{ origin: SpaceOrigin; target: number }>) =>
+  updates.filter((update) => update.origin === 'global');
 
 beforeEach(() => {
   vscodeMock.workspaceFolders = [];
@@ -72,77 +62,74 @@ beforeEach(() => {
   vscodeMock.getConfiguration.mockReset();
 });
 
-describe('SpaceStore dual-source behavior（v2.1：global 存使用者層級檔案）', () => {
+describe('SpaceStore dual-source behavior（v21-R4：global 只存標準 user settings）', () => {
   it('interprets updateSpacePath sourceIndex only in the matching origin array', async () => {
-    const { store, file } = createStore([abs('/ws')], [abs('/global')]);
+    const { store, data } = createStore([abs('/ws')], [abs('/global')]);
     expect(await store.updateSpacePath(abs('/global'), abs('/global-new'))).toBe(true);
-    expect(file).toEqual([abs('/global-new')]);
+    expect(data).toEqual({ workspace: [abs('/ws')], global: [abs('/global-new')] });
   });
 
   it('interprets renameSpace sourceIndex only in the matching origin array', async () => {
-    const { store, file } = createStore([abs('/ws')], [{ path: abs('/global'), name: 'Old' }]);
+    const { store, data } = createStore([abs('/ws')], [{ path: abs('/global'), name: 'Old' }]);
     expect(await store.renameSpace(abs('/global'), 'New')).toBe(true);
-    expect(file).toEqual([{ path: abs('/global'), name: 'New' }]);
+    expect(data.global).toEqual([{ path: abs('/global'), name: 'New' }]);
   });
 
   it('interprets removeSpace sourceIndex only in the matching origin array', async () => {
-    const { store, file } = createStore([abs('/ws')], [abs('/global'), abs('/global-2')]);
+    const { store, data } = createStore([abs('/ws')], [abs('/global'), abs('/global-2')]);
     expect(await store.removeSpace(abs('/global'))).toBe(true);
-    expect(file).toEqual([abs('/global-2')]);
+    expect(data).toEqual({ workspace: [abs('/ws')], global: [abs('/global-2')] });
   });
 
-  it('moves workspace definitions to user settings and mirrors them to the user-level file', async () => {
-    const { store, data, file } = createStore([abs('/ws'), { path: abs('/move'), name: 'Move' }], [abs('/already')]);
+  it('moves workspace definitions into user settings (Global target)', async () => {
+    const { store, data, updates } = createStore([abs('/ws'), { path: abs('/move'), name: 'Move' }], [abs('/already')]);
     expect(await store.markAsGlobal(abs('/move'))).toBe(true);
-    expect(data.workspace).toEqual([abs('/ws')]);
-    // v21-R3：settings 為正本，檔案為跨 profile 鏡像
-    expect(data.global).toEqual([abs('/already'), { path: abs('/move'), name: 'Move' }]);
-    expect(file).toEqual([abs('/already'), { path: abs('/move'), name: 'Move' }]);
+    expect(data).toEqual({ workspace: [abs('/ws')], global: [abs('/already'), { path: abs('/move'), name: 'Move' }] });
+    expect(globalUpdates(updates).every((update) => update.target === 1)).toBe(true);
   });
 
-  it('rolls back both layers when the mirror write fails', async () => {
-    const { store, data, file, failFile } = createStore([abs('/move')], [abs('/existing')]);
-    failFile();
-    await expect(store.markAsGlobal(abs('/move'))).rejects.toThrow('file write failed');
-    expect(data.workspace).toEqual([abs('/move')]);
-    expect(data.global).toEqual([]);
-    expect(file).toEqual([abs('/existing')]);
+  it('rolls back the workspace layer when the global update fails', async () => {
+    const { store, data, fail } = createStore([abs('/move')], [abs('/existing')]);
+    fail('global');
+    await expect(store.markAsGlobal(abs('/move'))).rejects.toThrow('update failed');
+    expect(data).toEqual({ workspace: [abs('/move')], global: [abs('/existing')] });
   });
 
-  it('moves global definitions back to the workspace (both layers)', async () => {
-    const { store, data, file } = createStore([abs('/ws')], [abs('/move')]);
+  it('moves global definitions back to the workspace', async () => {
+    const { store, data } = createStore([abs('/ws')], [abs('/move')]);
     expect(await store.unmarkGlobal(abs('/move'))).toBe(true);
-    expect(data.workspace).toEqual([abs('/ws'), abs('/move')]);
-    expect(data.global).toEqual([]);
-    expect(file).toEqual([]);
+    expect(data).toEqual({ workspace: [abs('/ws'), abs('/move')], global: [] });
   });
 
-  it('rolls back the file when the workspace update fails', async () => {
-    const { store, data, file, fail } = createStore([abs('/existing')], [abs('/move')]);
+  it('rolls back the global layer when the workspace update fails', async () => {
+    const { store, data, fail } = createStore([abs('/existing')], [abs('/move')]);
     fail('workspace');
     await expect(store.unmarkGlobal(abs('/move'))).rejects.toThrow('update failed');
-    expect(data.workspace).toEqual([abs('/existing')]);
-    expect(file).toEqual([abs('/move')]);
+    expect(data).toEqual({ workspace: [abs('/existing')], global: [abs('/move')] });
   });
 
-  it('adds to workspace when available and to settings+file otherwise', async () => {
+  it('adds to workspace when available and to user settings otherwise', async () => {
     const withWorkspace = createStore([], [], true);
     await withWorkspace.store.addSpace(abs('/ws-added'));
     expect(withWorkspace.updates[0]).toMatchObject({ origin: 'workspace', target: 2 });
 
     const withoutWorkspace = createStore([], [], false);
     await withoutWorkspace.store.addSpace(abs('/global-added'));
+    expect(withoutWorkspace.updates[0]).toMatchObject({ origin: 'global', target: 1 });
     expect(withoutWorkspace.data.global).toEqual([abs('/global-added')]);
-    expect(withoutWorkspace.file).toEqual([abs('/global-added')]);
   });
 
-  it('merges settings and the cross-profile file without duplicates', async () => {
-    const { store, data, file } = createStore([abs('/ws')], [abs('/from-file')], true, [abs('/in-settings')]);
-    expect(store.getDefinitions().map(({ basePath }) => basePath)).toEqual([abs('/ws'), abs('/in-settings'), abs('/from-file')]);
-    await store.markAsGlobal(abs('/ws'));
-    // 兩邊都保留全部全域 roots（去重後）
-    expect([...data.global].sort()).toEqual([abs('/from-file'), abs('/in-settings'), abs('/ws')].sort());
-    expect([...file].sort()).toEqual([abs('/from-file'), abs('/in-settings'), abs('/ws')].sort());
+  it('imports legacy entries once, keeping settings entries first and skipping duplicates', async () => {
+    const { store, data } = createStore([], [abs('/existing')]);
+    const imported = await store.importGlobalEntries([abs('/existing'), abs('/from-legacy'), { path: abs('/legacy-2'), name: 'Old' }]);
+    expect(imported).toBe(2);
+    expect(data.global).toEqual([abs('/existing'), abs('/from-legacy'), { path: abs('/legacy-2'), name: 'Old' }]);
+  });
+
+  it('does not touch settings when the legacy import has nothing new', async () => {
+    const { store, updates } = createStore([], [abs('/existing')]);
+    expect(await store.importGlobalEntries([abs('/existing')])).toBe(0);
+    expect(updates).toHaveLength(0);
   });
 
   it('returns workspace definitions before global, with workspace winning duplicate paths', () => {
@@ -155,13 +142,12 @@ describe('SpaceStore dual-source behavior（v2.1：global 存使用者層級檔�
 
 describe('markAsGlobal fallback（v2-R6 #7）', () => {
   it('adds an ad-hoc root to the global layer when it is not in any settings layer', async () => {
-    const { store, file, data } = createStore([], []);
+    const { store, data } = createStore([], []);
     const adhoc = abs('/adhoc/folder');
     expect(await store.markAsGlobal(adhoc)).toBe(false);
     expect(await store.addSpace(adhoc, 'adhoc', 'global')).toBe(true);
-    expect(store.getDefinitions().find(d => d.basePath === adhoc)?.origin).toBe('global');
+    expect(store.getDefinitions().find((definition) => definition.basePath === adhoc)?.origin).toBe('global');
     expect(store.isGlobal(adhoc)).toBe(true);
-    expect(file).toEqual([{ path: adhoc, name: 'adhoc' }]);
     expect(data.global).toEqual([{ path: adhoc, name: 'adhoc' }]);
   });
 });

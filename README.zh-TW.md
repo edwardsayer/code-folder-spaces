@@ -24,7 +24,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 
 1. **工作區根目錄**會自動取自目前 VS Code 工作區。可從空間清單隱藏，並透過 pane1 選單還原。
 2. **`codeFolderSpaces.spaces.workspace`** 是專案／工作區層級清單，適合與專案共用的根目錄。
-3. **全域根目錄**存於標準 user settings（`codeFolderSpaces.spaces.global`，即該 profile 的 `settings.json`），並鏡像到 `~/.code-folder-spaces/global-roots.json`，因此**同一個作業系統使用者在任何 VS Code profile、任何工作區／視窗都看得到**；並以 **🌐** 標記。
+3. **全域根目錄**存於標準 user settings（`codeFolderSpaces.spaces.global`，即該 profile 的 `settings.json`），在**同一 profile 的任何工作區／視窗**都看得到，並以 **🌐** 標記。注意 VS Code 各 profile 的設定互相隔離，其他 profile 需要各自設定（或使用 Settings Sync）。
 
 在空間根目錄的右鍵選單使用 **Mark as Global**，可將該根目錄從工作區清單移至全域清單；使用 **Unmark Global** 可移回。此操作會變更根目錄的來源；🌐 標記代表它屬於 profile 層級清單。
 
@@ -45,7 +45,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 | 設定 | 型別 | 預設值 | 說明 |
 | --- | --- | --- | --- |
 | `codeFolderSpaces.spaces.workspace` | array | `[]` | 專案／工作區層級的空間根目錄清單；項目可為路徑或物件。 |
-| `codeFolderSpaces.spaces.global` | array | `[]` | 全域根目錄（由 **Mark as Global** 寫入；會鏡像到 `~/.code-folder-spaces/global-roots.json` 以跨 profile 可見）。 |
+| `codeFolderSpaces.spaces.global` | array | `[]` | 全域根目錄（由 **Mark as Global** 寫入；user 設定層級、各 profile 獨立）。 |
 | `codeFolderSpaces.followActiveFile` | boolean | `true` | 在空間樹中跟隨目前作用中的編輯器檔案。 |
 | `codeFolderSpaces.maxDepth` | integer（1–100） | `10` | 扁平清單列舉資料夾時使用的最大深度。 |
 | `codeFolderSpaces.followWorkspaceDirectory` | boolean | `true` | 讓 pane1 根目錄與工作區資料夾保持同步；設定值中的根目錄（含全域）會保留並接在工作區根目錄之後。 |

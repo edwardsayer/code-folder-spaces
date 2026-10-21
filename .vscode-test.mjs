@@ -27,11 +27,11 @@ console.log(fromPath
   ? `[vscode-test] 使用本機 VS Code：${fromPath}`
   : `[vscode-test] 使用 test-electron 下載 VS Code：${process.env.VSCODE_TEST_VERSION ?? 'stable'}`);
 
-// v21-R2：global roots 改存使用者層級檔案（預設 ~/.code-folder-spaces/global-roots.json）。
-// 整合測試以環境變數把它導到暫存路徑，避免污染使用者真實設定，也避免跨次執行殘留。
-const userGlobalRootsFile = path.resolve(root, './.vscode-test/global-roots.json');
-fs.rmSync(userGlobalRootsFile, { force: true });
-process.env.CODEFOLDERSPACES_GLOBAL_ROOTS_FILE = userGlobalRootsFile;
+// v21-R4：global roots 只存標準 user settings；舊的自訂檔只剩「一次性遷移」。
+// 整合測試把遷移來源導到不存在的暫存路徑，確保不會讀到使用者真實檔案。
+const legacyGlobalRootsFile = path.resolve(root, './.vscode-test/legacy-global-roots.json');
+fs.rmSync(legacyGlobalRootsFile, { force: true });
+process.env.CODEFOLDERSPACES_LEGACY_GLOBAL_ROOTS = legacyGlobalRootsFile;
 
 export default {
   tests: [{
@@ -43,6 +43,6 @@ export default {
       ? { useInstallation: { fromPath } }
       : { version: process.env.VSCODE_TEST_VERSION ?? 'stable' }),
     mocha: { timeout: 60000, color: true },
-    env: { ...process.env, CODEFOLDERSPACES_GLOBAL_ROOTS_FILE: userGlobalRootsFile },
+    env: { ...process.env, CODEFOLDERSPACES_LEGACY_GLOBAL_ROOTS: legacyGlobalRootsFile },
   }],
 };

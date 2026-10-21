@@ -97,7 +97,9 @@ suite('工作區外空間根', () => {
     } finally {
       provider?.dispose();
       store.dispose();
-      await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.global', originalWorkspace, vscode.ConfigurationTarget.Workspace);
+      // v21-R4：spaces.global 宣告 scope: application，只能寫 User settings；此處原本誤用 Workspace
+      // target（restore 也抄錯 key），會直接拋錯並讓案例失敗。
+      await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.workspace', originalWorkspace, vscode.ConfigurationTarget.Workspace);
       await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.global', originalGlobal, vscode.ConfigurationTarget.Global);
     }
   });

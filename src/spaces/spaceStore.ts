@@ -3,7 +3,6 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { SpaceConfigEntry, SpaceDefinition, SpaceOrigin } from '../types';
 import { mergeSpaceDefinitions, normalizeSpaceEntries, originOf } from './spaceConfig';
-import { createUserGlobalRootsIO, mergeUserGlobalRoots, type UserGlobalRootsIO } from './userGlobalRoots';
 
 const SECTION = 'codeFolderSpaces';
 
@@ -31,12 +30,8 @@ export class SpaceStore implements vscode.Disposable {
   readonly onDidChange: vscode.Event<void> = this._onDidChange.event;
 
   private readonly _configurationListener: vscode.Disposable;
-  private readonly userGlobalRoots: UserGlobalRootsIO;
-  private userGlobalRootsCache: SpaceConfigEntry[];
 
-  constructor(private readonly shim?: SpaceStoreConfigurationShim, userGlobalRoots?: UserGlobalRootsIO) {
-    this.userGlobalRoots = userGlobalRoots ?? createUserGlobalRootsIO();
-    this.userGlobalRootsCache = this.userGlobalRoots.read();
+  constructor(private readonly shim?: SpaceStoreConfigurationShim) {
     this._configurationListener = vscode.workspace.onDidChangeConfiguration((event) => {
       if (
         event.affectsConfiguration(`${SECTION}.spaces.workspace`) ||
@@ -70,13 +65,34 @@ export class SpaceStore implements vscode.Disposable {
   /**
    * 讀取指定來源的原始設定（sourceIndex 僅對應此陣列）。
    *
-   * v21-R3：global 來源＝**標準 user settings 的 `spaces.global`（正本，可在 settings.json 看到）**
-   * ∪ 使用者層級檔案（跨 profile 鏡像）。兩者同路徑去重、設定優先。
+   * v21-R4：global 來源＝標準 user settings 的 `spaces.global`（唯一正本）。
+   * 舊的自訂鏡像檔已退役，由 `importGlobalEntries()` 一次性併入。
    */
   getRawEntries(origin: SpaceOrigin): SpaceConfigEntry[] {
-    const entries = this.getSettingEntries(origin);
-    if (origin !== 'global') return entries;
-    return mergeUserGlobalRoots(entries, this.userGlobalRootsCache);
+    return this.getSettingEntries(origin);
+  }
+
+  /** 一次性遷移用：把舊來源的 global roots 併入 settings（同路徑去重，既有設定優先）。 */
+  async importGlobalEntries(entries: readonly SpaceConfigEntry[]): Promise<number> {
+    if (entries.length === 0) return 0;
+    const current = this.getSettingEntries('global');
+    const key = (entry: SpaceConfigEntry): string => {
+      const raw = typeof entry === 'string' ? entry : (entry.path ?? '');
+      const normalized = path.normalize(raw);
+      return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    };
+    const seen = new Set(current.map(key));
+    const merged = [...current];
+    let imported = 0;
+    for (const entry of entries) {
+      const entryKey = key(entry);
+      if (seen.has(entryKey)) continue;
+      seen.add(entryKey);
+      merged.push(entry);
+      imported += 1;
+    }
+    if (imported > 0) await this.writeEntries('global', merged);
+    return imported;
   }
 
   /** 取得單一來源的正規化定義。 */
@@ -187,25 +203,12 @@ export class SpaceStore implements vscode.Disposable {
 
   private async writeEntries(origin: SpaceOrigin, entries: SpaceConfigEntry[]): Promise<void> {
     if (origin === 'global') {
-      // v21-R3：正本寫入**標準 user settings**（`codeFolderSpaces.spaces.global`），
-      // 同時鏡像到使用者層級檔案，讓同一 OS 使用者的其他 profile 也看得到。
-      // 鏡像失敗時把 settings 還原回寫入前的內容，避免兩層不同步。
+      // v21-R4：global 的唯一正本＝標準 user settings（Default profile 即
+      // %APPDATA%/Code/User/settings.json）。manifest 宣告 scope: application，
+      // 讀取一律取 inspect().globalValue，不會把其他層級的覆寫「提升」上來。
       const target = vscode.ConfigurationTarget.Global;
-      const previousSettings = this.getSettingEntries('global');
-      const previousFile = [...this.userGlobalRootsCache];
-      const updateSettings = async (value: SpaceConfigEntry[]): Promise<void> => {
-        if (this.shim) await this.shim.update('global', value, target);
-        else await vscode.workspace.getConfiguration(SECTION).update('spaces.global', value, target);
-      };
-      await updateSettings(entries);
-      try {
-        this.userGlobalRoots.write(entries);
-        this.userGlobalRootsCache = [...entries];
-      } catch (error) {
-        this.userGlobalRootsCache = previousFile;
-        try { await updateSettings(previousSettings); } catch { /* 保留原始錯誤，回滾失敗由呼叫端揭露 */ }
-        throw error;
-      }
+      if (this.shim) await this.shim.update('global', entries, target);
+      else await vscode.workspace.getConfiguration(SECTION).update('spaces.global', entries, target);
       return;
     }
     const target = vscode.ConfigurationTarget.Workspace;
@@ -214,17 +217,6 @@ export class SpaceStore implements vscode.Disposable {
     } else {
       await vscode.workspace.getConfiguration(SECTION).update(`spaces.${origin}`, entries, target);
     }
-  }
-
-  /** 重新載入使用者層級 global roots（例如另一個 profile 剛改過檔案）。 */
-  reloadUserGlobalRoots(): void {
-    this.userGlobalRootsCache = this.userGlobalRoots.read();
-    this._onDidChange.fire();
-  }
-
-  /** 使用者層級 global roots 檔案位置（供診斷／文件）。 */
-  get userGlobalRootsPath(): string {
-    return this.userGlobalRoots.filePath;
   }
 
   dispose(): void {
