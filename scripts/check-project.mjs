@@ -272,8 +272,12 @@ if (!pkg) {
     }
     for (const item of itemContext) {
       if (['codeFolderSpaces.root.markAsGlobal', 'codeFolderSpaces.root.unmarkGlobal'].includes(item.command)) continue;
-      if (String(item.when ?? '').includes('viewItem == codeFolderSpaces.spaceRoot')) {
-        errors.push(`root 條件請改用 viewItem =~ /^codeFolderSpaces\.spaceRoot/ 以涵蓋 global root：${item.command}`);
+      const when = String(item.when ?? '');
+      if (!when.includes('codeFolderSpaces.spaceRoot')) continue;
+      // 任何以 root 為條件的選單都必須用 regex 形式（同時涵蓋 `.spaceRoot` 與 `.spaceRoot.global`）；
+      // 只寫 `== codeFolderSpaces.spaceRoot` 或 `=~ /^codeFolderSpaces\.spaceRoot$/` 都會漏掉 global root。
+      if (!when.includes('=~ /^codeFolderSpaces\.spaceRoot/')) {
+        errors.push(`root 條件請改用 viewItem =~ /^codeFolderSpaces\.spaceRoot/（不可加 $）以涵蓋 global root：${item.command}`);
       }
     }
 
