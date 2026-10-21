@@ -42,8 +42,20 @@ export interface FolderSpacesApi {
   readonly version: string;
   /** 已設定的資料夾空間，包含其來源設定層。 */
   getSpaces(): Array<{ name: string; basePath: string; origin: SpaceOrigin }>;
-  /** 目前啟用的窗格：id／root／roots／佈局模式／固定插槽。 */
-  getPanes(): Array<{ id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }>;
+  /**
+   * 目前啟用的窗格：id／root／roots／佈局模式／固定插槽，
+   * 以及（v2.1 起）檢視設定 `view`、pane2 巢狀狀態 `nested`、pane1 在 tree 模式的標題 `title`。
+   */
+  getPanes(): Array<{
+    id: string;
+    root: string | null;
+    roots: string[];
+    mode: 'tree' | 'dual';
+    slot: 'primary' | 'secondary';
+    view: { mode: 'tree' | 'flat'; level: 1 | 2 | 'all'; content: 'all' | 'folders' | 'files' };
+    nested: boolean;
+    title?: string;
+  }>;
 }
 
 /** Runtime of one enabled pane: provider + TreeView + cascade scope (paneId-keyed, S4R6). */
@@ -422,9 +434,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     // 這是 Unmark Global 後「切到別的專案再切回來仍能 restore」的關鍵；沒有工作區（空視窗）時只顯示全域 roots。
     const configuredRoots = store.getDefinitionsByOrigin('global').map(definition => definition.basePath);
     const workspaceScopedRoots = store.getDefinitionsByOrigin('workspace').map(definition => definition.basePath);
-    const next = folders.length === 0
-      ? configuredRoots
-      : mergeFollowedWorkspaceRoots(current, visible, configuredRoots, workspaceScopedRoots);
+    // 注意：`folders.length === 0` 也可能是「開啟 0 資料夾的 .code-workspace」——此時
+    // workspace 設定的 roots 仍必須保留，因此一律走 merge（visible 為空即可）。
+    const next = mergeFollowedWorkspaceRoots(current, visible, configuredRoots, workspaceScopedRoots);
     if (current.length !== next.length || current.some((root, index) => !isSamePath(root, next[index]))) {
       await viewState.setPaneRoots('pane1', next);
       await paneChanged('pane1');
@@ -1556,7 +1568,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       id, root: rootOf(id), roots: [...viewState.get(id).roots], mode: viewState.getMode(), slot: paneSlotOf(id),
       // v2.1：公開檢視設定與 pane2 巢狀狀態，供自動化驗證（UI 本身不依賴此欄位）。
       view: { ...effectiveView(viewState.get(id)) },
-      title: id === 'pane1' ? paneTitleFor({ workspaceName: vscode.workspace.workspaceFolders?.length ? vscode.workspace.name : undefined, rootCount: viewState.get('pane1').roots.length }) : undefined,
+      title: id === 'pane1' && viewState.getMode() === 'tree'
+        ? paneTitleFor({ workspaceName: vscode.workspace.workspaceFolders?.length ? vscode.workspace.name : undefined, rootCount: viewState.get('pane1').roots.length })
+        : undefined,
       nested: isPane2Nested(effectiveView(viewState.get(id))),
     })),
   };
