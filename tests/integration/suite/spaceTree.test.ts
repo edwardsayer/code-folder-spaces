@@ -460,7 +460,8 @@ suite('空間樹 provider', () => {
       assert.equal(roots.length, 2);
       assert.ok(roots.every(node => node instanceof SpaceRootNode));
       assert.deepEqual(roots.map(node => (node as SpaceRootNode).rootPath).sort(), [alpha, beta].sort());
-      assert.ok(roots.every(node => node.contextValue === 'codeFolderSpaces.spaceRoot'));
+      // v21-R5：root 的 contextValue 依來源分為 `…spaceRoot`（workspace）與 `…spaceRoot.global`（global）。
+      assert.ok(roots.every(node => String(node.contextValue).startsWith('codeFolderSpaces.spaceRoot')));
     }
   ));
 

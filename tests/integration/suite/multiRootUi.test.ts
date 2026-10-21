@@ -126,13 +126,15 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     const entries = manifest.contributes?.menus?.['view/item/context'] ?? [];
     const rootRemove = entries.filter(item => /codeFolderSpaces\.pane[12]\.root\.remove/.test(item.command ?? ''));
     assert.equal(rootRemove.length, 2, 'pane1／pane2 應各有 pane-scoped root.remove inline action');
-    assert.ok(rootRemove.every(item => /viewItem == codeFolderSpaces\.spaceRoot/.test(item.when ?? '')),
+    // v21-R5：global root 的 contextValue 是 `codeFolderSpaces.spaceRoot.global`，條件須用 regex 涵蓋兩種。
+    assert.ok(rootRemove.every(item => /viewItem =~ \/\^codeFolderSpaces\\.spaceRoot\//.test(item.when ?? '')),
       `inline when 必須限制在 root context：${JSON.stringify(rootRemove)}`);
 
     // P2-3：鎖住本輪 OP-20 真正的 manifest 改動（原本只驗 root.remove，未驗下鑽／加子）。
     const drillInline = entries.filter(item => item.command === 'codeFolderSpaces.drillDown' && item.group === 'inline@2');
     assert.equal(drillInline.length, 1, '下鑽應恰好一個 inline@2 項目');
-    assert.match(drillInline[0].when ?? '', /viewItem == codeFolderSpaces\.spaceRoot/,
+    // v21-R5：root 的 contextValue 已分流（`.global`），下鑽條件改以 regex 涵蓋兩種。
+    assert.match(drillInline[0].when ?? '', /viewItem =~ \/\^codeFolderSpaces\\.spaceRoot\//,
       '下鑽 inline when 必須涵蓋根目錄列（OP-20）');
     assert.match(drillInline[0].when ?? '', /viewItem == codeFolderSpaces\.folder/, '下鑽 inline when 仍須涵蓋資料夾列');
     assert.ok(!/codeFolderSpaces\.file/.test(drillInline[0].when ?? ''), '下鑽不得出現在檔案列');

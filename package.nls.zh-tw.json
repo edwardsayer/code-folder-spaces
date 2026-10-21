@@ -80,5 +80,6 @@
   "command.paneAction.sort.mtime.desc.checked.title": "修改時間（遞減）✓",
   "command.paneAction.sort.ctime.asc.checked.title": "建立時間（遞增）✓",
   "command.paneAction.sort.ctime.desc.checked.title": "建立時間（遞減）✓",
-  "command.pane2.toggleNested.checked.title": "切換巢狀檔案 ✓"
+  "command.pane2.toggleNested.checked.title": "切換巢狀檔案 ✓",
+  "command.activateChildNode.title": "啟用子空間"
 }

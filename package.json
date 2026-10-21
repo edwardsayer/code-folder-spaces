@@ -124,6 +124,11 @@
         "category": "%category.folderSpaces%"
       },
       {
+        "command": "codeFolderSpaces.activateChildNode",
+        "title": "%command.activateChildNode.title%",
+        "icon": "$(arrow-right)"
+      },
+      {
         "command": "codeFolderSpaces.drillUp",
         "title": "%command.drillUp.title%",
         "icon": "$(debug-step-out)",
@@ -981,6 +986,10 @@
         {
           "command": "codeFolderSpaces.pane2.toggleNested.checked",
           "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.activateChildNode",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -1083,32 +1092,37 @@
       "view/item/context": [
         {
           "command": "codeFolderSpaces.drillDown",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem =~ /^codeFolderSpaces\\.spaceRoot/)",
           "group": "inline@2"
         },
         {
+          "command": "codeFolderSpaces.activateChildNode",
+          "when": "view == codeFolderSpaces.pane1 && (viewItem == codeFolderSpaces.folder || viewItem =~ /^codeFolderSpaces\\.spaceRoot/)",
+          "group": "inline@3"
+        },
+        {
           "command": "codeFolderSpaces.pane1.root.remove",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.canRemoveRoot && viewItem == codeFolderSpaces.spaceRoot",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.canRemoveRoot && viewItem =~ /^codeFolderSpaces\\.spaceRoot/",
           "group": "inline@1"
         },
         {
           "command": "codeFolderSpaces.pane2.root.remove",
-          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.canRemoveRoot && viewItem == codeFolderSpaces.spaceRoot",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.canRemoveRoot && viewItem =~ /^codeFolderSpaces\\.spaceRoot/",
           "group": "inline@1"
         },
         {
           "command": "codeFolderSpaces.drillDown",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem == codeFolderSpaces.spaceRoot)",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem =~ /^codeFolderSpaces\\.spaceRoot/)",
           "group": "1_modification@0"
         },
         {
           "command": "codeFolderSpaces.root.markAsGlobal",
-          "when": "viewItem == codeFolderSpaces.spaceRoot && !codeFolderSpaces.root.isGlobal",
+          "when": "viewItem == codeFolderSpaces.spaceRoot",
           "group": "navigation@10"
         },
         {
           "command": "codeFolderSpaces.root.unmarkGlobal",
-          "when": "viewItem == codeFolderSpaces.spaceRoot && codeFolderSpaces.root.isGlobal",
+          "when": "viewItem == codeFolderSpaces.spaceRoot.global",
           "group": "navigation@10"
         },
         {

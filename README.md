@@ -72,6 +72,7 @@ Example:
 
 Pane-specific actions live in each pane's title bar, submenus and context menus, and most of them are intentionally hidden from the Command Palette. Common actions include:
 
+- **Drill Into Folder** / **Activate Child Space** (inline buttons on every folder row in pane1; Activate Child Space opens Dual if needed and uses that folder as pane2's root)
 - **Add Folder…** / **Remove Root**
 - **View: Tree** / **View: Dual** (pane1 submenu; the active one is shown with a ✓ prefix)
 - **Filter by Path…** / **Clear Filter** / **Return to Parent**

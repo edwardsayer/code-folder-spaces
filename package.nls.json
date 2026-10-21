@@ -80,5 +80,6 @@
   "command.paneAction.sort.mtime.desc.checked.title": "Modified (Descending) ✓",
   "command.paneAction.sort.ctime.asc.checked.title": "Created (Ascending) ✓",
   "command.paneAction.sort.ctime.desc.checked.title": "Created (Descending) ✓",
-  "command.pane2.toggleNested.checked.title": "Toggle Nested Files ✓"
+  "command.pane2.toggleNested.checked.title": "Toggle Nested Files ✓",
+  "command.activateChildNode.title": "Activate Child Space"
 }

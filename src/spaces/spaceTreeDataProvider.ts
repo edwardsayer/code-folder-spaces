@@ -105,7 +105,9 @@ export class SpaceRootNode extends vscode.TreeItem {
     // The pane id keeps ids unique when two panes show the same root (PD-I2).
     this.id = `codeFolderSpaces.${paneId}:root:${definition.basePath}`;
     this.resourceUri = vscode.Uri.file(definition.basePath);
-    this.contextValue = 'codeFolderSpaces.spaceRoot';
+    // v21-R5：來源寫進 contextValue，讓「Mark as Global／Unmark Global」由**被右鍵的節點**決定，
+    // 不再依賴 `codeFolderSpaces.root.isGlobal`（右鍵不會改變選取，導致標記後仍顯示 Mark）。
+    this.contextValue = originOf(definition) === 'global' ? 'codeFolderSpaces.spaceRoot.global' : 'codeFolderSpaces.spaceRoot';
     this.tooltip = definition.basePath;
     if (originOf(definition) === 'global') {
       // spec §3.4 允許 `$(globe)` 或前綴 `🌐`。實測（2026-10-19 EDH）：VS Code 的

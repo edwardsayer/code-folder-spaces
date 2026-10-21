@@ -55,6 +55,19 @@ suite('擴充套件啟用', () => {
     // v2.1：Toggle Nested Files 直接掛在 pane2 的 view/title（成對），不再走子選單。
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.toggleNested' && item.group === '3_view@1'));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.toggleNested.checked' && item.group === '3_view@1'));
+    // v21-R5：pane1 每個資料夾列 always 顯示「Drill Into Folder」與「Activate Child Space」。
+    assert.ok(commands.has('codeFolderSpaces.activateChildNode'), 'activateChildNode 必須註冊');
+    const itemContext = (manifest.menus['view/item/context'] ?? []) as Array<{ command?: string; when?: string; group?: string }>;
+    const inlineActivate = itemContext.find(item => item.command === 'codeFolderSpaces.activateChildNode');
+    assert.ok(inlineActivate, 'view/item/context 需有 activateChildNode');
+    assert.ok(String(inlineActivate!.group).startsWith('inline@'), 'activateChildNode 必須是 inline 動作');
+    assert.match(String(inlineActivate!.when), /view == codeFolderSpaces\.pane1/);
+    assert.match(String(inlineActivate!.when), /viewItem == codeFolderSpaces\.folder/);
+    assert.match(String(inlineActivate!.when), /spaceRoot/);
+    // v21-R5：Mark／Unmark 由節點 contextValue 決定（不再依賴選取驅動的 context key）。
+    assert.equal(itemContext.find(item => item.command === 'codeFolderSpaces.root.markAsGlobal')?.when, 'viewItem == codeFolderSpaces.spaceRoot');
+    assert.equal(itemContext.find(item => item.command === 'codeFolderSpaces.root.unmarkGlobal')?.when, 'viewItem == codeFolderSpaces.spaceRoot.global');
+
     // 死條目清理：pane3–pane8 的 title 與 viewsWelcome 均已移除。
     const welcome = (manifest.viewsWelcome ?? []) as Array<{ view: string }>;
     assert.ok(welcome.every(item => !/^codeFolderSpaces\.pane[3-8]$/.test(item.view)), 'viewsWelcome 不應再有 pane3–pane8');

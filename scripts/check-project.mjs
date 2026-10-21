@@ -249,6 +249,34 @@ if (!pkg) {
       }
     }
 
+    // v21-R5：pane1 資料夾列 always 顯示「下鑽 + 啟用子空間」；Mark/Unmark 由節點 contextValue 決定。
+    const itemContext = pkg.contributes?.menus?.['view/item/context'] ?? [];
+    const inlineActivate = itemContext.find((item) => item.command === 'codeFolderSpaces.activateChildNode');
+    if (!inlineActivate) {
+      errors.push('view/item/context 缺少 codeFolderSpaces.activateChildNode（pane1 資料夾列的 Activate Child Space）');
+    } else {
+      if (!String(inlineActivate.group ?? '').startsWith('inline@')) errors.push('activateChildNode 必須是 inline 動作');
+      const when = String(inlineActivate.when ?? '');
+      if (!/view == codeFolderSpaces\.pane1/.test(when)) errors.push('activateChildNode 只應出現在 pane1');
+      if (!/viewItem == codeFolderSpaces\.folder/.test(when) || !/spaceRoot/.test(when)) {
+        errors.push('activateChildNode 的 when 必須涵蓋資料夾列與 root 列');
+      }
+    }
+    const markItem = itemContext.find((item) => item.command === 'codeFolderSpaces.root.markAsGlobal');
+    const unmarkItem = itemContext.find((item) => item.command === 'codeFolderSpaces.root.unmarkGlobal');
+    if (!markItem || markItem.when !== 'viewItem == codeFolderSpaces.spaceRoot') {
+      errors.push('root.markAsGlobal 的 when 必須是 viewItem == codeFolderSpaces.spaceRoot（僅非 global root）');
+    }
+    if (!unmarkItem || unmarkItem.when !== 'viewItem == codeFolderSpaces.spaceRoot.global') {
+      errors.push('root.unmarkGlobal 的 when 必須是 viewItem == codeFolderSpaces.spaceRoot.global');
+    }
+    for (const item of itemContext) {
+      if (['codeFolderSpaces.root.markAsGlobal', 'codeFolderSpaces.root.unmarkGlobal'].includes(item.command)) continue;
+      if (String(item.when ?? '').includes('viewItem == codeFolderSpaces.spaceRoot')) {
+        errors.push(`root 條件請改用 viewItem =~ /^codeFolderSpaces\.spaceRoot/ 以涵蓋 global root：${item.command}`);
+      }
+    }
+
     // D47（S4.1R11b 回歸防線）：選單項目（view/title 與 view/item/context）不提供可靠的 view id。
     // 真正的風險有兩種：
     //  (1) 命令 id **內嵌特定 paneN** 但 when 涵蓋多個 pane → handler 閉包綁定該 pane，

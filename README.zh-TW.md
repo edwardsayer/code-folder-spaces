@@ -72,6 +72,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 
 窗格專屬操作位於各窗格的標題列、子選單與右鍵選單；大部分刻意不在命令選擇區顯示。常用操作包括：
 
+- **Drill Into Folder**／**Activate Child Space**（pane1 每個資料夾列右側的 inline 按鈕；Activate Child Space 會在需要時開啟 Dual，並把該資料夾設為 pane2 root）
 - **Add Folder…**／**Remove Root**（新增資料夾／移除根目錄）
 - **View: Tree**／**View: Dual**（pane1 子選單；目前選項以 ✓ 前綴顯示）
 - **Filter by Path…**／**Clear Filter**／**Return to Parent**（過濾／清除／返回上層）

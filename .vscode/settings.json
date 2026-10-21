@@ -1,3 +1,8 @@
 {
-    "codeFolderSpaces.spaces.workspace": []
+    "codeFolderSpaces.spaces.workspace": [
+        {
+            "path": "d:\\GitDev\\code-extensions\\code-folder-spaces",
+            "name": "code-folder-spaces"
+        }
+    ]
 }

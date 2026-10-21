@@ -374,8 +374,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     return runtime;
   };
 
-  const rootOriginAttached = new Set<string>();
-  // v2-R2：`root.isGlobal` context listener 只註冊一次／pane（插槽重用時於 disposePane 清除）。
+  // 各 pane 的 runtime disposable 集中於 disposePane 處置（插槽重用時）。
   const disposePane = (paneId: string): void => {
     cascadeDisposables.get(paneId)?.dispose();
     cascadeDisposables.delete(paneId);
@@ -386,7 +385,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     // 插槽可能被重用：清除該 pane 的收合狀態與 context key，避免新 pane 顯示舊狀態。
     collapsedPanes.delete(paneId);
     expandedIds.delete(paneId);
-    rootOriginAttached.delete(paneId);
     void setCollapsedContext(paneId);
   };
 
@@ -401,19 +399,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 
   /**
-   * v2-R2：`codeFolderSpaces.root.isGlobal` context key 必須由**所有** pane 的選取驅動。
-   * 不可依附在 `attachPaneCascade` 內——`PaneCascadeController.attach` 對非 pane1 會 early-return，
-   * 導致在 pane2 選取 root 時右鍵選單（Mark／Unmark Global）依舊值顯示錯誤項目。
+   * v21-R5：原 `codeFolderSpaces.root.isGlobal` context key 已移除——右鍵不會改變選取，
+   * 會讓「Mark as Global」後選單仍顯示 Mark。改由節點自身的 `contextValue`
+   * （`codeFolderSpaces.spaceRoot` / `codeFolderSpaces.spaceRoot.global`）決定顯示哪個項目。
    */
-  const attachRootOriginContext = (runtime: PaneRuntime): void => {
-    if (rootOriginAttached.has(runtime.id)) return;
-    rootOriginAttached.add(runtime.id);
-    runtime.disposables.push(runtime.treeView.onDidChangeSelection(event => {
-      const selection = event.selection[0];
-      void vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal',
-        selection instanceof SpaceRootNode && originOf(selection.definition) === 'global');
-    }));
-  };
 
 
   /**
@@ -452,7 +441,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }
     for (const paneId of enabled) applyPaneScope(paneId);
     for (const runtime of paneRuntime.values()) attachPaneCascade(runtime);
-    for (const runtime of paneRuntime.values()) attachRootOriginContext(runtime);
     rebuildWatchers();
   };
 
@@ -1207,6 +1195,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await syncWorkspaceDirectory();
   };
 
+  /**
+   * v21-R5（使用者設計）：把指定資料夾設為 pane2 的 root。
+   * 若 pane2 尚未開啟（`mode == tree`），先切到 Dual 再設 root；已開啟則直接設。
+   * 注意：pane1 自己的 roots／drill 狀態不動（與 `pane1.mode.dual` 的「退回原 roots」語意不同）。
+   */
+  const activateChildSpace = async (folder: string): Promise<void> => {
+    if (!folder) return;
+    if (viewState.getMode() !== 'dual') {
+      await viewState.setMode('dual');
+      await viewState.setView('pane1', VIEW_PRESETS.Navigate);
+      syncPaneViews();
+      await syncPaneContexts();
+    }
+    await viewState.switchRoot('pane2', folder);
+    applyPaneScope('pane2');
+    paneRuntime.get('pane2')?.provider.refresh();
+    await syncPaneContexts();
+    await syncContext();
+  };
+
   const setPane1Sort = async (key: 'name' | 'mtime' | 'ctime', direction: 'asc' | 'desc'): Promise<void> => {
     await viewState.setSort('pane1', key, direction);
     repaintPane('pane1');
@@ -1242,15 +1250,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (!runtime) return;
       // 選取資料夾用自身，選取檔案用父目錄；沒有選取時使用 pane1 目前的 root。
       const info = nodeInfo(runtime.treeView.selection[0]);
-      const target = info?.isDirectory ? info.uri.fsPath
+      const folder = info?.isDirectory ? info.uri.fsPath
         : info?.uri ? path.dirname(info.uri.fsPath)
         : activeRoot(viewState.get('pane1'));
-      if (!target) return;
-      await viewState.switchRoot('pane2', target);
-      applyPaneScope('pane2');
-      paneRuntime.get('pane2')?.provider.refresh();
-      await syncPaneContexts();
-      await syncContext();
+      if (folder) await activateChildSpace(folder);
+    }),
+    // v21-R5（使用者）：pane1 每個資料夾列右側 always 顯示「下鑽」與「啟用子空間」兩個按鈕。
+    // 本命令由**被點擊節點**解析 pane（view/item/context 的 view 參數只用於選單顯示條件）。
+    vscode.commands.registerCommand('codeFolderSpaces.activateChildNode', async (node?: unknown) => {
+      const info = nodeInfo(node);
+      if (!info?.isDirectory || info.paneId !== 'pane1') return;
+      await activateChildSpace(info.uri.fsPath);
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested', async () => {
       // v2.1（使用者）：兩種狀態都是 flat——未勾選＝第 1 層檔案清單（List），已勾選＝所有層級檔案（Files）。
@@ -1332,7 +1342,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       }
       for (const runtime of paneRuntime.values()) applyPaneScope(runtime.id);
       for (const runtime of paneRuntime.values()) runtime.provider.refresh();
-      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal', true);
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.root.unmarkGlobal', async (node?: unknown) => {
@@ -1340,7 +1349,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (!await store.unmarkGlobal(node.definition.basePath)) return;
       for (const runtime of paneRuntime.values()) applyPaneScope(runtime.id);
       for (const runtime of paneRuntime.values()) runtime.provider.refresh();
-      await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.root.isGlobal', false);
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane.resetLayout', async () => {
