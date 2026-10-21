@@ -39,14 +39,15 @@ export function mergeFollowedWorkspaceRoots(current: string[], visible: string[]
     result.push(root);
   };
   visible.forEach(push);
-  configured.forEach(push);
-  // 設定值已被涵蓋；current 僅用來保留「設定順序之外」的既有設定根（維持使用者當下順序）。
   const visibleKeys = new Set(visible.map(rootKey));
   const configuredKeys = new Set(configured.map(rootKey));
+  // 既有設定根維持使用者目前的相對順序（避免每次同步重新洗牌）……
   for (const root of current) {
     const key = rootKey(root);
     if (!configuredKeys.has(key) || visibleKeys.has(key)) continue;
     push(root);
   }
+  // ……其餘設定根（例如剛 Mark as Global、或別的專案設定的）接在後面，依設定順序。
+  for (const root of configured) push(root);
   return result;
 }

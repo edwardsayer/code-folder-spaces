@@ -228,10 +228,22 @@ if (!pkg) {
         if (!paneTitle.some((item) => item.submenu === submenu)) errors.push(`pane${pane} 的 view/title 缺少 submenu ${submenu}`);
       }
       for (const action of statefulTitlePairs[pane] ?? []) {
+        const whens = [];
         for (const suffix of ['', '.checked']) {
           const id = `codeFolderSpaces.paneN.${action}${suffix}`;
           if (!inTitle.includes(id)) errors.push(`pane${pane} 的 view/title 缺少 ${id}`);
           if (!palette.has(`codeFolderSpaces.pane${pane}.${action}${suffix}`)) errors.push(`pane 命令未在 Command Palette 隱藏：codeFolderSpaces.pane${pane}.${action}${suffix}`);
+          const entry = paneTitle.find((item) => item.command === `codeFolderSpaces.pane${pane}.${action}${suffix}`);
+          if (!entry) continue;
+          if (typeof entry.when !== 'string' || entry.when.length === 0) {
+            errors.push(`pane${pane} 的 view/title 成對項目缺少 when：${entry.command}`);
+          } else {
+            whens.push(entry.when);
+          }
+          if (entry.toggled) errors.push(`view/title 成對項目不應使用 toggled：${entry.command}`);
+        }
+        if (whens.length === 2 && whens[0] === whens[1]) {
+          errors.push(`pane${pane} 的 view/title 成對項目 when 未互斥：${action}`);
         }
       }
     }

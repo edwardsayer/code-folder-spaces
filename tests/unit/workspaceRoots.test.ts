@@ -40,9 +40,9 @@ describe('mergeFollowedWorkspaceRoots（OP-15 Follow Workspace Directory，v2.1 
       .toEqual(['C:\work\a']);
   });
 
-  it('orders visible workspace roots first, then configured roots in configuration order', () => {
+  it('orders visible roots first, then keeps existing configured roots in their current order', () => {
     expect(mergeFollowedWorkspaceRoots(['C:\notes2', 'C:\notes1'], ['C:\work'], ['C:\notes1', 'C:\notes2']))
-      .toEqual(['C:\work', 'C:\notes1', 'C:\notes2']);
+      .toEqual(['C:\work', 'C:\notes2', 'C:\notes1']);
   });
 
   it('adds a configured root that the current pane does not have yet (other project)', () => {
@@ -50,7 +50,7 @@ describe('mergeFollowedWorkspaceRoots（OP-15 Follow Workspace Directory，v2.1 
       .toEqual(['C:\work\b', 'C:\notes']);
   });
 
-  it('keeps configured root order after the workspace roots', () => {
+  it('appends newly configured roots in configuration order', () => {
     expect(mergeFollowedWorkspaceRoots([], ['C:\work'], ['C:\notes2', 'C:\notes1']))
       .toEqual(['C:\work', 'C:\notes2', 'C:\notes1']);
   });
