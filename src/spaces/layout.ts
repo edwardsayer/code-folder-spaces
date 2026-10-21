@@ -146,7 +146,8 @@ export function buildDefaultLayout(ctx: LayoutInitContext = {}): LayoutDocument 
   primary.roots = ctx.primaryRoot ? [normalizedPath(ctx.primaryRoot)] : [];
   primary.view = ctx.primaryView ? normalizeView(ctx.primaryView) : { ...VIEW_PRESETS.Explorer };
   const secondary = defaultLayoutPane();
-  secondary.view = { ...VIEW_PRESETS.Contents };
+  // v2.1（使用者）：pane2 預設改為 flat 第 1 層檔案清單（List），不再預設列出全部層級。
+  secondary.view = { ...VIEW_PRESETS.List };
   return { version: 1, mode: 'tree', primary, secondary };
 }
 

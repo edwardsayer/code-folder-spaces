@@ -5,11 +5,11 @@ import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider, setLeafFolderIcon
 import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { originOf } from './spaces/spaceConfig';
-import { visibleWorkspaceRoots } from './spaces/workspaceRoots';
+import { mergeFollowedWorkspaceRoots, visibleWorkspaceRoots } from './spaces/workspaceRoots';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
-import { VIEW_PRESETS, matchPresetName } from './spaces/viewPresets';
-import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions, toggleViewMode } from './spaces/viewState';
+import { VIEW_PRESETS, isPane2Nested, matchPresetName, togglePane2Nested } from './spaces/viewPresets';
+import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
 import { isDrillDownNoop, isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { normalizeExcludeSetting, parseGitIgnore, shouldHideLikeExplorer, type GitIgnoreRule } from './spaces/explorerVisibility';
@@ -410,13 +410,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const hidden = hiddenWorkspaceRoots();
     const visible = visibleWorkspaceRoots(folders.map(folder => folder.uri.fsPath), hidden);
     const current = viewState.get('pane1').roots;
-    if (settings().get<boolean>('followWorkspaceDirectory', true) &&
-        (current.length !== visible.length || current.some((root, index) => !isSamePath(root, visible[index])))) {
-      if (visible.length === 0 && current.length > 0) {
-        getLogChannel().info('All workspace roots are hidden; keeping current pane1 roots.');
-        return;
-      }
-      await viewState.setPaneRoots('pane1', visible);
+    if (!settings().get<boolean>('followWorkspaceDirectory', true)) return;
+    if (visible.length === 0 && current.length > 0) {
+      getLogChannel().info('All workspace roots are hidden; keeping current pane1 roots.');
+      return;
+    }
+    // v2.1：只替換「工作區自動帶入」的 roots，保留使用者設定的 roots（含 Mark as Global 的 profile 層 root），
+    // 否則切換專案會把 global root 永久丟掉，切回原專案也回不來。
+    const configuredRoots = store.getDefinitions().map(definition => definition.basePath);
+    const next = mergeFollowedWorkspaceRoots(current, visible, configuredRoots);
+    if (current.length !== next.length || current.some((root, index) => !isSamePath(root, next[index]))) {
+      await viewState.setPaneRoots('pane1', next);
       await paneChanged('pane1');
     }
   };
@@ -691,6 +695,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.level`, state ? String(effectiveView(state).level) : '');
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.content`, state ? effectiveView(state).content : '');
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.sort`, state ? `${state.sort.key}:${state.sort.direction}` : '');
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.nested`, Boolean(state && isPane2Nested(effectiveView(state))));
     }
   };
 
@@ -1209,10 +1214,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await viewState.setMode('dual');
       // 切換 mode 刻意覆寫 pane1 檢視，讓 Dual 模式固定使用 Navigate。
       await viewState.setView('pane1', VIEW_PRESETS.Navigate);
-      // pane2 的角色固定是 pane1 選取資料夾的鏡像，內容一律 Contents（flat/all/all）。
-      // v2-R7 起 pane2 已有 `pane2.toggleNested` 可改顯示，故這行只是「進入 Dual 時的初始檢視」；
-      // cascade 只換 root 不改 view，使用者本次 session 的扁平／巢狀選擇不會被覆寫。
-      await viewState.setView('pane2', VIEW_PRESETS.Contents);
+      // v2.1（使用者）：進入 Dual 不再重設 pane2 檢視；預設值（flat 第 1 層檔案清單）由 layout 預設提供，
+      // 使用者切換過的扁平／巢狀狀態跨 session 記憶（cascade 只換 root、不改 view）。
       syncPaneViews();
       await syncPaneContexts();
       await syncContext();
@@ -1233,8 +1236,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested', async () => {
+      // v2.1（使用者）：兩種狀態都是 flat——未勾選＝第 1 層檔案清單（List），已勾選＝所有層級檔案（Files）。
       const view = effectiveView(viewState.get('pane2'));
-      await viewState.setView('pane2', toggleViewMode(view));
+      await viewState.setView('pane2', togglePane2Nested(view));
       repaintPane('pane2');
       await syncContext();
     }),
@@ -1244,6 +1248,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.desc', () => setPane1Sort('mtime', 'desc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.asc', () => setPane1Sort('ctime', 'asc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.desc', () => setPane1Sort('ctime', 'desc')),
+    // v2.1（使用者）：VS Code 的 extension menus 不提供子選單勾號，改用「已選項目顯示 ✓ 前綴」的成對命令。
+    // `.checked` 變體只負責顯示（由 when 控制何時可見），執行時轉回原命令，行為完全相同。
+    // 以字面 id 逐一註冊（命令 parity 檢查為靜態掃描，動態組字串不會被辨識）。
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.tree.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.dual.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.dual')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.name.asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.name.desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.mtime.asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.mtime.desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.ctime.asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.ctime.desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleNested')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.workspaceFolders', () => toggleWorkspaceRoots()),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.switchRoot', () => switchRootForPane('pane1')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.resetLayout', () => vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout')),
@@ -1335,7 +1351,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         // 注意：不可改用 `targetPaneId(node)`——無節點時它會退化成主 pane，反而破壞 (a)。
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.root.remove`, paneCommand((node?: unknown) => {
           const candidate = node && typeof node === 'object' ? node as { paneId?: unknown; rootPath?: unknown } : undefined;
-          const nodePaneId = typeof candidate?.paneId === 'string' && /^pane[1-8]$/.test(candidate.paneId)
+          const nodePaneId = typeof candidate?.paneId === 'string' && new RegExp(`^pane[1-${MAX_PANE_INDEX}]$`).test(candidate.paneId)
             ? candidate.paneId : id;
           const root = typeof candidate?.rootPath === 'string' ? candidate.rootPath : undefined;
           return removeRootForPane(nodePaneId, root);
@@ -1481,6 +1497,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     getSpaces: () => store.getDefinitions().map((definition) => ({ name: definition.name, basePath: definition.basePath, origin: originOf(definition) })),
     getPanes: () => viewState.getEnabledPaneIds().map(id => ({
       id, root: rootOf(id), roots: [...viewState.get(id).roots], mode: viewState.getMode(), slot: paneSlotOf(id),
+      // v2.1：公開檢視設定與 pane2 巢狀狀態，供自動化驗證（UI 本身不依賴此欄位）。
+      view: { ...effectiveView(viewState.get(id)) },
+      nested: isPane2Nested(effectiveView(viewState.get(id))),
     })),
   };
 }

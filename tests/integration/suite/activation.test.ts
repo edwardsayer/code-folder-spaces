@@ -22,7 +22,7 @@ suite('擴充套件啟用', () => {
     }
   });
 
-  test('v2-R7 命令、pane 子選單打勾與標題貢獻符合契約', async () => {
+  test('v2.1 成對勾號命令、pane2 巢狀切換與標題貢獻符合契約', async () => {
     const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
     assert.ok(extension);
     const manifest = extension.packageJSON.contributes;
@@ -31,18 +31,32 @@ suite('擴充套件啟用', () => {
     assert.ok(!commands.has('codeFolderSpaces.pane1.adoptChild'));
     assert.ok(!commands.has('codeFolderSpaces.pane1.toggleNested'));
     assert.ok(commands.has('codeFolderSpaces.pane2.toggleNested'));
-    const menus = manifest.menus as Record<string, Array<{ command?: string; toggled?: string }>>;
-    assert.equal(menus['codeFolderSpaces.pane1.view'].length, 2);
-    assert.equal(menus['codeFolderSpaces.pane1.sort'].length, 6);
-    assert.equal(menus['codeFolderSpaces.pane2.view'].length, 1);
-    for (const id of ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort', 'codeFolderSpaces.pane2.view']) {
-      assert.ok(menus[id].every(item => Boolean(item.toggled)), `${id} 每個項目均需 toggled`);
+    const menus = manifest.menus as Record<string, Array<{ command?: string; toggled?: string; when?: string }>>;
+    // v2.1：子選單以「✓ 前綴 + 成對命令 + when」呈現勾選狀態；VS Code 不渲染 extension 子選單的 toggled。
+    assert.equal(menus['codeFolderSpaces.pane1.view'].length, 4);
+    assert.equal(menus['codeFolderSpaces.pane1.sort'].length, 12);
+    assert.equal(menus['codeFolderSpaces.pane2.view'], undefined, 'pane2 View 子選單應已移除');
+    for (const id of ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort']) {
+      const items = menus[id];
+      assert.ok(items.every(item => !item.toggled), `${id} 不應再使用 toggled`);
+      assert.ok(items.every(item => Boolean(item.when)), `${id} 每個項目均需 when`);
+      const ids = new Set(items.map(item => item.command));
+      for (const command of ids) {
+        const base = String(command).replace(/\.checked$/, '');
+        assert.ok(ids.has(base) && ids.has(`${base}.checked`), `${id} 狀態項目需成對：${command}`);
+      }
     }
     const title = manifest.menus['view/title'] as Array<{ command?: string; submenu?: string; when?: string; group?: string }>;
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.activateChild' && item.group === 'navigation@1'));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.drillUp' && item.when?.includes('mode == tree')));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.drillUp' && item.group === 'navigation@0'));
-    assert.ok(title.some(item => item.submenu === 'codeFolderSpaces.pane2.view' && item.group === '3_view@1'));
+    // v2.1：Toggle Nested Files 直接掛在 pane2 的 view/title（成對），不再走子選單。
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.toggleNested' && item.group === '3_view@1'));
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.toggleNested.checked' && item.group === '3_view@1'));
+    // 死條目清理：pane3–pane8 的 title 與 viewsWelcome 均已移除。
+    const welcome = (manifest.viewsWelcome ?? []) as Array<{ view: string }>;
+    assert.ok(welcome.every(item => !/^codeFolderSpaces\.pane[3-8]$/.test(item.view)), 'viewsWelcome 不應再有 pane3–pane8');
+    assert.ok(title.every(item => !/view == codeFolderSpaces\.pane[3-8]/.test(String(item.when ?? ''))), 'view/title 不應再有 pane3–pane8');
   });
 
   test('manifest 包含 view 且已註冊 focus 命令', async () => {

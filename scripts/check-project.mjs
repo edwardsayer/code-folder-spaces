@@ -169,10 +169,13 @@ if (!pkg) {
     // 契約隨產品演進維護：v2 固定雙 pane 的 title 清單取代舊多窗格清單，並非放寬檢查。
     const paneTitleContract = {
       1: ['filter', 'clearFilter', 'drillUp', 'activateChild', 'addRoot', 'refresh', 'workspaceFolders', 'switchRoot', 'resetLayout'],
-      2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'close'],
+      2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'toggleNested', 'close'],
     };
     // v2-R6（使用者）：移除 pane1.more 這一層 submenu，其項目直接掛進「...」下拉。
-    const expectedSubmenus = ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort', 'codeFolderSpaces.pane2.view'];
+    // v2.1（使用者）：pane2 不再有 View 子選單，Toggle Nested Files 直接放進 view/title；
+    // 子選單勾號改用「✓ 前綴 + 成對命令 + when」workaround（extension menus 無勾號屬性）。
+    const expectedSubmenus = ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort'];
+    const statefulTitlePairs = { 2: ['toggleNested'] };
     const directTitleActions = ['workspaceFolders', 'switchRoot', 'resetLayout'];
     const submenus = new Set((pkg.contributes?.submenus ?? []).map(({ id }) => id));
     const referencedSubmenus = new Set(Object.values(pkg.contributes?.menus ?? {}).flatMap((items) =>
@@ -183,8 +186,20 @@ if (!pkg) {
     }
     for (const id of submenus) {
       if (!referencedSubmenus.has(id)) errors.push(`submenu 未被任何 menus 項目引用：${id}`);
-      for (const item of pkg.contributes?.menus?.[id] ?? []) {
-        if (!item.toggled) errors.push(`submenu 項目缺少 toggled：${id} → ${item.command ?? '(unknown)'}`);
+      const items = pkg.contributes?.menus?.[id] ?? [];
+      const commands = new Set(items.map((item) => item.command).filter((value) => typeof value === 'string'));
+      for (const item of items) {
+        if (typeof item.command !== 'string') continue;
+        if (typeof item.when !== 'string' || item.when.length === 0) {
+          errors.push(`submenu 項目缺少 when（✓／非✓ 成對切換所需）：${id} → ${item.command}`);
+        }
+        if (item.toggled) {
+          errors.push(`submenu 不應再使用 toggled（VS Code 不渲染子選單勾號）：${id} → ${item.command}`);
+        }
+        const base = item.command.endsWith('.checked') ? item.command.slice(0, -'.checked'.length) : item.command;
+        if (!commands.has(base) || !commands.has(`${base}.checked`)) {
+          errors.push(`submenu 狀態項目缺少成對命令：${id} → ${item.command}`);
+        }
       }
     }
     for (const [menuId, items] of Object.entries(pkg.contributes?.menus ?? {})) {
@@ -208,9 +223,16 @@ if (!pkg) {
       }
       const paneSubmenus = pane === '1'
         ? ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort']
-        : ['codeFolderSpaces.pane2.view'];
+        : [];
       for (const submenu of paneSubmenus) {
         if (!paneTitle.some((item) => item.submenu === submenu)) errors.push(`pane${pane} 的 view/title 缺少 submenu ${submenu}`);
+      }
+      for (const action of statefulTitlePairs[pane] ?? []) {
+        for (const suffix of ['', '.checked']) {
+          const id = `codeFolderSpaces.paneN.${action}${suffix}`;
+          if (!inTitle.includes(id)) errors.push(`pane${pane} 的 view/title 缺少 ${id}`);
+          if (!palette.has(`codeFolderSpaces.pane${pane}.${action}${suffix}`)) errors.push(`pane 命令未在 Command Palette 隱藏：codeFolderSpaces.pane${pane}.${action}${suffix}`);
+        }
       }
     }
 

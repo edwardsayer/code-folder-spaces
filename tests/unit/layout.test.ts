@@ -129,7 +129,8 @@ describe('LayoutStore initialization and modes', () => {
     await store.initialize({ primaryRoot: P('one') });
     expect(store.getMode()).toBe('tree');
     expect(store.get('pane1')).toBe(store.getPane('primary'));
-    expect(store.getPane('secondary').view).toEqual(VIEW_PRESETS.Contents);
+    // v2.1：pane2 預設改為 flat 第 1 層檔案清單（List）。
+    expect(store.getPane('secondary').view).toEqual(VIEW_PRESETS.List);
     await store.setMode('dual');
     expect(store.getMode()).toBe('dual');
     expect(store.get('pane8')).toBe(store.getPane('secondary'));

@@ -23,6 +23,25 @@ export const VIEW_PRESETS: Readonly<Record<ViewPresetName, ViewPreset>> = {
 
 export const DEFAULT_VIEW_PRESET: ViewPresetName = 'Explorer';
 
+/**
+ * pane2 的「巢狀檔案」切換（v2.1，使用者定義）。
+ * 兩種狀態都是 **flat 模式**，只差層級：
+ *  - 未勾選（預設）：`List`＝flat／第 1 層／只列檔案；
+ *  - 已勾選：`Files`＝flat／所有層級／只列檔案。
+ */
+export const PANE2_NESTED_OFF = VIEW_PRESETS.List;
+export const PANE2_NESTED_ON = VIEW_PRESETS.Files;
+
+/** 判斷 pane2 是否處於「巢狀檔案（列出所有層級）」狀態；其他檢視變更一律視為未勾選。 */
+export function isPane2Nested(view: ViewSettings): boolean {
+  return view.mode === 'flat' && view.level === 'all' && view.content === 'files';
+}
+
+/** pane2 的巢狀切換：只在兩個 flat 檢視之間互換，不回到 tree。 */
+export function togglePane2Nested(view: ViewSettings): ViewSettings {
+  return isPane2Nested(view) ? { ...PANE2_NESTED_OFF } : { ...PANE2_NESTED_ON };
+}
+
 export function isViewPresetName(value: unknown): value is ViewPresetName {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(VIEW_PRESETS, value);
 }
