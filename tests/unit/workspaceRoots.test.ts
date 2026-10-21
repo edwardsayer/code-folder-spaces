@@ -60,3 +60,20 @@ describe('mergeFollowedWorkspaceRoots（OP-15 Follow Workspace Directory，v2.1 
       .toEqual(['C:\work\b']);
   });
 });
+
+describe('mergeFollowedWorkspaceRoots：三種持久化來源（v21-R6）', () => {
+  it('includes this project/workspace scoped roots so Unmark Global can be restored', () => {
+    expect(mergeFollowedWorkspaceRoots([], ['C:/projA'], ['C:/global'], ['C:/from-project-settings']))
+      .toEqual(['C:/projA', 'C:/from-project-settings', 'C:/global']);
+  });
+
+  it('keeps a restored project root even when it is not a workspace folder', () => {
+    const merged = mergeFollowedWorkspaceRoots(['C:/old'], ['C:/projB'], ['C:/global'], ['C:/unmarked-root']);
+    expect(merged).toContain('C:/unmarked-root');
+    expect(merged).not.toContain('C:/old');
+  });
+
+  it('dedupes a project root that is also a workspace folder', () => {
+    expect(mergeFollowedWorkspaceRoots([], ['C:/projA'], [], ['C:/projA'])).toEqual(['C:/projA']);
+  });
+});

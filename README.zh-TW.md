@@ -11,6 +11,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 ## Tree 與 Dual 模式
 
 - **Tree** 僅顯示 pane1 的單一資料夾樹。
+- Tree 模式的面板標題會顯示 workspace／專案資料夾名稱（多個 root 時加上 `+ n`），沒有開啟資料夾時顯示 **Global**。
 - **Dual** 顯示上下排列的 pane1 與 pane2。pane1 是控制中心：可透過標題列操作與原生子選單（**View:**、**Sort:**）管理版面、根目錄、工作區資料夾、排序及其他導覽。pane2 的選單較精簡，只提供基本操作（巢狀檔案清單切換、過濾、收合／展開、重新整理及關閉）。
 - 代表目前狀態的選單項目會加上**尾綴 ✓**：pane1 的 **View:**／**Sort:** 子選單與 pane2 的 **Toggle Nested Files**（VS Code 未提供擴充套件原生勾號 API，故標記是標題的一部分；放在文字之後，標題起點不會被推擠）。
 - pane2 預設是扁平的**第一層檔案清單**；按標題列的 **Toggle Nested Files** 會展開為所有層級的檔案（仍是扁平清單）。
@@ -46,6 +47,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 | --- | --- | --- | --- |
 | `codeFolderSpaces.spaces.workspace` | array | `[]` | 專案／工作區層級的空間根目錄清單；項目可為路徑或物件。 |
 | `codeFolderSpaces.spaces.global` | array | `[]` | 全域根目錄（由 **Mark as Global** 寫入；user 設定層級、各 profile 獨立）。 |
+| `codeFolderSpaces.spaces.workspace` | array | `[]` | 專案根目錄：一般資料夾寫入該專案的 `.vscode/settings.json`；以 `.code-workspace` 開啟時寫入 workspace 檔案（**Unmark Global** 的目標）。 |
 | `codeFolderSpaces.followActiveFile` | boolean | `true` | 在空間樹中跟隨目前作用中的編輯器檔案。 |
 | `codeFolderSpaces.maxDepth` | integer（1–100） | `10` | 扁平清單列舉資料夾時使用的最大深度。 |
 | `codeFolderSpaces.followWorkspaceDirectory` | boolean | `true` | 讓 pane1 根目錄與工作區資料夾保持同步；設定值中的根目錄（含全域）會保留並接在工作區根目錄之後。 |

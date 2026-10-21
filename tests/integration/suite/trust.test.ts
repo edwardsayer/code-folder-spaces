@@ -70,4 +70,34 @@ suite('Workspace Trust 與 SpaceStore 設定範圍', () => {
       } finally { restoreFixtureSettings(); }
     }
   });
+
+  test('unmarkGlobal 寫回「非 global」位置：單一資料夾 → 專案 .vscode/settings.json', async () => {
+    const config = vscode.workspace.getConfiguration('codeFolderSpaces');
+    const originalWorkspace = config.inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue;
+    const originalGlobal = config.inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue;
+    const tempPath = fs.mkdtempSync(path.join(os.tmpdir(), 'code-folder-spaces-unmark-'));
+    const store = new SpaceStore();
+    try {
+      assert.equal(await store.addSpace(tempPath), true);
+      assert.equal(await store.markAsGlobal(tempPath), true);
+      assert.deepEqual(vscode.workspace.getConfiguration('codeFolderSpaces').inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue ?? [], [tempPath]);
+      // v21-R6：Unmark 應寫回 workspace 層（單一資料夾＝專案 .vscode/settings.json；
+      // .code-workspace 環境則寫入 workspace 設定檔，同一個 ConfigurationTarget.Workspace）。
+      assert.equal(await store.unmarkGlobal(tempPath), true);
+      const workspaceValue = vscode.workspace.getConfiguration('codeFolderSpaces').inspect<SpaceConfigEntry[]>('spaces.workspace')?.workspaceValue;
+      assert.deepEqual(workspaceValue ?? [], [tempPath]);
+      assert.deepEqual(vscode.workspace.getConfiguration('codeFolderSpaces').inspect<SpaceConfigEntry[]>('spaces.global')?.globalValue ?? [], []);
+      // 檔案層證據：單一資料夾專案的 settings.json 真的被寫入。
+      const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      assert.ok(folder, '整合 harness 應開啟單一資料夾');
+      const settingsFile = path.join(folder!, '.vscode', 'settings.json');
+      assert.ok(fs.existsSync(settingsFile), '專案 .vscode/settings.json 應存在');
+      assert.ok(fs.readFileSync(settingsFile, 'utf8').includes('spaces.workspace'), '專案 settings 應含 spaces.workspace');
+    } finally {
+      store.dispose();
+      fs.rmSync(tempPath, { recursive: true, force: true });
+      await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.workspace', originalWorkspace, vscode.ConfigurationTarget.Workspace);
+      await vscode.workspace.getConfiguration('codeFolderSpaces').update('spaces.global', originalGlobal, vscode.ConfigurationTarget.Global);
+    }
+  });
 });

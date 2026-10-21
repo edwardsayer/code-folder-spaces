@@ -27,9 +27,15 @@ const rootKey = (root: string): string => {
  *    ——即使目前 pane 還沒有它（切換到別的專案時仍應出現）；
  *  - 丟掉其餘 roots（例如前一個專案自動帶入、既非工作區根也非全域 roots 的目錄）。
  *
- * 注意：`spaces.workspace` 屬專案清單，**不**在此自動併入（呼叫端只傳全域 roots）。
+ * 注意：`spaces.workspace`（或 .code-workspace 設定）的 roots 以 `workspaceScoped` 傳入並一併併入——
+ * 它們是「非 global」的持久化位置，Unmark Global 後必須能在切回專案時 restore。
  */
-export function mergeFollowedWorkspaceRoots(current: string[], visible: string[], configured: string[]): string[] {
+export function mergeFollowedWorkspaceRoots(
+  current: string[],
+  visible: string[],
+  configured: string[],
+  workspaceScoped: string[] = [],
+): string[] {
   const result: string[] = [];
   const seen = new Set<string>();
   const push = (root: string): void => {
@@ -39,8 +45,11 @@ export function mergeFollowedWorkspaceRoots(current: string[], visible: string[]
     result.push(root);
   };
   visible.forEach(push);
+  // v21-R6：本專案 `spaces.workspace`（或 .code-workspace 設定）的 roots 也要出現在 pane——
+  // 這是 Unmark Global 之後「切回專案要能 restore」的關鍵（root 存在專案／workspace 設定裡）。
+  workspaceScoped.forEach(push);
   const visibleKeys = new Set(visible.map(rootKey));
-  const configuredKeys = new Set(configured.map(rootKey));
+  const configuredKeys = new Set([...configured, ...workspaceScoped].map(rootKey));
   // 既有設定根維持使用者目前的相對順序（避免每次同步重新洗牌）……
   for (const root of current) {
     const key = rootKey(root);

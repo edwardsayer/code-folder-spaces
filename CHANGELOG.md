@@ -36,6 +36,8 @@ All notable changes to Folder Spaces are documented in this file.
 
 - Global roots (`Mark as Global`) are stored **only** in the standard user settings (`codeFolderSpaces.spaces.global`, `scope: application`). An early preview build's `~/.code-folder-spaces/global-roots.json` is imported once at startup and then retired as `global-roots.migrated.json`; no custom file is written anymore.
 - Folder rows in pane1 now always show two inline buttons: **Drill Into Folder** and **Activate Child Space** (`$(arrow-right)`). Activate Child Space switches to Dual first when needed, then sets that folder as pane2's root; the title bar no longer carries the text button.
+- Project roots are persisted where VS Code expects them: global roots in user settings, non-global roots in the project's `.vscode/settings.json` or in the `.code-workspace` file. Panel roots are rebuilt from all three sources, so an unmarked root survives switching projects and coming back.
+- In Tree mode the panel title shows the workspace/project name (or **Global** when no folder is open), with a `+ n` suffix when several roots are shown.
 - **Mark as Global / Unmark Global** are now chosen by the clicked node's context value, so the context menu switches to *Unmark Global* immediately after marking (previously it kept showing *Mark as Global* until the selection changed).
 - Follow Workspace Directory no longer overwrites pane1 roots with the workspace roots only: configured roots (`codeFolderSpaces.spaces.workspace` / `.global`, including **Mark as Global** roots) are preserved and appear in every workspace, so a global root no longer disappears after switching projects or reloading.
 

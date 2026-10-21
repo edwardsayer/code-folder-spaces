@@ -100,5 +100,6 @@
   "Workspace Folders…": "Workspace Folders…",
   "Switch Root…": "Switch Root…",
   "Reset Layout": "Reset Layout",
-  "Close Folder Space 2": "Close Folder Space 2"
+  "Close Folder Space 2": "Close Folder Space 2",
+  "Open a folder or workspace before unmarking a global root.": "Open a folder or workspace before unmarking a global root."
 }

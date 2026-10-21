@@ -100,5 +100,6 @@
   "Workspace Folders…": "工作區資料夾…",
   "Switch Root…": "切換根目錄…",
   "Reset Layout": "重設配置",
-  "Close Folder Space 2": "關閉 Folder Space 2"
+  "Close Folder Space 2": "關閉 Folder Space 2",
+  "Open a folder or workspace before unmarking a global root.": "請先開啟資料夾或 workspace，才能取消全域標記。"
 }

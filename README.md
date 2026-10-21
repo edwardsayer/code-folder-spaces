@@ -11,6 +11,7 @@ VS Code's built-in Explorer always shows the entire workspace. Folder Spaces pro
 ## Tree and Dual modes
 
 - **Tree** shows pane1 as a single folder tree.
+- In Tree mode the pane title shows the workspace or project folder name (with a `+ n` suffix when there are several roots) or **Global** when no folder is open.
 - **Dual** shows pane1 above pane2. Pane1 is the control center: its title-bar actions and native submenus (**View:**, **Sort:**) manage layout, roots, workspace folders, sorting and other navigation. Pane2 has a smaller, basic-operation menu (switching the nested-file listing, filtering, collapse/expand, refresh and close).
 - Menu items that represent a current state are marked with a trailing **✓**: the **View:** and **Sort:** submenus in pane1 and **Toggle Nested Files** in pane2 (VS Code offers no native checkmark API for extension menus, so the marker is part of the label and sits after the text so labels stay aligned).
 - Pane2 starts as a flat **first-level file list**; **Toggle Nested Files** in its title bar expands it to files from all levels (still a flat listing).
@@ -45,7 +46,8 @@ Each entry may be a path string or an object with `path`, `name`, `icon`, `showF
 | Setting | Type | Default | Description |
 | --- | --- | --- | --- |
 | `codeFolderSpaces.spaces.workspace` | array | `[]` | Project/workspace-level space roots. Entries are paths or objects. |
-| `codeFolderSpaces.spaces.global` | array | `[]` | Global roots (written by **Mark as Global**; user-settings scope, profile-specific). |
+| `codeFolderSpaces.spaces.global` | array | `[]` | Global roots (written by **Mark as Global**) — user settings, profile-specific. |
+| `codeFolderSpaces.spaces.workspace` | array | `[]` | Project roots: written to the folder's `.vscode/settings.json`, or to the `.code-workspace` file when opened as a workspace (target of **Unmark Global**). |
 | `codeFolderSpaces.followActiveFile` | boolean | `true` | Follow the active editor file in the space tree. |
 | `codeFolderSpaces.maxDepth` | integer (1–100) | `10` | Maximum folder depth enumerated by flat listings. |
 | `codeFolderSpaces.followWorkspaceDirectory` | boolean | `true` | Keep pane1's workspace roots synchronized with workspace folders. Configured roots (including global ones) are preserved and added after the workspace roots. |

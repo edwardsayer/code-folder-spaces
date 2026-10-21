@@ -6,6 +6,7 @@ import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { originOf } from './spaces/spaceConfig';
 import { mergeFollowedWorkspaceRoots, visibleWorkspaceRoots } from './spaces/workspaceRoots';
+import { paneTitleFor } from './spaces/paneTitle';
 import { legacyGlobalRootsExists, readLegacyGlobalRoots, resolveLegacyGlobalRootsPath, retireLegacyGlobalRoots } from './spaces/legacyGlobalRoots';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
@@ -416,19 +417,37 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const visible = visibleWorkspaceRoots(folders.map(folder => folder.uri.fsPath), hidden);
     const current = viewState.get('pane1').roots;
     if (!settings().get<boolean>('followWorkspaceDirectory', true)) return;
-    if (visible.length === 0 && current.length > 0) {
-      getLogChannel().info('All workspace roots are hidden; keeping current pane1 roots.');
-      return;
-    }
-    // v2.1：只替換「工作區自動帶入」的 roots，保留使用者設定的 roots（含 Mark as Global 的 profile 層 root），
-    // 否則切換專案會把 global root 永久丟掉，切回原專案也回不來。
-    // 只合併「全域」roots（使用者層級檔案＋legacy spaces.global）；spaces.workspace 屬專案清單，不自動塞進 pane。
+    // v21-R6：三種持久化來源都要回到 pane——
+    // ①工作區根 ②本專案／workspace 設定的 roots（`spaces.workspace`）③全域 roots（`spaces.global`）。
+    // 這是 Unmark Global 後「切到別的專案再切回來仍能 restore」的關鍵；沒有工作區（空視窗）時只顯示全域 roots。
     const configuredRoots = store.getDefinitionsByOrigin('global').map(definition => definition.basePath);
-    const next = mergeFollowedWorkspaceRoots(current, visible, configuredRoots);
+    const workspaceScopedRoots = store.getDefinitionsByOrigin('workspace').map(definition => definition.basePath);
+    const next = folders.length === 0
+      ? configuredRoots
+      : mergeFollowedWorkspaceRoots(current, visible, configuredRoots, workspaceScopedRoots);
     if (current.length !== next.length || current.some((root, index) => !isSamePath(root, next[index]))) {
       await viewState.setPaneRoots('pane1', next);
       await paneChanged('pane1');
     }
+  };
+
+  /**
+   * v21-R6（使用者）：單一 pane（tree 模式）時，面板標題用有意義的名稱——
+   * workspace／專案資料夾名稱，或 `Global`（沒有工作區時）；多 root 時為 `名稱 + n`。
+   * dual 模式維持 `Folder Space 1／2`，避免兩個 pane 同名。
+   */
+  const updatePaneTitles = (): void => {
+    const mode = viewState.getMode();
+    const workspaceName = vscode.workspace.workspaceFolders?.length ? vscode.workspace.name : undefined;
+    const runtime = paneRuntime.get('pane1');
+    if (runtime) {
+      const applied = mode === 'tree'
+        ? paneTitleFor({ workspaceName, rootCount: viewState.get('pane1').roots.length })
+        : undefined;
+      runtime.treeView.title = applied;
+    }
+    const runtime2 = paneRuntime.get('pane2');
+    if (runtime2) runtime2.treeView.title = undefined;
   };
 
   const syncPaneViews = (): void => {
@@ -462,6 +481,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canAddPane', false);
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canRemovePane', false);
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.layoutReady', true);
+    // v21-R6：標題依「workspace／專案名稱＋root 數」計算；放在 syncContext 尾端確保所有狀態變更後都刷新。
+    updatePaneTitles();
   };
 
   const reconcilePaneRoots = async (): Promise<void> => {
@@ -1121,6 +1142,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     () => {
       // D70：spaces 設定變更不回寫既有 pane，只刷新 pane 定義解析與视图。
       for (const paneId of paneRuntime.keys()) applyPaneScope(paneId);
+      // v21-R6：設定變更（含 Unmark Global 寫回專案／workspace 設定）要同步回 pane roots 與標題。
+      void syncWorkspaceDirectory();
       void syncContext();
     },
     undefined,
@@ -1346,9 +1369,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }),
     vscode.commands.registerCommand('codeFolderSpaces.root.unmarkGlobal', async (node?: unknown) => {
       if (!(node instanceof SpaceRootNode)) return;
+      // Unmark 會寫回「非 global」的持久化位置（單一資料夾＝專案 .vscode/settings.json；
+      // .code-workspace＝workspace 設定檔）。沒有工作區時無處可寫，直接提示而不靜默失敗。
+      if (!vscode.workspace.workspaceFolders?.length && !vscode.workspace.workspaceFile) {
+        void vscode.window.showWarningMessage(vscode.l10n.t('Open a folder or workspace before unmarking a global root.'));
+        return;
+      }
       if (!await store.unmarkGlobal(node.definition.basePath)) return;
+      // v21-R6：設定變更後重新合併 pane roots，確保該 root 立即回到 pane（並可跨專案 restore）。
+      await syncWorkspaceDirectory();
       for (const runtime of paneRuntime.values()) applyPaneScope(runtime.id);
       for (const runtime of paneRuntime.values()) runtime.provider.refresh();
+      updatePaneTitles();
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane.resetLayout', async () => {
@@ -1524,6 +1556,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       id, root: rootOf(id), roots: [...viewState.get(id).roots], mode: viewState.getMode(), slot: paneSlotOf(id),
       // v2.1：公開檢視設定與 pane2 巢狀狀態，供自動化驗證（UI 本身不依賴此欄位）。
       view: { ...effectiveView(viewState.get(id)) },
+      title: id === 'pane1' ? paneTitleFor({ workspaceName: vscode.workspace.workspaceFolders?.length ? vscode.workspace.name : undefined, rootCount: viewState.get('pane1').roots.length }) : undefined,
       nested: isPane2Nested(effectiveView(viewState.get(id))),
     })),
   };
