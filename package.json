@@ -1365,7 +1365,8 @@
                 }
               }
             ]
-          }
+          },
+          "scope": "application"
         },
         "codeFolderSpaces.followActiveFile": {
           "type": "boolean",

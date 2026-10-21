@@ -47,11 +47,23 @@ export class SpaceStore implements vscode.Disposable {
     });
   }
 
-  /** 只讀 VS Code 設定（不含使用者層級檔案）。 */
+  /**
+   * 只讀 VS Code 設定（不含跨 profile 鏡像檔）。
+   *
+   * global 一律取 **globalValue**（`configuration.inspect`），避免把 workspace／資料夾層覆寫
+   * 當成全域值讀進來——否則 Mark as Global 會把低層設定「提升」寫進 user settings。
+   * （manifest 亦把 `spaces.global` 宣告為 `scope: application`，從源頭禁止低層覆寫。）
+   */
   private getSettingEntries(origin: SpaceOrigin): SpaceConfigEntry[] {
-    const value = this.shim
-      ? this.shim.get(origin)
-      : vscode.workspace.getConfiguration(SECTION).get<SpaceConfigEntry[]>(`spaces.${origin}`, []);
+    if (this.shim) {
+      const value = this.shim.get(origin);
+      return Array.isArray(value) ? [...value] : [];
+    }
+    const configuration = vscode.workspace.getConfiguration(SECTION);
+    const inspected = configuration.inspect<SpaceConfigEntry[]>(`spaces.${origin}`);
+    const value = origin === 'global'
+      ? inspected?.globalValue ?? []
+      : inspected?.workspaceValue ?? inspected?.globalValue ?? configuration.get<SpaceConfigEntry[]>(`spaces.${origin}`, []);
     return Array.isArray(value) ? [...value] : [];
   }
 
