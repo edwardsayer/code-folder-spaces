@@ -77,3 +77,18 @@ describe('mergeFollowedWorkspaceRoots：三種持久化來源（v21-R6）', () =
     expect(mergeFollowedWorkspaceRoots([], ['C:/projA'], [], ['C:/projA'])).toEqual(['C:/projA']);
   });
 });
+
+describe('hiddenWorkspaceRoots 與全域 roots 的關係（使用者 2026-10-21 裁定）', () => {
+  it('同一路徑被隱藏但仍設定在全域時，仍以全域 root 回到 pane', () => {
+    const all = ['C:/proj', 'C:/shared'];
+    const visible = visibleWorkspaceRoots(all, ['C:/shared']);
+    expect(visible).toEqual(['C:/proj']);
+    // merged 會把 configured（全域）無條件併回，因此 hidden 只影響「工作區根」身份。
+    expect(mergeFollowedWorkspaceRoots([], visible, ['C:/shared'], [])).toEqual(['C:/proj', 'C:/shared']);
+  });
+
+  it('純工作區根（未設定在全域）被隱藏後不會回到 pane', () => {
+    const visible = visibleWorkspaceRoots(['C:/proj', 'C:/other'], ['C:/other']);
+    expect(mergeFollowedWorkspaceRoots([], visible, [], [])).toEqual(['C:/proj']);
+  });
+});
