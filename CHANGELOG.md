@@ -16,6 +16,8 @@ All notable changes to Folder Spaces are documented in this file.
 - `.code-workspace` files get **Open Workspace** / **Open Workspace in New Window** inline actions in any pane.
 - Added three settings: `codeFolderSpaces.defaultPreset.singlePane`, `.dualPane.pane1` and `.dualPane.pane2`, applied when switching between Tree and Dual mode.
 - Root path comparison is now case-insensitive on Windows for drill/filter state, so casing differences no longer drop pane state.
+- Removed the redundant node-less `codeFolderSpaces.pane1.activateChild` command (no UI entry point since v2.1). Pane2's root is set only by the pane cascade or the `Activate Child Space` inline button (`codeFolderSpaces.activateChildNode`). The contributed command count is now 71.
+- Fixed: folders added with **Add Folder to Space…** in an empty window (no folder/workspace open) were silently dropped on reload. Empty windows now keep the pane roots and only merge in the global roots.
 
 ## [0.1.0] — 2026-10-19
 

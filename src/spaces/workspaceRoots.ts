@@ -60,3 +60,26 @@ export function mergeFollowedWorkspaceRoots(
   for (const root of configured) push(root);
   return result;
 }
+
+/**
+ * v22-R2（C1）：**完全沒有工作區**（空視窗）時的 root 合併規則。
+ *
+ * 空視窗沒有任何「工作區根」可對齊，若照 `mergeFollowedWorkspaceRoots` 走，會把使用者剛用
+ * Add Folder to Space 加入、但尚未成為設定根的 root 靜默丟棄（實機重現：reload 後 root 消失）。
+ * 因此改為**只併入、不丟棄**：
+ *  - 先保留 pane 現況（使用者本次加入的 root）；
+ *  - 再補上 `spaces.global` 的全域 roots（新加入或別處標記為 global 的）。
+ */
+export function mergeRootsWithoutWorkspace(current: string[], configured: string[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  const push = (root: string): void => {
+    const key = rootKey(root);
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(root);
+  };
+  current.forEach(push);
+  configured.forEach(push);
+  return result;
+}

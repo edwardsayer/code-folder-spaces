@@ -73,7 +73,6 @@
   "command.pane1.mode.tree.title": "檢視：樹狀",
   "command.pane1.mode.dual.title": "雙窗格",
   "command.pane2.toggleNested.title": "切換巢狀檔案",
-  "command.pane1.activateChild.title": "啟用子空間",
   "command.pane1.workspaceFolders.title": "工作區資料夾...",
   "command.pane1.mode.dual.checked.title": "雙窗格 ✓",
   "command.paneAction.sort.name.asc.checked.title": "名稱（遞增）✓",

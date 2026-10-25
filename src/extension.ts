@@ -6,7 +6,7 @@ import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider, setLeafFolderIcon
 import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { originOf } from './spaces/spaceConfig';
-import { mergeFollowedWorkspaceRoots, visibleWorkspaceRoots } from './spaces/workspaceRoots';
+import { mergeFollowedWorkspaceRoots, mergeRootsWithoutWorkspace, visibleWorkspaceRoots } from './spaces/workspaceRoots';
 import { computePaneTitleAndHint } from './spaces/paneTitle';
 import { legacyGlobalRootsExists, readLegacyGlobalRoots, resolveLegacyGlobalRootsPath, retireLegacyGlobalRoots } from './spaces/legacyGlobalRoots';
 import { DirectoryCache } from './spaces/directoryCache';
@@ -440,7 +440,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
    * 當開啟新專案或切換工作區時，若啟用此設定，主窗格（primary pane，通常為 pane1）
    * 的根目錄自動同步對齊目前工作區的第一個資料夾。
    */
-    const syncWorkspaceDirectory = async (): Promise<void> => {
+  const syncWorkspaceDirectory = async (): Promise<void> => {
     const folders = vscode.workspace.workspaceFolders ?? [];
     const hidden = hiddenWorkspaceRoots();
     const visible = visibleWorkspaceRoots(folders.map(folder => folder.uri.fsPath), hidden);
@@ -448,12 +448,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (!settings().get<boolean>('followWorkspaceDirectory', true)) return;
     // v21-R6：三種持久化來源都要回到 pane——
     // ①工作區根 ②本專案／workspace 設定的 roots（`spaces.workspace`）③全域 roots（`spaces.global`）。
-    // 這是 Unmark Global 後「切到別的專案再切回來仍能 restore」的關鍵；沒有工作區（空視窗）時只顯示全域 roots。
+    // 這是 Unmark Global 後「切到別的專案再切回來仍能 restore」的關鍵。空視窗走下面的例外（保留現況＋全域 roots）。
     const configuredRoots = store.getDefinitionsByOrigin('global').map(definition => definition.basePath);
     const workspaceScopedRoots = store.getDefinitionsByOrigin('workspace').map(definition => definition.basePath);
-    // 注意：`folders.length === 0` 也可能是「開啟 0 資料夾的 .code-workspace」——此時
-    // workspace 設定的 roots 仍必須保留，因此一律走 merge（visible 為空即可）。
-    const next = mergeFollowedWorkspaceRoots(current, visible, configuredRoots, workspaceScopedRoots);
+    // v22-R2（C1）：**完全沒有工作區**（空視窗）時不可丟棄 pane roots——
+    // `mergeFollowedWorkspaceRoots` 會把「非工作區根、非設定根」一律丟棄，若照走會把使用者
+    // 在空視窗用 Add Folder to Space 加入的 root 靜默清掉（實機重現：reload 後 root 消失）。
+    // 空視窗改走 `mergeRootsWithoutWorkspace`（保留現況＋併入全域 roots）。
+    // 仍須區分「0 資料夾的 .code-workspace」——那裡 workspace 設定的 roots 必須保留，
+    // 因此只有 `workspaceFile` 也不存在時才視為空視窗。
+    const hasAnyWorkspace = Boolean(vscode.workspace.workspaceFile) || folders.length > 0;
+    const next = hasAnyWorkspace
+      ? mergeFollowedWorkspaceRoots(current, visible, configuredRoots, workspaceScopedRoots)
+      : mergeRootsWithoutWorkspace(current, configuredRoots);
     if (current.length !== next.length || current.some((root, index) => !isSamePath(root, next[index]))) {
       await viewState.setPaneRoots('pane1', next);
       await paneChanged('pane1');
@@ -1391,16 +1398,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       syncPaneViews();
       await syncPaneContexts();
       await syncContext();
-    }),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.activateChild', async () => {
-      const runtime = paneRuntime.get('pane1');
-      if (!runtime) return;
-      // 選取資料夾用自身，選取檔案用父目錄；沒有選取時使用 pane1 目前的 root。
-      const info = nodeInfo(runtime.treeView.selection[0]);
-      const folder = info?.isDirectory ? info.uri.fsPath
-        : info?.uri ? path.dirname(info.uri.fsPath)
-        : activeRoot(viewState.get('pane1'));
-      if (folder) await activateChildSpace(folder);
     }),
     // v21-R5（使用者）：pane1 每個資料夾列右側 always 顯示「下鑽」與「啟用子空間」兩個按鈕。
     // 本命令由**被點擊節點**解析 pane（view/item/context 的 view 參數只用於選單顯示條件）。

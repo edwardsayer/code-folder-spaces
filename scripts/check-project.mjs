@@ -161,14 +161,14 @@ if (!pkg) {
   // 僅在 manifest 採用 per-pane 命令時啟用（避免誤判其他專案／測試 fixture）。
   if ([...contributedCommands].some((id) => id.startsWith('codeFolderSpaces.pane1.'))) {
     const paneCommandContract = {
-      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'addRoot', 'mode.tree', 'mode.dual', 'activateChild', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc', 'workspaceFolders', 'resetLayout'],
+      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'addRoot', 'mode.tree', 'mode.dual', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc', 'workspaceFolders', 'resetLayout'],
       2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'toggleNested', 'close'],
     };
     const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
     // 契約隨產品演進維護：v2 固定雙 pane 的 title 清單取代舊多窗格清單，並非放寬檢查。
     const paneTitleContract = {
-      // v21-R2（使用者）：activateChild 不再放進 pane1 的 view/title（文字按鈕會擠壓標題列），命令本身保留。
+      // v22-R2（C3）：pane1.activateChild（無節點版）已移除，pane2 root 只由 cascade 或 activateChildNode 設定。
       1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'addRoot', 'refresh', 'workspaceFolders', 'resetLayout'],
       2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'toggleNested', 'close'],
     };

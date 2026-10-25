@@ -340,10 +340,7 @@
         "command": "codeFolderSpaces.pane2.toggleNested",
         "title": "%command.pane2.toggleNested.title%"
       },
-      {
-        "command": "codeFolderSpaces.pane1.activateChild",
-        "title": "%command.pane1.activateChild.title%"
-      },
+
       {
         "command": "codeFolderSpaces.pane1.sort.name.asc",
         "title": "%command.paneAction.sort.name.asc.title%"
@@ -910,10 +907,7 @@
           "command": "codeFolderSpaces.pane2.toggleNested",
           "when": "false"
         },
-        {
-          "command": "codeFolderSpaces.pane1.activateChild",
-          "when": "false"
-        },
+
         {
           "command": "codeFolderSpaces.pane1.sort.name.asc",
           "when": "false"

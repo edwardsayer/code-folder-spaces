@@ -86,7 +86,7 @@ Pane-specific actions live in each pane's title bar, submenus and context menus,
 - **Toggle Nested Files** (pane2 title bar)
 - **Mark as Global** / **Unmark Global** (space-root context menu)
 
-The full manifest currently contributes 72 commands.
+The full manifest currently contributes 71 commands.
 
 ## Breaking changes from v1.x
 

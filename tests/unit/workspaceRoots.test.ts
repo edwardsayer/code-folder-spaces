@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeFollowedWorkspaceRoots, visibleWorkspaceRoots } from '../../src/spaces/workspaceRoots';
+import { mergeFollowedWorkspaceRoots, mergeRootsWithoutWorkspace, visibleWorkspaceRoots } from '../../src/spaces/workspaceRoots';
 
 describe('visibleWorkspaceRoots', () => {
   it('returns all roots when none are hidden', () => {
@@ -90,5 +90,34 @@ describe('hiddenWorkspaceRoots 與全域 roots 的關係（使用者 2026-10-21 
   it('純工作區根（未設定在全域）被隱藏後不會回到 pane', () => {
     const visible = visibleWorkspaceRoots(['C:/proj', 'C:/other'], ['C:/other']);
     expect(mergeFollowedWorkspaceRoots([], visible, [], [])).toEqual(['C:/proj']);
+  });
+});
+
+describe('mergeRootsWithoutWorkspace（v22-R2／C1：空視窗）', () => {
+  it('保留空視窗中使用者剛加入的 root（不被 sync 清掉）', () => {
+    expect(mergeRootsWithoutWorkspace(['C:/added-now'], [])).toEqual(['C:/added-now']);
+  });
+
+  it('併入全域 roots（新加入或別處標記為 global）', () => {
+    expect(mergeRootsWithoutWorkspace(['C:/added-now'], ['C:/global-notes']))
+      .toEqual(['C:/added-now', 'C:/global-notes']);
+  });
+
+  it('現況為空時只顯示全域 roots', () => {
+    expect(mergeRootsWithoutWorkspace([], ['C:/global-notes'])).toEqual(['C:/global-notes']);
+  });
+
+  it('去重且保持現況順序在前', () => {
+    expect(mergeRootsWithoutWorkspace(['C:/a', 'C:/b'], ['C:/b', 'C:/c']))
+      .toEqual(['C:/a', 'C:/b', 'C:/c']);
+  });
+
+  it('Windows 上以大小寫不敏感去重（非 Windows 保留兩筆）', () => {
+    const merged = mergeRootsWithoutWorkspace(['C:/Repo'], ['c:/repo']);
+    if (process.platform === 'win32') {
+      expect(merged).toEqual(['C:/Repo']);
+    } else {
+      expect(merged).toHaveLength(2);
+    }
   });
 });

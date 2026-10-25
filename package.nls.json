@@ -73,7 +73,6 @@
   "command.pane1.mode.tree.title": "View: Tree",
   "command.pane1.mode.dual.title": "Dual Pane",
   "command.pane2.toggleNested.title": "Toggle Nested Files",
-  "command.pane1.activateChild.title": "Activate Child Space",
   "command.pane1.workspaceFolders.title": "Workspace Folders...",
   "command.pane1.mode.dual.checked.title": "Dual Pane ✓",
   "command.paneAction.sort.name.asc.checked.title": "Name (Ascending) ✓",

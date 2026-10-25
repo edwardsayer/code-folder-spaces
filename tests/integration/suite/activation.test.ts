@@ -27,7 +27,9 @@ suite('擴充套件啟用', () => {
     assert.ok(extension);
     const manifest = extension.packageJSON.contributes;
     const commands = new Set((manifest.commands ?? []).map((item: { command: string }) => item.command));
-    assert.ok(commands.has('codeFolderSpaces.pane1.activateChild'));
+    // v22-R2（C3）：無節點版 activateChild 已移除，pane2 root 只由 cascade 或 activateChildNode 設定。
+    assert.ok(!commands.has('codeFolderSpaces.pane1.activateChild'), 'pane1.activateChild 已移除（C3）');
+    assert.ok(commands.has('codeFolderSpaces.activateChildNode'), 'activateChildNode 必須保留');
     assert.ok(!commands.has('codeFolderSpaces.pane1.adoptChild'));
     assert.ok(!commands.has('codeFolderSpaces.pane1.toggleNested'));
     assert.ok(commands.has('codeFolderSpaces.pane2.toggleNested'));
@@ -47,9 +49,10 @@ suite('擴充套件啟用', () => {
       }
     }
     const title = manifest.menus['view/title'] as Array<{ command?: string; submenu?: string; when?: string; group?: string }>;
-    // v21-R2（使用者）：Activate Child Space 不再出現在 pane1 的 view/title（文字按鈕會擠壓標題列）。
-    assert.ok(!title.some(item => item.command === 'codeFolderSpaces.pane1.activateChild'));
-    assert.ok(commands.has('codeFolderSpaces.pane1.activateChild'), '命令本身仍需保留');
+    // v21-R2（使用者）：Activate Child Space 不出現在 pane1 的 view/title（文字按鈕會擠壓標題列）。
+    // v22-R2（C3）：無節點版命令已整併移除，僅保留節點版 activateChildNode。
+    assert.ok(!title.some(item => item.command === 'codeFolderSpaces.activateChildNode'), '節點版不掛 view/title');
+    assert.ok(commands.has('codeFolderSpaces.activateChildNode'), '節點版命令必須保留');
     // v22-R1（使用者）：pane1 在 dual 模式下亦可 drilldown，drillUp 不再限制 mode == tree，只要 canDrillUp 即可顯示。
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.drillUp' && item.when?.includes('pane1.canDrillUp') && !item.when?.includes('mode == tree')));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.drillUp' && item.group === 'navigation@0'));
