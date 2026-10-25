@@ -1042,7 +1042,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         }
 
         let targetPath = input;
-        if (targetPath.startsWith('~')) {
+        // 僅 `~`、`~/`、`~\` 視為家目錄；`~user` 之類不做展開（避免誤解成 homedir/user）。
+        if (targetPath === '~' || targetPath.startsWith('~/') || targetPath.startsWith('~' + path.sep)) {
           targetPath = path.join(os.homedir(), targetPath.slice(1));
         }
         targetPath = path.resolve(targetPath);

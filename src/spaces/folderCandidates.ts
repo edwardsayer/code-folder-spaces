@@ -51,9 +51,12 @@ export function collectCandidateFolders(options: CollectCandidatesOptions): stri
     const resolved = path.resolve(candidate);
     // 排除已存在於 currentRoots
     if (currentRoots.some(r => isSamePath(r, resolved))) continue;
-    // 不秀當前 project 或 workspace 目錄的子目錄
+    // 不秀當前 project 或 workspace 目錄的子目錄，也不秀已在 pane root 之下的子目錄
+    // （後者請直接用 Drill Into Folder）。
     const isSubOfWs = workspaceFolders.some(ws => isStrictSubdirectory(resolved, ws));
     if (isSubOfWs) continue;
+    const isSubOfRoot = currentRoots.some(root => isStrictSubdirectory(resolved, root));
+    if (isSubOfRoot) continue;
     // 去重
     if (result.some(existing => isSamePath(existing, resolved))) continue;
     result.push(resolved);

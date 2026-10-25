@@ -72,6 +72,22 @@ describe('folderCandidates', () => {
       expect(candidates).toContain(otherWs);
     });
 
+    it('排除任意 current root 之下的子目錄（不限 workspace folder）', () => {
+      // v22-R1 gate C2：非 workspace folder 的 root 也套用同一排除規則；子目錄請用 Drill Into Folder。
+      const wsRoot = path.resolve('/repo/app');
+      const externalRoot = path.resolve('/external/proj');
+      const externalSub = path.resolve('/external/proj/src');
+
+      const candidates = collectCandidateFolders({
+        currentRoots: [wsRoot, externalRoot],
+        globalRoots: [],
+        workspaceFolders: [wsRoot],
+        recentFolders: [externalSub],
+      });
+
+      expect(candidates).not.toContain(externalSub);
+    });
+
     it('排除已在 currentRoots 的路徑', () => {
       const wsRoot = path.resolve('/repo/app');
       const parent = path.dirname(wsRoot);
