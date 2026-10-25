@@ -117,7 +117,7 @@ node tools/vscode-debug.mjs close
 - **Follow Workspace Directory（OP-15，v2.1 起保留全域根）**：只同步**工作區根＋全域 roots**的合併結果（不含 `spaces.workspace`）；`Mark as Global` 的 root 會在每個專案都出現並附 🌐 標記。詳見上方「Follow Workspace Directory 的根目錄合併」。pane2 root 仍只由 cascade 或 `activateChildNode` 決定。
 - **Dual 模式的 drill（v22-R1 起對稱）**：`pane1.drillUp` 的 `when` 於 v22-R1 移除 `codeFolderSpaces.mode == tree`——**Dual 下 pane1 也可下鑽並顯示 Return to Parent**（只看 `codeFolderSpaces.pane1.canDrillUp`）。`pane1.mode.dual` 仍在 `setMode('dual')` **之前**先 `resetRoot('pane1')`，故切入 Dual 時 pane1 退回原 roots，pane2 的 drill 狀態保留。`pane2.drillUp` 恆存在（`navigation@0`），**不要**再加 mode 條件（v2-R6 S5a 曾因此誤刪造成回歸）。
 - **pane2 的 Toggle View Mode 三態切換（v22-R5，使用者指示）**：pane2 支援三種模式循環切換——①`Explorer`（預設，局部原生樹，支援即地下鑽與小圓角端點圖示，按需延遲載入不卡頓且無純檔案空白問題）②`File List`（`List`，第 1 層只列檔案，icon `$(list-flat)`）③`Nested File List`（`Files`，所有層級只列檔案，icon `$(layers)`）。點擊標題列按鈕（`navigation@2`）循序循環。
-- **Files (pane2) 可見性同步與 Dual Pane ✓ 出口（v22-R5）**：監聽 `treeView.onDidChangeVisibility`，若使用者在 UI 關閉/取消勾選 Files (pane2)，自動切回 Tree 模式（Spaces 自動恢復 Explorer）；Files 亦提供 `Dual Pane ✓` 出口按鈕，若 Spaces 不慎被關閉可直接在 Files 點擊退出 Dual 並還原 Spaces。
+- **雙窗格可見性感知與成對 Dual Pane 出口（v22-R5／R6，使用者指示）**：持續監聽 `treeView.onDidChangeVisibility`；若使用者在 UI 關閉/取消勾選 Files (pane2)，自動切回 Tree 模式（Spaces 自動恢復 Explorer）；若使用者取消勾選 Spaces (pane1)，Files 上的 Dual Pane 命令自動切換為未勾選（`Dual Pane`），點擊可立即召回 Spaces 並恢復雙窗格；在 Spaces 點擊未勾選的 `Dual Pane` 亦會強制解除 Files 的隱藏狀態。兩窗格均配備成對 `mode.dual`／`mode.dual.checked`。
 - **Reset Pane Layout 已從使用者選單移除（v22-R5）**：現行 Dual Pane 與 Refresh 機制已完整覆蓋排版與重整需求，避免使用者誤觸重置；保留內部指令供測試 harness 重設環境。
 - **Close Pane（v22-R4）**：原 `Close Space` 操作更名為 `Close Pane`（`關閉窗格`）。
 - **資料夾右鍵選單清理（v22-R4）**：移除 `view/item/context` 右鍵選單中的 `Drill Into Folder`，下鑽一律由樹列右側的 inline 按鈕（`inline@2`，`$(arrow-down)`）觸發。

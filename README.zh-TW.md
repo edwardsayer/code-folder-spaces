@@ -86,7 +86,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 - **Toggle View Mode**（pane2 標題列：Explorer／File List／Nested File List 檢視模式循環）
 - **Mark as Global**／**Unmark Global**（空間根目錄右鍵選單）
 
-目前 manifest 共提供 85 個命令。
+目前 manifest 共提供 86 個命令。
 
 ## 與 v1.x 的重大變更
 

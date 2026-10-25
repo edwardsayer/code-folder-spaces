@@ -398,12 +398,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       }),
     );
     // active-file follow 跟「主 pane」（最低編號啟用窗格，S4.1R3-D：pane1 可關閉）；每個 pane 的可見性變化都重新排程。
-    // v22-R5（使用者指示）：若處於 dual 模式且使用者手動隱藏/關閉 Files (pane2)，自動切回 tree 模式（Spaces 自動還原 Explorer）
-    runtime.disposables.push(treeView.onDidChangeVisibility(event => {
+    // v22-R5/R6（使用者指示）：監聽 pane 隱藏事件，視為 Close；同步雙窗格真實狀態
+    runtime.disposables.push(treeView.onDidChangeVisibility(async event => {
+      log.info(`[visibility] ${paneId}: visible=${event.visible}, mode=${viewState.getMode()}`);
       scheduleFollow();
       if (paneId === 'pane2' && !event.visible && viewState.getMode() === 'dual') {
-        void closePane('pane2');
+        await closePane('pane2');
       }
+      await syncDualVisibilityContext();
     }));
     context.subscriptions.push(new vscode.Disposable(() => { for (const disposable of runtime.disposables) disposable.dispose(); }));
     paneRuntime.set(paneId, runtime);
@@ -411,6 +413,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   };
 
   // 各 pane 的 runtime disposable 集中於 disposePane 處置（插槽重用時）。
+
+  const showPane = async (paneId: string): Promise<void> => {
+    try {
+      await vscode.commands.executeCommand(`codeFolderSpaces.${paneId}.focus`);
+    } catch {
+      // ignore
+    }
+    try {
+      const runtime = paneRuntime.get(paneId);
+      if (runtime) {
+        const roots = (await runtime.provider.getChildren()) as Array<SpaceRootNode | SpaceEntryNode>;
+        if (roots.length > 0) {
+          await runtime.treeView.reveal(roots[0], { select: false, focus: false, expand: false });
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const syncDualVisibilityContext = async (): Promise<void> => {
+    const p1Visible = Boolean(paneRuntime.get('pane1')?.treeView.visible);
+    const p2Visible = Boolean(paneRuntime.get('pane2')?.treeView.visible);
+    const isDualActive = p1Visible && p2Visible && viewState.getMode() === 'dual';
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.pane1.dualChecked', isDualActive);
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.pane2.dualChecked', isDualActive);
+  };
   const disposePane = (paneId: string): void => {
     cascadeDisposables.get(paneId)?.dispose();
     cascadeDisposables.delete(paneId);
@@ -778,6 +807,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.pane2.viewMode', getPane2ViewMode(view));
       }
     }
+    await syncDualVisibilityContext();
   };
 
   // --- file operations ------------------------------------------------------
@@ -1395,7 +1425,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.dual', async () => {
-      if (viewState.getMode() === 'dual') return;
       if (viewState.get('pane1').drillStack.length > 0) await viewState.resetRoot('pane1');
       await viewState.setMode('dual');
       await viewState.setView('pane1', VIEW_PRESETS[getDualPane1DefaultPreset()]);
@@ -1403,6 +1432,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       syncPaneViews();
       await syncPaneContexts();
       await syncContext();
+      // v22-R6：若 Files (pane2) 曾被手動隱藏，確保強制解除隱藏彈出
+      await showPane('pane2');
+      await syncDualVisibilityContext();
     }),
     // v21-R5（使用者）：pane1 每個資料夾列右側 always 顯示「下鑽」與「啟用子空間」兩個按鈕。
     // 本命令由**被點擊節點**解析 pane（view/item/context 的 view 參數只用於選單顯示條件）。
@@ -1440,7 +1472,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.mtime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.mtime.desc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.ctime.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.ctime.asc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.ctime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.ctime.desc')),
-    // v22-R5：在 Files (pane2) 增加「Dual Pane ✓」出口按鈕，點擊可直接退回 Tree 模式
+    // v22-R6（使用者指示）：在 Files (pane2) 增加「Dual Pane」成對命令（未勾選召回 Spaces，已勾選退回 Tree）
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.mode.dual', async () => {
+      await showPane('pane1');
+      if (viewState.getMode() !== 'dual') {
+        await viewState.setMode('dual');
+        syncPaneViews();
+        await syncPaneContexts();
+        await syncContext();
+      }
+      await syncDualVisibilityContext();
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.mode.dual.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree')),
     // v22-R5（使用者指示）：Toggle View Mode 支援三態循環（Explorer -> File List -> Nested File List）
     vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleViewMode', async () => {
@@ -1723,6 +1765,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         title: titleResult.displayName,
         hint: titleResult.hint,
         nested: isPane2Nested(effectiveView(pane)),
+        visible: Boolean(paneRuntime.get(id)?.treeView.visible),
       };
     }),
     getContainerHint: () => {

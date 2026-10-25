@@ -10,6 +10,7 @@ All notable changes to Folder Spaces are documented in this file.
 
 ### Added
 
+- Added paired `Dual Pane` and `Dual Pane ✓` on both Spaces and Files panes, synchronizing directly with UI visibility: if either pane is hidden from the container menu, the remaining pane shows an unchecked `Dual Pane` action that immediately unhides and restores the missing pane.
 - Added `codeFolderSpaces.pane2.toggleViewMode` on Pane 2's title bar, cycling across three view modes: **Explorer** (default in Dual mode, lazy-loaded tree with in-place drill-down and leaf folder icons), **File List** (flat first-level files), and **Nested File List** (flat recursive files).
 - Added `codeFolderSpaces.pane2.mode.dual.checked` on Pane 2's menu as an exit button to easily return to Tree mode if Pane 1 is hidden.
 - Added automatic sync on Pane 2 visibility: hiding/closing Pane 2 automatically closes Dual mode and restores Pane 1 to the standard Explorer view.

@@ -86,7 +86,7 @@ Pane-specific actions live in each pane's title bar, submenus and context menus,
 - **Toggle View Mode** (pane2 title bar: Explorer / File List / Nested File List)
 - **Mark as Global** / **Unmark Global** (space-root context menu)
 
-The full manifest currently contributes 85 commands.
+The full manifest currently contributes 86 commands.
 
 ## Breaking changes from v1.x
 

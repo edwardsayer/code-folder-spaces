@@ -162,7 +162,7 @@ if (!pkg) {
   if ([...contributedCommands].some((id) => id.startsWith('codeFolderSpaces.pane1.'))) {
     const paneCommandContract = {
       1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'addRoot', 'mode.tree', 'mode.dual', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc', 'workspaceFolders'],
-      2: ['filter', 'clearFilter', 'drillUp', 'refresh', 'root.add', 'root.remove', 'toggleNested', 'toggleViewMode', 'viewMode.explorer', 'viewMode.fileList', 'viewMode.nestedFileList', 'mode.dual.checked', 'close', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc'],
+      2: ['filter', 'clearFilter', 'drillUp', 'refresh', 'root.add', 'root.remove', 'toggleNested', 'toggleViewMode', 'viewMode.explorer', 'viewMode.fileList', 'viewMode.nestedFileList', 'mode.dual', 'close', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc'],
     };
     const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
@@ -170,14 +170,14 @@ if (!pkg) {
     const paneTitleContract = {
       // v22-R2（C3）：pane1.activateChild（無節點版）已移除，pane2 root 只由 cascade 或 activateChildNode 設定。
       1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'addRoot', 'refresh', 'workspaceFolders'],
-      2: ['filter', 'clearFilter', 'drillUp', 'viewMode.explorer', 'viewMode.fileList', 'viewMode.nestedFileList', 'mode.dual.checked', 'refresh', 'close'],
+      2: ['filter', 'clearFilter', 'drillUp', 'viewMode.explorer', 'viewMode.fileList', 'viewMode.nestedFileList', 'refresh', 'close'],
     };
     // v2-R6（使用者）：移除 pane1.more 這一層 submenu，其項目直接掛進「...」下拉。
     // v2.1（使用者）：pane2 不再有 View 子選單，Toggle Nested Files 直接放進 view/title；
     // 子選單勾號改用「✓ 前綴 + 成對命令 + when」workaround（extension menus 無勾號屬性）。
     const expectedSubmenus = ['codeFolderSpaces.pane1.sort', 'codeFolderSpaces.pane2.sort'];
-    // 使用者：View 子選單取消，Dual Pane／Dual Pane ✓ 成對命令直接放進 pane1 view/title。
-    const statefulTitlePairs = { 1: ['mode.dual'] };
+    // 使用者：View 子選單取消，Dual Pane／Dual Pane ✓ 成對命令直接放進 view/title。
+    const statefulTitlePairs = { 1: ['mode.dual'], 2: ['mode.dual'] };
     const directTitleActions = ['workspaceFolders'];
     const submenus = new Set((pkg.contributes?.submenus ?? []).map(({ id }) => id));
     const referencedSubmenus = new Set(Object.values(pkg.contributes?.menus ?? {}).flatMap((items) =>
