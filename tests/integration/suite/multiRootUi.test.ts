@@ -239,8 +239,10 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     assert.ok(!commands.has('codeFolderSpaces.pane1.switchRoot'), 'pane1 不應再有 switchRoot（已移除）');
     assert.ok(commands.has('codeFolderSpaces.pane1.collapseAll'), 'pane1 應有 collapseAll 掛在 view/title');
     assert.ok(commands.has('codeFolderSpaces.pane1.expandAll'), 'pane1 應有 expandAll 掛在 view/title');
-    assert.ok(commands.has('codeFolderSpaces.pane2.collapseAll'), 'pane2 應有 collapseAll 掛在 view/title');
-    assert.ok(commands.has('codeFolderSpaces.pane2.expandAll'), 'pane2 應有 expandAll 掛在 view/title');
+    assert.ok(!commands.has('codeFolderSpaces.pane2.collapseAll'), 'pane2 不應有 collapseAll（已移除）');
+    assert.ok(!commands.has('codeFolderSpaces.pane2.expandAll'), 'pane2 不應有 expandAll（已移除）');
+    assert.ok(commands.has('codeFolderSpaces.pane2.toggleNested'), 'pane2 應有 toggleNested 掛在 view/title 標題列');
+    assert.ok(commands.has('codeFolderSpaces.pane2.toggleNested.checked'), 'pane2 應有 toggleNested.checked 掛在 view/title 標題列');
     assert.ok(!submenus.has('codeFolderSpaces.pane2.more'), 'pane2 不應有 more submenu');
     assert.ok(submenus.has('codeFolderSpaces.pane2.sort'), 'pane2 應有原生 sort submenu 掛在 view/title');
   });

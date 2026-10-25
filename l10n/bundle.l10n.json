@@ -62,7 +62,7 @@
   "Folder Spaces supports at most 8 folder space slots.": "Folder Spaces supports at most 8 folder space slots.",
   "Folder is already in this folder space.": "Folder is already in this folder space.",
   "A folder space needs at least one folder. Use Close Folder Space instead.": "A folder space needs at least one folder. Use Close Folder Space instead.",
-  "Folder Space 1 cannot be closed.": "Folder Space 1 cannot be closed.",
+  "Spaces cannot be closed.": "Spaces cannot be closed.",
   "Align Click Behavior": "Align Click Behavior",
   "This is a window-level setting and affects all trees in this window, including the built-in File Explorer.": "This is a window-level setting and affects all trees in this window, including the built-in File Explorer.",
   "Click behavior was not changed.": "Click behavior was not changed.",

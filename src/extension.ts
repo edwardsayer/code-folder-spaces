@@ -1200,7 +1200,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   const closePane = async (paneId = 'pane2'): Promise<void> => {
     if (paneId === 'pane1') {
-      void vscode.window.showInformationMessage(vscode.l10n.t('Folder Space 1 cannot be closed.'));
+      void vscode.window.showInformationMessage(vscode.l10n.t('Spaces cannot be closed.'));
       return;
     }
     await viewState.setMode('tree');
@@ -1540,8 +1540,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
           const root = typeof candidate?.rootPath === 'string' ? candidate.rootPath : undefined;
           return removeRootForPane(nodePaneId, root);
         })),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.collapseAll`, paneCommand(() => collapseAllForPane(id))),
-        vscode.commands.registerCommand(`codeFolderSpaces.${id}.expandAll`, paneCommand(() => expandAllForPane(id))),
+        ...(id === 'pane1' ? [
+          vscode.commands.registerCommand(`codeFolderSpaces.pane1.collapseAll`, paneCommand(() => collapseAllForPane('pane1'))),
+          vscode.commands.registerCommand(`codeFolderSpaces.pane1.expandAll`, paneCommand(() => expandAllForPane('pane1'))),
+        ] : []),
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.refresh`, paneCommand(() => repaintPane(id))),
         // S4.1：行內按鈕以 pane 專屬 id 路由（D47），各 pane 一致。
         vscode.commands.registerCommand(`codeFolderSpaces.${id}.filter`, paneCommand(() => filterForPane(id))),

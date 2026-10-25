@@ -162,7 +162,7 @@ if (!pkg) {
   if ([...contributedCommands].some((id) => id.startsWith('codeFolderSpaces.pane1.'))) {
     const paneCommandContract = {
       1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'addRoot', 'mode.tree', 'mode.dual', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc', 'workspaceFolders', 'resetLayout'],
-      2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'toggleNested', 'close', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc'],
+      2: ['filter', 'clearFilter', 'drillUp', 'refresh', 'root.add', 'root.remove', 'toggleNested', 'close', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc'],
     };
     const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
     const titleItems = pkg.contributes?.menus?.['view/title'] ?? [];
@@ -170,7 +170,7 @@ if (!pkg) {
     const paneTitleContract = {
       // v22-R2（C3）：pane1.activateChild（無節點版）已移除，pane2 root 只由 cascade 或 activateChildNode 設定。
       1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'addRoot', 'refresh', 'workspaceFolders', 'resetLayout'],
-      2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'toggleNested', 'close'],
+      2: ['filter', 'clearFilter', 'drillUp', 'refresh', 'toggleNested', 'close'],
     };
     // v2-R6（使用者）：移除 pane1.more 這一層 submenu，其項目直接掛進「...」下拉。
     // v2.1（使用者）：pane2 不再有 View 子選單，Toggle Nested Files 直接放進 view/title；

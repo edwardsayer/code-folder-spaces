@@ -10,6 +10,11 @@ All notable changes to Folder Spaces are documented in this file.
 
 ### Changed
 
+- Renamed the two pane views from "Folder Space 1" and "Folder Space 2" to **Spaces** and **Files** in both English and Traditional Chinese localizations.
+- Promoted **Toggle Nested Files** (`codeFolderSpaces.pane2.toggleNested`) to a title-bar action button on Pane 2 (`navigation@2`), equipped with paired `$(list-flat)` and `$(list-tree)` icons.
+- Removed Pane 2's **Collapse All** and **Expand All** commands (`codeFolderSpaces.pane2.collapseAll` / `.expandAll`), as Pane 2 presents a flat file listing. Total contributed commands is now 81.
+- Renamed Pane 2's **Close Space** action to **Close Pane** (`Close Pane` / `關閉窗格`).
+- Removed **Drill Into Folder** from the treeview item context menu (`view/item/context`), keeping only the row inline button to avoid redundant context-menu clutter.
 - Refined the extension icon (`assets/icon.svg`, `assets/icon.png`): changed the purple badge stroke to a clean white outline (Scheme A) for seamless contrast on both light and dark themes, adjusted the front folder crease line to be brighter, bolder and positioned at ~1/3 below the folder border towards the badge, and added a matching subtle crease line on the back golden folder.
 - Fixed: **Collapse All** now reliably collapses all roots and nested folders in multi-root setups by focusing the TreeView and collapsing all roots unconditionally regardless of item selection.
 - Removed the pane1 **View** submenu and the `pane1.mode.tree.checked` command. **Dual Pane** / **Dual Pane ✓** are now a state-paired menu item directly in the pane1 title menu; clicking the checked item returns to Tree mode.

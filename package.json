@@ -279,16 +279,6 @@
         "icon": "$(expand-all)"
       },
       {
-        "command": "codeFolderSpaces.pane2.collapseAll",
-        "title": "%command.paneAction.collapseAll.title%",
-        "icon": "$(collapse-all)"
-      },
-      {
-        "command": "codeFolderSpaces.pane2.expandAll",
-        "title": "%command.paneAction.expandAll.title%",
-        "icon": "$(expand-all)"
-      },
-      {
         "command": "codeFolderSpaces.pane1.filter",
         "title": "%command.filter.title%",
         "icon": "$(filter)",
@@ -338,7 +328,8 @@
       },
       {
         "command": "codeFolderSpaces.pane2.toggleNested",
-        "title": "%command.pane2.toggleNested.title%"
+        "title": "%command.pane2.toggleNested.title%",
+        "icon": "$(list-flat)"
       },
 
       {
@@ -403,7 +394,8 @@
       },
       {
         "command": "codeFolderSpaces.pane2.toggleNested.checked",
-        "title": "%command.pane2.toggleNested.checked.title%"
+        "title": "%command.pane2.toggleNested.checked.title%",
+        "icon": "$(list-tree)"
       },
       {
         "command": "codeFolderSpaces.pane2.sort.name.asc",
@@ -892,14 +884,6 @@
           "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane2.collapseAll",
-          "when": "false"
-        },
-        {
-          "command": "codeFolderSpaces.pane2.expandAll",
-          "when": "false"
-        },
-        {
           "command": "codeFolderSpaces.pane1.filter",
           "when": "false"
         },
@@ -1133,13 +1117,13 @@
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane2.collapseAll",
-          "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.collapsed",
+          "command": "codeFolderSpaces.pane2.toggleNested",
+          "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.nested",
           "group": "navigation@2"
         },
         {
-          "command": "codeFolderSpaces.pane2.expandAll",
-          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.collapsed",
+          "command": "codeFolderSpaces.pane2.toggleNested.checked",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.nested",
           "group": "navigation@2"
         },
         {
@@ -1181,16 +1165,6 @@
           "command": "codeFolderSpaces.pane1.resetLayout",
           "when": "view == codeFolderSpaces.pane1",
           "group": "4_actions@3"
-        },
-        {
-          "command": "codeFolderSpaces.pane2.toggleNested",
-          "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.nested",
-          "group": "3_view@1"
-        },
-        {
-          "command": "codeFolderSpaces.pane2.toggleNested.checked",
-          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.nested",
-          "group": "3_view@1"
         }
       ],
       "view/item/context": [
@@ -1223,11 +1197,6 @@
           "command": "codeFolderSpaces.pane2.root.remove",
           "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.canRemoveRoot && viewItem =~ /^codeFolderSpaces\\.spaceRoot/",
           "group": "inline@1"
-        },
-        {
-          "command": "codeFolderSpaces.drillDown",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem =~ /^codeFolderSpaces\\.spaceRoot/)",
-          "group": "1_modification@0"
         },
         {
           "command": "codeFolderSpaces.root.markAsGlobal",
