@@ -129,7 +129,8 @@ node tools/vscode-debug.mjs close
 - **VS Code 設定 key 父子遮蔽**：設定 key `a.b` 可能影響 `a.b.c` 的讀取。舊 `codeFolderSpaces.spaces` 曾遮蔽 `codeFolderSpaces.spaces.workspace`／`.global`；舊 key 必須在 activate 時主動清除，不能只從 manifest 移除。
 - **Switch Root 已移除（v22-R1）**：`codeFolderSpaces.switchRoot`／`codeFolderSpaces.pane1.switchRoot` 命令、選單與 `check-project.mjs` 的 `paneCommandContract` 條目均已刪除，**勿復活**。`LayoutStore.switchRoot()` 仍是內部 API（pane cascade 與測試使用），被移除的只是使用者可見命令。root 的變更途徑只剩 Add Folder to Space…／Remove Root／Drill Into Folder／cascade／Activate Child Space。
 - **Add Folder to Space… 是單一 QuickPick（v22-R1）**：清單來自 `collectCandidateFolders()`（非 global root 的父層＋最近開啟資料夾，**不含** workspace／專案子目錄），尾端固定 `Browse for folder…`；**也接受直接輸入路徑**（`~` 展開、`path.resolve` 正規化、非目錄時報錯）。`_workbench.getRecentlyOpened` 為非公開命令，失敗時靜默略過、不得中斷流程。
-- **pane1 的 Collapse All／Expand Level（v22-R1）**：`Expand Level` 在**未選取 root 時對所有 root 各展開一層**、選取 root 時只展開該 root；`isOpen` 判定為「無 `id` 視為已展開」，否則無 id 節點會被無限重複展開。`Collapse All` 同樣尊重選取。無 root／無 scope 時**不得**送出 `list.collapseAll`（該命令作用於目前焦點清單，會誤傷其他視圖）。
+- **Collapse All／Expand Level（v22-R1，v22-R3 修訂）**：`Expand Level` 在**未選取 root 時對所有 root 各展開一層**、選取 root 時只展開該 root；`isOpen` 判定為「無 `id` 視為已展開」，否則無 id 節點會被無限重複展開。`Collapse All` 於 v22-R3 修訂為**多 root 情況下一律全數收合所有 root**（不再因選中個別 root 而只收合該 root），並確保 TreeView 獲取焦點以穩定執行 `list.collapseAll`。無 root／無 scope 時**不得**送出 `list.collapseAll`。
+- **pane2 排序（v22-R3）**：pane2 擁有與 pane1 對稱的原生 **Sort** 子選單與 12 個成對命令（`codeFolderSpaces.pane2.sort.*`），各自獨立記憶與套用排序狀態。
 - **`.code-workspace` 節點（v22-R1）**：`contextValue = codeFolderSpaces.file.code-workspace`（副檔名比對大小寫不敏感），提供 `openWorkspace`／`openWorkspaceInNewWindow` 兩個 inline 動作（皆委派 `vscode.openFolder`）。檔案操作類 `when` 已納入此 contextValue，且**必須保留 `isWorkspaceTrusted`**（`capabilities.untrustedWorkspaces` 承諾 restricted 模式停用磁碟修改）。
 - **TreeItem.description 不解析 codicon**：例如 `$(globe)` 會以原字串呈現；需要標記時使用 Unicode 字元。
 - **QuickPickItem 沒有 `disabled` 屬性**：不可選項應從 QuickPick items 直接排除。

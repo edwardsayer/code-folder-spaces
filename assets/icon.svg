@@ -28,14 +28,16 @@
   <g transform="translate(64, 64) scale(1.28) translate(-68, -67.5)" filter="url(#folderShadow)">
     <!-- Back folder (Multi-space representation) -->
     <path d="M34 26a5 5 0 0 1 5-5h19l7 8h32a5 5 0 0 1 5 5v16H34z" fill="url(#backGrad)" opacity="0.95" />
+    <!-- Back folder subtle crease line -->
+    <path d="M34 34.5h67" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.4" />
 
     <!-- Front solid folder -->
     <path d="M22 42a6 6 0 0 1 6-6h21l8 9h45a6 6 0 0 1 6 6v48a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6z" fill="url(#folderGrad)" />
-    <!-- Folder front pocket crease line -->
-    <path d="M22 51h86" stroke="#ffffff" stroke-opacity="0.25" stroke-width="1.5" />
+    <!-- Folder front pocket crease line (slightly lower, brighter and bolder) -->
+    <path d="M22 56.5h86" stroke="#ffffff" stroke-opacity="0.45" stroke-width="2.2" />
 
-    <!-- Badge: Solid Obsidian Purple Circle with crisp dark outline -->
-    <circle cx="88" cy="88" r="24.5" fill="url(#badgeGrad)" stroke="#121418" stroke-width="4.5" />
+    <!-- Badge: Solid Obsidian Purple Circle with crisp white outline (Scheme A) -->
+    <circle cx="88" cy="88" r="24.5" fill="url(#badgeGrad)" stroke="#ffffff" stroke-width="3.2" />
 
     <!-- Remote Explorer Opposing Chevrons in crisp white -->
     <g transform="translate(88, 88) scale(3.55556) translate(-17.25, -17.8177)" fill="#ffffff">

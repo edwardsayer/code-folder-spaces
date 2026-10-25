@@ -4,8 +4,14 @@ All notable changes to Folder Spaces are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added `codeFolderSpaces.pane2.sort.*` commands and a native **Sort** submenu to pane2 with paired checkmark items (matching pane1's sort capabilities). The total contributed command count is now 83.
+
 ### Changed
 
+- Refined the extension icon (`assets/icon.svg`, `assets/icon.png`): changed the purple badge stroke to a clean white outline (Scheme A) for seamless contrast on both light and dark themes, adjusted the front folder crease line to be brighter, bolder and positioned at ~1/3 below the folder border towards the badge, and added a matching subtle crease line on the back golden folder.
+- Fixed: **Collapse All** now reliably collapses all roots and nested folders in multi-root setups by focusing the TreeView and collapsing all roots unconditionally regardless of item selection.
 - Removed the pane1 **View** submenu and the `pane1.mode.tree.checked` command. **Dual Pane** / **Dual Pane ✓** are now a state-paired menu item directly in the pane1 title menu; clicking the checked item returns to Tree mode.
 - Added a new extension icon (`assets/icon.png`, source `assets/icon.svg`) and a codicon-style single-color Activity Bar icon (`assets/spaces.svg`).
 - Removed **Switch Root…** (`codeFolderSpaces.switchRoot` / `codeFolderSpaces.pane1.switchRoot`). Pane roots are changed by **Add Folder to Space…**, **Drill Into Folder**, the pane cascade, or **Activate Child Space**.

@@ -239,7 +239,10 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     assert.ok(!commands.has('codeFolderSpaces.pane1.switchRoot'), 'pane1 不應再有 switchRoot（已移除）');
     assert.ok(commands.has('codeFolderSpaces.pane1.collapseAll'), 'pane1 應有 collapseAll 掛在 view/title');
     assert.ok(commands.has('codeFolderSpaces.pane1.expandAll'), 'pane1 應有 expandAll 掛在 view/title');
+    assert.ok(commands.has('codeFolderSpaces.pane2.collapseAll'), 'pane2 應有 collapseAll 掛在 view/title');
+    assert.ok(commands.has('codeFolderSpaces.pane2.expandAll'), 'pane2 應有 expandAll 掛在 view/title');
     assert.ok(!submenus.has('codeFolderSpaces.pane2.more'), 'pane2 不應有 more submenu');
+    assert.ok(submenus.has('codeFolderSpaces.pane2.sort'), 'pane2 應有原生 sort submenu 掛在 view/title');
   });
 
   test('live 命令 pane2.root.remove 只操作 pane2（P1-1：不得錯路由到 pane1）', async () => {

@@ -406,6 +406,54 @@
         "title": "%command.pane2.toggleNested.checked.title%"
       },
       {
+        "command": "codeFolderSpaces.pane2.sort.name.asc",
+        "title": "%command.paneAction.sort.name.asc.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.name.desc",
+        "title": "%command.paneAction.sort.name.desc.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.mtime.asc",
+        "title": "%command.paneAction.sort.mtime.asc.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.mtime.desc",
+        "title": "%command.paneAction.sort.mtime.desc.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.ctime.asc",
+        "title": "%command.paneAction.sort.ctime.asc.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.ctime.desc",
+        "title": "%command.paneAction.sort.ctime.desc.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.name.asc.checked",
+        "title": "%command.paneAction.sort.name.asc.checked.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.name.desc.checked",
+        "title": "%command.paneAction.sort.name.desc.checked.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.mtime.asc.checked",
+        "title": "%command.paneAction.sort.mtime.asc.checked.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.mtime.desc.checked",
+        "title": "%command.paneAction.sort.mtime.desc.checked.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.ctime.asc.checked",
+        "title": "%command.paneAction.sort.ctime.asc.checked.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.sort.ctime.desc.checked",
+        "title": "%command.paneAction.sort.ctime.desc.checked.title%"
+      },
+      {
         "command": "codeFolderSpaces.openWorkspace",
         "title": "%command.openWorkspace.title%",
         "icon": "$(root-folder)",
@@ -973,6 +1021,54 @@
           "when": "false"
         },
         {
+          "command": "codeFolderSpaces.pane2.sort.name.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.asc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.desc",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.asc.checked",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.desc.checked",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.asc.checked",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.desc.checked",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.asc.checked",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.desc.checked",
+          "when": "false"
+        },
+        {
           "command": "codeFolderSpaces.activateChildNode",
           "when": "false"
         },
@@ -1069,6 +1165,11 @@
         {
           "submenu": "codeFolderSpaces.pane1.sort",
           "when": "view == codeFolderSpaces.pane1",
+          "group": "2_sort@1"
+        },
+        {
+          "submenu": "codeFolderSpaces.pane2.sort",
+          "when": "view == codeFolderSpaces.pane2",
           "group": "2_sort@1"
         },
         {
@@ -1267,6 +1368,68 @@
           "group": "navigation@6",
           "when": "codeFolderSpaces.pane1.sort == 'ctime:desc'"
         }
+      ],
+      "codeFolderSpaces.pane2.sort": [
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.asc",
+          "group": "navigation@1",
+          "when": "codeFolderSpaces.pane2.sort != 'name:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.asc.checked",
+          "group": "navigation@1",
+          "when": "codeFolderSpaces.pane2.sort == 'name:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.desc",
+          "group": "navigation@2",
+          "when": "codeFolderSpaces.pane2.sort != 'name:desc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.name.desc.checked",
+          "group": "navigation@2",
+          "when": "codeFolderSpaces.pane2.sort == 'name:desc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.asc",
+          "group": "navigation@3",
+          "when": "codeFolderSpaces.pane2.sort != 'mtime:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.asc.checked",
+          "group": "navigation@3",
+          "when": "codeFolderSpaces.pane2.sort == 'mtime:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.desc",
+          "group": "navigation@4",
+          "when": "codeFolderSpaces.pane2.sort != 'mtime:desc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.mtime.desc.checked",
+          "group": "navigation@4",
+          "when": "codeFolderSpaces.pane2.sort == 'mtime:desc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.asc",
+          "group": "navigation@5",
+          "when": "codeFolderSpaces.pane2.sort != 'ctime:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.asc.checked",
+          "group": "navigation@5",
+          "when": "codeFolderSpaces.pane2.sort == 'ctime:asc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.desc",
+          "group": "navigation@6",
+          "when": "codeFolderSpaces.pane2.sort != 'ctime:desc'"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.sort.ctime.desc.checked",
+          "group": "navigation@6",
+          "when": "codeFolderSpaces.pane2.sort == 'ctime:desc'"
+        }
       ]
     },
     "configuration": {
@@ -1441,6 +1604,10 @@
       {
         "id": "codeFolderSpaces.pane1.sort",
         "label": "%submenu.pane1.sort%"
+      },
+      {
+        "id": "codeFolderSpaces.pane2.sort",
+        "label": "%submenu.pane2.sort%"
       }
     ]
   },
@@ -1454,6 +1621,7 @@
     "test:unit:watch": "vitest",
     "package:vsix": "node esbuild.mjs --production && vsce package --no-rewrite-relative-links --allow-missing-repository",
     "check:project": "node scripts/check-project.mjs",
+    "render:icon": "node scripts/render-icon.mjs",
     "check": "npm run typecheck && npm run test:unit && npm run build && npm run check:project && node scripts/check-command-parity.mjs"
   },
   "devDependencies": {

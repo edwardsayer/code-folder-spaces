@@ -70,6 +70,7 @@
   "command.root.unmarkGlobal.title": "取消全域標記",
   "command.pane1.addRoot.title": "新增資料夾到空間...",
   "submenu.pane1.sort": "排序",
+  "submenu.pane2.sort": "排序",
   "command.pane1.mode.tree.title": "檢視：樹狀",
   "command.pane1.mode.dual.title": "雙窗格",
   "command.pane2.toggleNested.title": "切換巢狀檔案",

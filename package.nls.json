@@ -70,6 +70,7 @@
   "command.root.unmarkGlobal.title": "Unmark Global",
   "command.pane1.addRoot.title": "Add Folder to Space...",
   "submenu.pane1.sort": "Sort",
+  "submenu.pane2.sort": "Sort",
   "command.pane1.mode.tree.title": "View: Tree",
   "command.pane1.mode.dual.title": "Dual Pane",
   "command.pane2.toggleNested.title": "Toggle Nested Files",

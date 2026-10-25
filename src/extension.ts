@@ -1243,15 +1243,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     const roots = (await runtime.provider.getChildren()) as Array<SpaceRootNode | SpaceEntryNode>;
     if (roots.length === 0) return;
 
-    const selection = runtime.treeView.selection[0];
-    const targetRoots = (selection && isRootNode(selection))
-      ? [selection as SpaceRootNode | SpaceEntryNode]
-      : roots;
-
-    for (const root of targetRoots) {
-      await runtime.treeView.reveal(root, { select: false, focus: false, expand: false });
-      await vscode.commands.executeCommand('list.collapseAll');
-    }
+    // 將焦點帶入該 TreeView 的第一個 root，確保 VS Code 內建 list.collapseAll 穩定作用於當前 TreeView
+    // （若有 multiroot，每個 root 及其子資料夾皆一鍵全數收合）
+    await runtime.treeView.reveal(roots[0], { select: false, focus: true, expand: false });
+    await vscode.commands.executeCommand('list.collapseAll');
 
     expandedSet(paneId).clear();
     collapsedPanes.add(paneId);
@@ -1374,9 +1369,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await syncContext();
   };
 
-  const setPane1Sort = async (key: 'name' | 'mtime' | 'ctime', direction: 'asc' | 'desc'): Promise<void> => {
-    await viewState.setSort('pane1', key, direction);
-    repaintPane('pane1');
+  const setPaneSort = async (paneId: string, key: 'name' | 'mtime' | 'ctime', direction: 'asc' | 'desc'): Promise<void> => {
+    await viewState.setSort(paneId, key, direction);
+    repaintPane(paneId);
     await syncContext();
   };
 
@@ -1413,12 +1408,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       repaintPane('pane2');
       await syncContext();
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.asc', () => setPane1Sort('name', 'asc')),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.desc', () => setPane1Sort('name', 'desc')),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.asc', () => setPane1Sort('mtime', 'asc')),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.desc', () => setPane1Sort('mtime', 'desc')),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.asc', () => setPane1Sort('ctime', 'asc')),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.desc', () => setPane1Sort('ctime', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.asc', () => setPaneSort('pane1', 'name', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.desc', () => setPaneSort('pane1', 'name', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.asc', () => setPaneSort('pane1', 'mtime', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.desc', () => setPaneSort('pane1', 'mtime', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.asc', () => setPaneSort('pane1', 'ctime', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.desc', () => setPaneSort('pane1', 'ctime', 'desc')),
     // v2.1（使用者）：VS Code 的 extension menus 不提供子選單勾號，改用「已選項目顯示 ✓ 前綴」的成對命令。
     // `.checked` 變體只負責顯示（由 when 控制何時可見），執行時轉回原命令，行為完全相同。
     // 以字面 id 逐一註冊（命令 parity 檢查為靜態掃描，動態組字串不會被辨識）。
@@ -1430,6 +1425,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.mtime.desc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.ctime.asc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.ctime.desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.name.asc', () => setPaneSort('pane2', 'name', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.name.desc', () => setPaneSort('pane2', 'name', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.mtime.asc', () => setPaneSort('pane2', 'mtime', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.mtime.desc', () => setPaneSort('pane2', 'mtime', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.ctime.asc', () => setPaneSort('pane2', 'ctime', 'asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.ctime.desc', () => setPaneSort('pane2', 'ctime', 'desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.name.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.name.asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.name.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.name.desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.mtime.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.mtime.asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.mtime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.mtime.desc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.ctime.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.ctime.asc')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.ctime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.ctime.desc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleNested')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.workspaceFolders', () => toggleWorkspaceRoots()),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.resetLayout', () => vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout')),
