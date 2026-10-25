@@ -8,8 +8,16 @@ All notable changes to Folder Spaces are documented in this file.
 
 - Added `codeFolderSpaces.pane2.sort.*` commands and a native **Sort** submenu to pane2 with paired checkmark items (matching pane1's sort capabilities). The total contributed command count is now 83.
 
+### Added
+
+- Added `codeFolderSpaces.pane2.toggleViewMode` on Pane 2's title bar, cycling across three view modes: **Explorer** (default in Dual mode, lazy-loaded tree with in-place drill-down and leaf folder icons), **File List** (flat first-level files), and **Nested File List** (flat recursive files).
+- Added `codeFolderSpaces.pane2.mode.dual.checked` on Pane 2's menu as an exit button to easily return to Tree mode if Pane 1 is hidden.
+- Added automatic sync on Pane 2 visibility: hiding/closing Pane 2 automatically closes Dual mode and restores Pane 1 to the standard Explorer view.
+
 ### Changed
 
+- Changed Pane 2's default preset in Dual mode to **Explorer** (eliminating empty-pane perception when a directory only contains subfolders and avoiding recursive listing lag on large workspaces).
+- Removed **Reset Pane Layout** from user-facing views and menus (superseded by Dual Pane and Refresh controls). Total contributed commands is now 85.
 - Renamed the two pane views from "Folder Space 1" and "Folder Space 2" to **Spaces** and **Files** in both English and Traditional Chinese localizations.
 - Promoted **Toggle Nested Files** (`codeFolderSpaces.pane2.toggleNested`) to a title-bar action button on Pane 2 (`navigation@2`), equipped with paired `$(list-flat)` and `$(list-tree)` icons.
 - Removed Pane 2's **Collapse All** and **Expand All** commands (`codeFolderSpaces.pane2.collapseAll` / `.expandAll`), as Pane 2 presents a flat file listing. Total contributed commands is now 81.

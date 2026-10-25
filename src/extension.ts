@@ -11,7 +11,7 @@ import { computePaneTitleAndHint } from './spaces/paneTitle';
 import { legacyGlobalRootsExists, readLegacyGlobalRoots, resolveLegacyGlobalRootsPath, retireLegacyGlobalRoots } from './spaces/legacyGlobalRoots';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
-import { VIEW_PRESETS, isPane2Nested, isViewPresetName, matchPresetName, togglePane2Nested, DEFAULT_SINGLE_PANE_PRESET, DEFAULT_DUAL_PANE1_PRESET, DEFAULT_DUAL_PANE2_PRESET, type ViewPresetName } from './spaces/viewPresets';
+import { VIEW_PRESETS, isPane2Nested, isViewPresetName, matchPresetName, cyclePane2ViewMode, getPane2ViewMode, DEFAULT_SINGLE_PANE_PRESET, DEFAULT_DUAL_PANE1_PRESET, DEFAULT_DUAL_PANE2_PRESET, type ViewPresetName } from './spaces/viewPresets';
 import { collectCandidateFolders } from './spaces/folderCandidates';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
 import { isDrillDownNoop, isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
@@ -398,7 +398,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       }),
     );
     // active-file follow 跟「主 pane」（最低編號啟用窗格，S4.1R3-D：pane1 可關閉）；每個 pane 的可見性變化都重新排程。
-    runtime.disposables.push(treeView.onDidChangeVisibility(scheduleFollow));
+    // v22-R5（使用者指示）：若處於 dual 模式且使用者手動隱藏/關閉 Files (pane2)，自動切回 tree 模式（Spaces 自動還原 Explorer）
+    runtime.disposables.push(treeView.onDidChangeVisibility(event => {
+      scheduleFollow();
+      if (paneId === 'pane2' && !event.visible && viewState.getMode() === 'dual') {
+        void closePane('pane2');
+      }
+    }));
     context.subscriptions.push(new vscode.Disposable(() => { for (const disposable of runtime.disposables) disposable.dispose(); }));
     paneRuntime.set(paneId, runtime);
     return runtime;
@@ -767,6 +773,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.content`, state ? effectiveView(state).content : '');
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.sort`, state ? `${state.sort.key}:${state.sort.direction}` : '');
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.nested`, Boolean(state && isPane2Nested(effectiveView(state))));
+      if (id === 'pane2') {
+        const view = state ? effectiveView(state) : VIEW_PRESETS.Explorer;
+        await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.pane2.viewMode', getPane2ViewMode(view));
+      }
     }
   };
 
@@ -1401,13 +1411,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       if (!info?.isDirectory || info.paneId !== 'pane1') return;
       await activateChildSpace(info.uri.fsPath);
     }),
-    vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested', async () => {
-      // v2.1（使用者）：兩種狀態都是 flat——未勾選＝第 1 層檔案清單（List），已勾選＝所有層級檔案（Files）。
-      const view = effectiveView(viewState.get('pane2'));
-      await viewState.setView('pane2', togglePane2Nested(view));
-      repaintPane('pane2');
-      await syncContext();
-    }),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.asc', () => setPaneSort('pane1', 'name', 'asc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.desc', () => setPaneSort('pane1', 'name', 'desc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.asc', () => setPaneSort('pane1', 'mtime', 'asc')),
@@ -1437,9 +1440,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.mtime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.mtime.desc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.ctime.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.ctime.asc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.sort.ctime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.sort.ctime.desc')),
-    vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleNested')),
+    // v22-R5：在 Files (pane2) 增加「Dual Pane ✓」出口按鈕，點擊可直接退回 Tree 模式
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.mode.dual.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree')),
+    // v22-R5（使用者指示）：Toggle View Mode 支援三態循環（Explorer -> File List -> Nested File List）
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleViewMode', async () => {
+      const current = effectiveView(viewState.get('pane2'));
+      await viewState.setView('pane2', cyclePane2ViewMode(current));
+      repaintPane('pane2');
+      await syncContext();
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.viewMode.explorer', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleViewMode')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.viewMode.fileList', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleViewMode')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.viewMode.nestedFileList', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleViewMode')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleViewMode')),
+    vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleViewMode')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.workspaceFolders', () => toggleWorkspaceRoots()),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.resetLayout', () => vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.addRoot', () => addRootForPane('pane1')),
     vscode.commands.registerCommand('codeFolderSpaces.focusMainPane', async () => {
       const runtime = paneRuntime.get(primaryPaneId());
@@ -1510,6 +1525,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       updatePaneTitles();
       await syncContext();
     }),
+    // 內部測試與自動化重設指令（不在 view/title 渲染，供測試 harness 使用）
     vscode.commands.registerCommand('codeFolderSpaces.pane.resetLayout', async () => {
       await viewState.resetToDefaults(paneInitContext());
       syncPaneViews();

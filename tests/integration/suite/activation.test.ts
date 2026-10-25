@@ -65,9 +65,10 @@ suite('擴充套件啟用', () => {
     // v22-R1（使用者）：pane1 加回 collapseAll / expandAll。
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.collapseAll'));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.expandAll'));
-    // v22-R4（使用者）：Toggle Nested Files 改為 pane2 標題列按鈕（navigation@2），成對切換。
-    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.toggleNested' && item.group === 'navigation@2'));
-    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.toggleNested.checked' && item.group === 'navigation@2'));
+    // v22-R5（使用者）：Toggle View Mode 擴充為三態，標題列按鈕（navigation@2）。
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.viewMode.explorer' && item.group === 'navigation@2'));
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.viewMode.fileList' && item.group === 'navigation@2'));
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.viewMode.nestedFileList' && item.group === 'navigation@2'));
     // v21-R5：pane1 每個資料夾列 always 顯示「Drill Into Folder」與「Activate Child Space」。
     assert.ok(commands.has('codeFolderSpaces.activateChildNode'), 'activateChildNode 必須註冊');
     const itemContext = (manifest.menus['view/item/context'] ?? []) as Array<{ command?: string; when?: string; group?: string }>;

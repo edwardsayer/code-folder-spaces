@@ -24,10 +24,10 @@ export const VIEW_PRESETS: Readonly<Record<ViewPresetName, ViewPreset>> = {
 export const DEFAULT_VIEW_PRESET: ViewPresetName = 'Explorer';
 export const DEFAULT_SINGLE_PANE_PRESET: ViewPresetName = 'Explorer';
 export const DEFAULT_DUAL_PANE1_PRESET: ViewPresetName = 'Navigate';
-export const DEFAULT_DUAL_PANE2_PRESET: ViewPresetName = 'List';
+export const DEFAULT_DUAL_PANE2_PRESET: ViewPresetName = 'Explorer';
 
 /**
- * pane2 的「巢狀檔案」切換（v2.1，使用者定義）。
+ * pane2 的「巢狀檔案」切換（v2.1，歷史相容）。
  * 兩種狀態都是 **flat 模式**，只差層級：
  *  - 未勾選（預設）：`List`＝flat／第 1 層／只列檔案；
  *  - 已勾選：`Files`＝flat／所有層級／只列檔案。
@@ -43,6 +43,29 @@ export function isPane2Nested(view: ViewSettings): boolean {
 /** pane2 的巢狀切換：只在兩個 flat 檢視之間互換，不回到 tree。 */
 export function togglePane2Nested(view: ViewSettings): ViewSettings {
   return isPane2Nested(view) ? { ...PANE2_NESTED_OFF } : { ...PANE2_NESTED_ON };
+}
+
+/** v22-R5（使用者指示）：pane2 支援三種檢視模式 */
+export type Pane2ViewMode = 'explorer' | 'fileList' | 'nestedFileList';
+
+/** 判斷 pane2 目前所屬的 View Mode（三態：Explorer、File List、Nested File List） */
+export function getPane2ViewMode(view: ViewSettings): Pane2ViewMode {
+  if (view.mode === 'tree') return 'explorer';
+  if (view.mode === 'flat' && view.level === 'all' && view.content === 'files') return 'nestedFileList';
+  return 'fileList';
+}
+
+/** 循環切換 pane2 的檢視模式：Explorer -> File List -> Nested File List -> Explorer */
+export function cyclePane2ViewMode(view: ViewSettings): ViewSettings {
+  const current = getPane2ViewMode(view);
+  switch (current) {
+    case 'explorer':
+      return { ...VIEW_PRESETS.List };
+    case 'fileList':
+      return { ...VIEW_PRESETS.Files };
+    case 'nestedFileList':
+      return { ...VIEW_PRESETS.Explorer };
+  }
 }
 
 export function isViewPresetName(value: unknown): value is ViewPresetName {

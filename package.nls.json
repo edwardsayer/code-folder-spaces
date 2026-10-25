@@ -83,5 +83,9 @@
   "command.paneAction.sort.ctime.asc.checked.title": "Created (Ascending) ✓",
   "command.paneAction.sort.ctime.desc.checked.title": "Created (Descending) ✓",
   "command.pane2.toggleNested.checked.title": "Toggle Nested Files ✓",
+  "command.pane2.toggleViewMode.title": "Toggle View Mode",
+  "command.pane2.viewMode.explorer.title": "View Mode: Explorer",
+  "command.pane2.viewMode.fileList.title": "View Mode: File List",
+  "command.pane2.viewMode.nestedFileList.title": "View Mode: Nested File List",
   "command.activateChildNode.title": "Activate Child Space"
 }

@@ -83,5 +83,9 @@
   "command.paneAction.sort.ctime.asc.checked.title": "建立時間（遞增）✓",
   "command.paneAction.sort.ctime.desc.checked.title": "建立時間（遞減）✓",
   "command.pane2.toggleNested.checked.title": "切換巢狀檔案 ✓",
+  "command.pane2.toggleViewMode.title": "切換檢視模式",
+  "command.pane2.viewMode.explorer.title": "檢視模式：總管",
+  "command.pane2.viewMode.fileList.title": "檢視模式：檔案清單",
+  "command.pane2.viewMode.nestedFileList.title": "檢視模式：巢狀檔案清單",
   "command.activateChildNode.title": "啟用子空間"
 }

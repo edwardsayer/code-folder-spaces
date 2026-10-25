@@ -81,12 +81,12 @@ Pane-specific actions live in each pane's title bar, submenus and context menus,
 - **Dual Pane** / **Dual Pane ✓** (pane1 menu; only one of the pair is shown depending on state; clicking toggles between Tree and Dual)
 - **Collapse All** / **Expand Level** (pane1 title bar; Expand Level reveals one more level of every root when nothing is selected, or one more level under the selected root)
 - **Filter by Path…** / **Clear Filter** / **Return to Parent**
-- **Refresh** / **Reset Pane Layout**
+- **Refresh**
 - **Open Workspace** / **Open Workspace in New Window** (inline buttons on `.code-workspace` rows in any pane)
-- **Toggle Nested Files** (pane2 title bar)
+- **Toggle View Mode** (pane2 title bar: Explorer / File List / Nested File List)
 - **Mark as Global** / **Unmark Global** (space-root context menu)
 
-The full manifest currently contributes 81 commands.
+The full manifest currently contributes 85 commands.
 
 ## Breaking changes from v1.x
 
@@ -95,7 +95,7 @@ Version 0.1.0 replaces the former multi-pane/preset model with fixed Tree and Du
 ## Known limitations
 
 - Pane1 cannot be closed; closing pane2 returns to Tree mode.
-- In Dual mode, pane2 is a flat file listing: by default only first-level files, and with **Toggle Nested Files** enabled the files of all levels (folders are not shown as rows).
+- In Dual mode, pane2 defaults to an in-place **Explorer** tree, and can cycle to **File List** (flat first-level files) or **Nested File List** (flat recursive files) via **Toggle View Mode**.
 - Workspace roots may be hidden, but are sourced from the current VS Code workspace.
 - Glob support includes `*`, `**`, `**/`, `?` and escaping; brace patterns and character classes are not supported. `src/**` does not match the `src` directory itself.
 - File nesting applies to sibling files in the same directory, with each file assigned to at most one parent. A path filter disables nesting.

@@ -81,12 +81,12 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 - **Dual Pane**／**Dual Pane ✓**（pane1 選單；依狀態擇一顯示，點擊在 Tree 與 Dual 間切換）
 - **Collapse All**／**Expand Level**（pane1 標題列；未選取時展開每個 root 的下一層，選取 root 時只展開該 root 的下一層）
 - **Filter by Path…**／**Clear Filter**／**Return to Parent**（過濾／清除／返回上層）
-- **Refresh**／**Reset Pane Layout**（重新整理／重設版面）
+- **Refresh**（重新整理）
 - **Open Workspace**／**Open Workspace in New Window**（任何 pane 的 `.code-workspace` 檔案列 inline 按鈕）
-- **Toggle Nested Files**（pane2 標題列）
+- **Toggle View Mode**（pane2 標題列：Explorer／File List／Nested File List 檢視模式循環）
 - **Mark as Global**／**Unmark Global**（空間根目錄右鍵選單）
 
-目前 manifest 共提供 81 個命令。
+目前 manifest 共提供 85 個命令。
 
 ## 與 v1.x 的重大變更
 
@@ -95,7 +95,7 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 ## 已知限制
 
 - pane1 不可關閉；關閉 pane2 會回到 Tree 模式。
-- Dual 模式中，pane2 是扁平的檔案清單：預設只列第一層檔案，啟用 **Toggle Nested Files** 後列出所有層級的檔案（不顯示資料夾列）。
+- Dual 模式中，pane2 預設為局部 **Explorer** 樹狀模式（支援就地下鑽與按需延遲載入），並可透過標題列 **Toggle View Mode** 按鈕循環切換為 **File List**（第一層檔案）或 **Nested File List**（所有層級檔案）。
 - 工作區根目錄可隱藏，但來源仍是目前 VS Code 工作區。
 - Glob 支援 `*`、`**`、`**/`、`?` 與跳脫字元；不支援 brace pattern 與字元類別。`src/**` 不匹配 `src` 目錄本身。
 - 檔案嵌套只比對同目錄兄弟檔，每個檔案最多指派給一個父項；啟用路徑過濾時會停用嵌套。

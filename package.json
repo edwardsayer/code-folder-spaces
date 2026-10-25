@@ -361,12 +361,32 @@
         "title": "%command.pane1.workspaceFolders.title%"
       },
       {
-        "command": "codeFolderSpaces.pane1.resetLayout",
-        "title": "%command.pane.resetLayout.title%"
-      },
-      {
         "command": "codeFolderSpaces.pane1.mode.dual.checked",
         "title": "%command.pane1.mode.dual.checked.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.mode.dual.checked",
+        "title": "%command.pane1.mode.dual.checked.title%"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.toggleViewMode",
+        "title": "%command.pane2.toggleViewMode.title%",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.viewMode.explorer",
+        "title": "%command.pane2.viewMode.explorer.title%",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.viewMode.fileList",
+        "title": "%command.pane2.viewMode.fileList.title%",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "codeFolderSpaces.pane2.viewMode.nestedFileList",
+        "title": "%command.pane2.viewMode.nestedFileList.title%",
+        "icon": "$(layers)"
       },
       {
         "command": "codeFolderSpaces.pane1.sort.name.asc.checked",
@@ -924,6 +944,10 @@
           "when": "false"
         },
         {
+          "command": "codeFolderSpaces.pane.resetLayout",
+          "when": "false"
+        },
+        {
           "command": "codeFolderSpaces.pane1.addRoot",
           "when": "false"
         },
@@ -969,11 +993,27 @@
           "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane1.resetLayout",
+          "command": "codeFolderSpaces.pane1.mode.dual.checked",
           "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane1.mode.dual.checked",
+          "command": "codeFolderSpaces.pane2.mode.dual.checked",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.toggleViewMode",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.viewMode.explorer",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.viewMode.fileList",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.viewMode.nestedFileList",
           "when": "false"
         },
         {
@@ -1117,13 +1157,18 @@
           "group": "navigation@1"
         },
         {
-          "command": "codeFolderSpaces.pane2.toggleNested",
-          "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.nested",
+          "command": "codeFolderSpaces.pane2.viewMode.explorer",
+          "when": "view == codeFolderSpaces.pane2 && (codeFolderSpaces.pane2.viewMode == 'explorer' || !codeFolderSpaces.pane2.viewMode)",
           "group": "navigation@2"
         },
         {
-          "command": "codeFolderSpaces.pane2.toggleNested.checked",
-          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.nested",
+          "command": "codeFolderSpaces.pane2.viewMode.fileList",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.viewMode == 'fileList'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane2.viewMode.nestedFileList",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.viewMode == 'nestedFileList'",
           "group": "navigation@2"
         },
         {
@@ -1147,6 +1192,11 @@
           "group": "1_view@1"
         },
         {
+          "command": "codeFolderSpaces.pane2.mode.dual.checked",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.mode == dual",
+          "group": "1_view@1"
+        },
+        {
           "submenu": "codeFolderSpaces.pane1.sort",
           "when": "view == codeFolderSpaces.pane1",
           "group": "2_sort@1"
@@ -1160,11 +1210,6 @@
           "command": "codeFolderSpaces.pane1.workspaceFolders",
           "when": "view == codeFolderSpaces.pane1",
           "group": "4_actions@1"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.resetLayout",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "4_actions@3"
         }
       ],
       "view/item/context": [
@@ -1564,7 +1609,7 @@
             "List",
             "Items"
           ],
-          "default": "List",
+          "default": "Explorer",
           "description": "%configuration.defaultPreset.dualPane.pane2.description%"
         }
       }

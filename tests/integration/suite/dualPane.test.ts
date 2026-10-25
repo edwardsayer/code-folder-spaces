@@ -130,13 +130,13 @@ suite('dual pane integration', () => {
     const origDual2 = config.inspect('defaultPreset.dualPane.pane2')?.workspaceValue;
 
     try {
-      // 1. 切換至 Dual：預設 pane1=Navigate, pane2=List
+      // 1. 切換至 Dual：預設 pane1=Navigate, pane2=Explorer（v22-R5 使用者指示改為 Explorer）
       await vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.dual');
       let panes = api.getPanes();
       const dualP1 = panes.find(p => p.id === 'pane1');
       const dualP2 = panes.find(p => p.id === 'pane2');
       assert.deepEqual(dualP1?.view, VIEW_PRESETS.Navigate, 'Dual 模式 pane1 應套用預設 Navigate');
-      assert.deepEqual(dualP2?.view, VIEW_PRESETS.List, 'Dual 模式 pane2 應套用預設 List');
+      assert.deepEqual(dualP2?.view, VIEW_PRESETS.Explorer, 'Dual 模式 pane2 應套用預設 Explorer');
 
       // 2. 切換至 Tree：pane1 切回預設 Explorer
       await vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree');
