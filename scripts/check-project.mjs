@@ -161,7 +161,7 @@ if (!pkg) {
   // 僅在 manifest 採用 per-pane 命令時啟用（避免誤判其他專案／測試 fixture）。
   if ([...contributedCommands].some((id) => id.startsWith('codeFolderSpaces.pane1.'))) {
     const paneCommandContract = {
-      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'addRoot', 'mode.tree', 'mode.dual', 'activateChild', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc', 'workspaceFolders', 'switchRoot', 'resetLayout'],
+      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'addRoot', 'mode.tree', 'mode.dual', 'activateChild', 'sort.name.asc', 'sort.name.desc', 'sort.mtime.asc', 'sort.mtime.desc', 'sort.ctime.asc', 'sort.ctime.desc', 'workspaceFolders', 'resetLayout'],
       2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'root.add', 'root.remove', 'toggleNested', 'close'],
     };
     const palette = new Set((pkg.contributes?.menus?.commandPalette ?? []).filter((item) => item.when === 'false').map((item) => item.command));
@@ -169,15 +169,16 @@ if (!pkg) {
     // 契約隨產品演進維護：v2 固定雙 pane 的 title 清單取代舊多窗格清單，並非放寬檢查。
     const paneTitleContract = {
       // v21-R2（使用者）：activateChild 不再放進 pane1 的 view/title（文字按鈕會擠壓標題列），命令本身保留。
-      1: ['filter', 'clearFilter', 'drillUp', 'addRoot', 'refresh', 'workspaceFolders', 'switchRoot', 'resetLayout'],
+      1: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'addRoot', 'refresh', 'workspaceFolders', 'resetLayout'],
       2: ['filter', 'clearFilter', 'drillUp', 'collapseAll', 'expandAll', 'refresh', 'toggleNested', 'close'],
     };
     // v2-R6（使用者）：移除 pane1.more 這一層 submenu，其項目直接掛進「...」下拉。
     // v2.1（使用者）：pane2 不再有 View 子選單，Toggle Nested Files 直接放進 view/title；
     // 子選單勾號改用「✓ 前綴 + 成對命令 + when」workaround（extension menus 無勾號屬性）。
-    const expectedSubmenus = ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort'];
-    const statefulTitlePairs = { 2: ['toggleNested'] };
-    const directTitleActions = ['workspaceFolders', 'switchRoot', 'resetLayout'];
+    const expectedSubmenus = ['codeFolderSpaces.pane1.sort'];
+    // 使用者：View 子選單取消，Dual Pane／Dual Pane ✓ 成對命令直接放進 pane1 view/title。
+    const statefulTitlePairs = { 1: ['mode.dual'], 2: ['toggleNested'] };
+    const directTitleActions = ['workspaceFolders', 'resetLayout'];
     const submenus = new Set((pkg.contributes?.submenus ?? []).map(({ id }) => id));
     const referencedSubmenus = new Set(Object.values(pkg.contributes?.menus ?? {}).flatMap((items) =>
       (items ?? []).map((item) => item.submenu).filter((id) => typeof id === 'string')));
@@ -223,7 +224,7 @@ if (!pkg) {
         if (!inTitle.includes(command)) errors.push(`pane${pane} 的 view/title 缺少 ${command}`);
       }
       const paneSubmenus = pane === '1'
-        ? ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort']
+        ? ['codeFolderSpaces.pane1.sort']
         : [];
       for (const submenu of paneSubmenus) {
         if (!paneTitle.some((item) => item.submenu === submenu)) errors.push(`pane${pane} 的 view/title 缺少 submenu ${submenu}`);

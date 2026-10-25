@@ -118,4 +118,58 @@ suite('dual pane integration', () => {
       assert.equal(activeRoot(state.get('pane2')), arbitrary);
     }
   ));
+
+  test('mode 切換與 pane2 close 自動套用 defaultPreset 設定', async () => {
+    const ext = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    assert.ok(ext);
+    const api = await ext.activate() as { getPanes(): Array<{ id: string; view: unknown; mode: string }> };
+
+    const config = vscode.workspace.getConfiguration('codeFolderSpaces');
+    const origSingle = config.inspect('defaultPreset.singlePane')?.workspaceValue;
+    const origDual1 = config.inspect('defaultPreset.dualPane.pane1')?.workspaceValue;
+    const origDual2 = config.inspect('defaultPreset.dualPane.pane2')?.workspaceValue;
+
+    try {
+      // 1. 切換至 Dual：預設 pane1=Navigate, pane2=List
+      await vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.dual');
+      let panes = api.getPanes();
+      const dualP1 = panes.find(p => p.id === 'pane1');
+      const dualP2 = panes.find(p => p.id === 'pane2');
+      assert.deepEqual(dualP1?.view, VIEW_PRESETS.Navigate, 'Dual 模式 pane1 應套用預設 Navigate');
+      assert.deepEqual(dualP2?.view, VIEW_PRESETS.List, 'Dual 模式 pane2 應套用預設 List');
+
+      // 2. 切換至 Tree：pane1 切回預設 Explorer
+      await vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree');
+      panes = api.getPanes();
+      const treeP1 = panes.find(p => p.id === 'pane1');
+      assert.deepEqual(treeP1?.view, VIEW_PRESETS.Explorer, 'Tree 模式 pane1 應套用預設 Explorer');
+
+      // 3. 切至 Dual 後執行 pane2.close：pane1 亦需切為 Single 預設 Explorer
+      await vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.dual');
+      await vscode.commands.executeCommand('codeFolderSpaces.pane2.close');
+      panes = api.getPanes();
+      const closedP1 = panes.find(p => p.id === 'pane1');
+      assert.deepEqual(closedP1?.view, VIEW_PRESETS.Explorer, '關閉 pane2 後 pane1 應套用預設 Explorer');
+
+      // 4. 自訂設定值：切換時套用使用者自訂 preset
+      await config.update('defaultPreset.singlePane', 'Context', vscode.ConfigurationTarget.Workspace);
+      await config.update('defaultPreset.dualPane.pane1', 'Columns', vscode.ConfigurationTarget.Workspace);
+      await config.update('defaultPreset.dualPane.pane2', 'Files', vscode.ConfigurationTarget.Workspace);
+
+      await vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.dual');
+      panes = api.getPanes();
+      assert.deepEqual(panes.find(p => p.id === 'pane1')?.view, VIEW_PRESETS.Columns, '自訂 dualPane.pane1 Columns 應生效');
+      assert.deepEqual(panes.find(p => p.id === 'pane2')?.view, VIEW_PRESETS.Files, '自訂 dualPane.pane2 Files 應生效');
+
+      await vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree');
+      panes = api.getPanes();
+      assert.deepEqual(panes.find(p => p.id === 'pane1')?.view, VIEW_PRESETS.Context, '自訂 singlePane Context 應生效');
+    } finally {
+      await config.update('defaultPreset.singlePane', origSingle, vscode.ConfigurationTarget.Workspace);
+      await config.update('defaultPreset.dualPane.pane1', origDual1, vscode.ConfigurationTarget.Workspace);
+      await config.update('defaultPreset.dualPane.pane2', origDual2, vscode.ConfigurationTarget.Workspace);
+      // 還原為 tree 模式
+      await vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree');
+    }
+  });
 });

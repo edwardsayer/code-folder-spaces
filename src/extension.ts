@@ -1,16 +1,18 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import type { SpaceDefinition, SpaceOrigin } from './types';
 import { SpaceEntryNode, SpaceRootNode, SpaceTreeDataProvider, setLeafFolderIcon } from './spaces/spaceTreeDataProvider';
 import type { SpaceNode } from './spaces/spaceTreeDataProvider';
 import { SpaceStore } from './spaces/spaceStore';
 import { originOf } from './spaces/spaceConfig';
 import { mergeFollowedWorkspaceRoots, visibleWorkspaceRoots } from './spaces/workspaceRoots';
-import { paneTitleFor } from './spaces/paneTitle';
+import { computePaneTitleAndHint } from './spaces/paneTitle';
 import { legacyGlobalRootsExists, readLegacyGlobalRoots, resolveLegacyGlobalRootsPath, retireLegacyGlobalRoots } from './spaces/legacyGlobalRoots';
 import { DirectoryCache } from './spaces/directoryCache';
 import { createRefreshScheduler } from './spaces/refreshScheduler';
-import { VIEW_PRESETS, isPane2Nested, matchPresetName, togglePane2Nested } from './spaces/viewPresets';
+import { VIEW_PRESETS, isPane2Nested, isViewPresetName, matchPresetName, togglePane2Nested, DEFAULT_SINGLE_PANE_PRESET, DEFAULT_DUAL_PANE1_PRESET, DEFAULT_DUAL_PANE2_PRESET, type ViewPresetName } from './spaces/viewPresets';
+import { collectCandidateFolders } from './spaces/folderCandidates';
 import { activeRoot, classifySpaceRename, effectiveView, normalizeSpaceKey, PaneStateStore, resolvePaneDefinitions } from './spaces/viewState';
 import { isDrillDownNoop, isPaneRootDirectory, paneSlotOf } from './spaces/paneRules';
 import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
@@ -55,7 +57,10 @@ export interface FolderSpacesApi {
     view: { mode: 'tree' | 'flat'; level: 1 | 2 | 'all'; content: 'all' | 'folders' | 'files' };
     nested: boolean;
     title?: string;
+    hint?: string;
   }>;
+  /** 簡化規則：Container hint 永遠與 pane 1 的 hint 保持一致 */
+  getContainerHint(): string;
 }
 
 /** Runtime of one enabled pane: provider + TreeView + cascade scope (paneId-keyed, S4R6). */
@@ -115,13 +120,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const hasWorkspace = Boolean(vscode.workspace.workspaceFile || vscode.workspace.workspaceFolders?.length);
   const viewState = new PaneStateStore(hasWorkspace ? context.workspaceState : context.globalState);
   const settings = () => vscode.workspace.getConfiguration('codeFolderSpaces');
+  const getSinglePaneDefaultPreset = (): ViewPresetName => {
+    const val = settings().get<string>('defaultPreset.singlePane');
+    return isViewPresetName(val) ? val : DEFAULT_SINGLE_PANE_PRESET;
+  };
+  const getDualPane1DefaultPreset = (): ViewPresetName => {
+    const val = settings().get<string>('defaultPreset.dualPane.pane1');
+    return isViewPresetName(val) ? val : DEFAULT_DUAL_PANE1_PRESET;
+  };
+  const getDualPane2DefaultPreset = (): ViewPresetName => {
+    const val = settings().get<string>('defaultPreset.dualPane.pane2');
+    return isViewPresetName(val) ? val : DEFAULT_DUAL_PANE2_PRESET;
+  };
   const hiddenWorkspaceRoots = (): string[] => {
     const hidden = context.workspaceState.get<unknown>('codeFolderSpaces.hiddenWorkspaceRoots', []);
     return Array.isArray(hidden) ? hidden.filter((root): root is string => typeof root === 'string') : [];
   };
   const paneInitContext = () => ({
     primaryRoot: store.getDefinitions()[0]?.basePath,
-    primaryView: VIEW_PRESETS.Explorer,
+    primaryView: VIEW_PRESETS[getSinglePaneDefaultPreset()],
   });
   const layout = await viewState.initialize(paneInitContext());
   if (layout.kind === 'rebuilt') {
@@ -277,14 +294,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       definition?: SpaceDefinition;
       space?: SpaceDefinition;
     };
-    if (!candidate.uri || typeof candidate.uri.fsPath !== 'string') return undefined;
+    const rawUri = candidate.uri as unknown as { fsPath?: string; scheme?: string; path?: string } | undefined;
+    const uri = candidate.uri instanceof vscode.Uri ? candidate.uri
+      : typeof rawUri?.fsPath === 'string' ? vscode.Uri.file(rawUri.fsPath)
+      : (rawUri?.scheme ? vscode.Uri.from({ scheme: rawUri.scheme, path: rawUri.path ?? '' }) : undefined);
+    if (!uri || typeof uri.fsPath !== 'string') return undefined;
     if (typeof candidate.paneId !== 'string' || candidate.paneId.length === 0) return undefined;
     const isRoot = Boolean(candidate.definition);
     const definition = candidate.definition ?? candidate.space;
     if (!definition) return undefined;
     return {
       paneId: candidate.paneId,
-      uri: candidate.uri,
+      uri,
       isDirectory: isRoot ? true : candidate.isDirectory === true,
       definition,
     };
@@ -303,7 +324,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   // --- pane runtimes ------------------------------------------------------
 
   const paneDefinitionsFor = (paneId: string): SpaceDefinition[] => resolvePaneDefinitions(viewState.get(paneId), store.getDefinitions());
-  const paneDefinitionFor = (paneId: string): SpaceDefinition | null => paneDefinitionsFor(paneId)[0] ?? null;
 
   const applyPaneScope = (paneId: string): void => {
     const runtime = paneRuntime.get(paneId);
@@ -314,11 +334,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     runtime.scope = root ? { paneId, root } : undefined;
     runtime.provider.expandRoot = paneSlotOf(paneId) === 'secondary';
     runtime.provider.setScope(definitions.length > 0 ? { paneId, definitions } : undefined);
-    // S4.1：pane 標題一律為「Folder Space <n>」（根路徑由 description 顯示）。
-    runtime.treeView.title = vscode.l10n.t('Folder Space {0}', paneIndexOf(paneId));
-    runtime.treeView.description = definitions.length === 1
-      ? root ?? paneDefinitionFor(paneId)?.basePath ?? definitions[0].basePath
-      : definitions.length > 1 ? vscode.l10n.t('{0} folders', definitions.length) : '';
+    // 不管 Tree 還是 Dual，都不要有 description 了
+    runtime.treeView.description = undefined;
   };
 
   const createPaneDragAndDrop = (paneId: string) => createTreeDragAndDropController(paneId, {
@@ -450,16 +467,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
    */
   const updatePaneTitles = (): void => {
     const mode = viewState.getMode();
-    const workspaceName = vscode.workspace.workspaceFolders?.length ? vscode.workspace.name : undefined;
-    const runtime = paneRuntime.get('pane1');
-    if (runtime) {
-      const applied = mode === 'tree'
-        ? paneTitleFor({ workspaceName, rootCount: viewState.get('pane1').roots.length })
-        : undefined;
-      runtime.treeView.title = applied;
+
+    for (const paneId of ['pane1', 'pane2']) {
+      const runtime = paneRuntime.get(paneId);
+      if (!runtime) continue;
+      const pane = viewState.get(paneId);
+      const definitions = paneDefinitionsFor(paneId);
+
+      const titleResult = computePaneTitleAndHint({
+        mode,
+        roots: pane.roots,
+        drillRoot: pane.drillRoot,
+        hasDrillStack: pane.drillStack.length > 0,
+        definitionName: definitions[0]?.name,
+      });
+
+      runtime.treeView.title = titleResult.viewTitle;
+      runtime.treeView.description = undefined; // 不管 Tree 還是 Dual，都不要有 description 了
     }
-    const runtime2 = paneRuntime.get('pane2');
-    if (runtime2) runtime2.treeView.title = undefined;
   };
 
   const syncPaneViews = (): void => {
@@ -713,7 +738,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   const syncContext = async (): Promise<void> => {
     const definitions = store.getDefinitions();
-    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasSpaces', definitions.length > 0);
+    const hasAnyRoots = viewState.getEnabledPaneIds().some(id => viewState.get(id).roots.length > 0);
+    await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasSpaces', definitions.length > 0 || hasAnyRoots);
     const pane = viewState.get(primaryPaneId());
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.hasFilter', Boolean(pane.filter));
     await vscode.commands.executeCommand('setContext', 'codeFolderSpaces.canDrillUp', pane.drillStack.length > 0);
@@ -910,16 +936,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
 
   const rootOf = (paneId: string): string | null => activeRoot(viewState.get(paneId));
 
-  const pickPaneRoot = async (): Promise<string | undefined> => {
-    type RootItem = vscode.QuickPickItem & { rootPath?: string; browse?: boolean };
-    const items: RootItem[] = store.getDefinitions().map(space => ({ label: space.name, description: space.basePath, rootPath: space.basePath }));
-    items.push({ label: vscode.l10n.t('Browse for folder…'), browse: true });
-    const picked = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a folder for this folder space') });
-    if (!picked) return undefined;
-    if (picked.rootPath) return picked.rootPath;
-    return pickFolderDialog();
-  };
-
   /** S4.1R20：原生資料夾選擇對話框（本檔唯一入口，避免重複程式碼與雙擊問題）。 */
   const pickFolderDialog = async (): Promise<string | undefined> => {
     const folder = await vscode.window.showOpenDialog({
@@ -931,37 +947,123 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     return folder?.[0]?.fsPath;
   };
 
-  const browsePaneRoot = async (paneId: string): Promise<string | undefined> => {
-    const current = rootOf(paneId);
-    if (!current) return pickPaneRoot();
-    const items: Array<vscode.QuickPickItem & { rootPath: string }> = store.getDefinitions()
-      .filter(space => !isSamePath(space.basePath, current))
-      .map(space => ({ label: space.name, description: space.basePath, rootPath: space.basePath }));
+  const getRecentlyOpenedFolders = async (): Promise<string[]> => {
     try {
-      for (const [name, type] of await vscode.workspace.fs.readDirectory(vscode.Uri.file(current))) {
-        if (type & vscode.FileType.Directory) items.push({ label: name, description: path.join(current, name), rootPath: path.join(current, name) });
+      const recent = await vscode.commands.executeCommand<{
+        workspaces?: Array<{
+          folderUri?: vscode.Uri;
+          workspace?: { configPath: vscode.Uri };
+          fileUri?: vscode.Uri;
+        }>;
+      }>('_workbench.getRecentlyOpened');
+      if (recent && Array.isArray(recent.workspaces)) {
+        return recent.workspaces
+          .map(w => w.folderUri?.scheme === 'file' ? w.folderUri.fsPath : undefined)
+          .filter((p): p is string => typeof p === 'string');
       }
-    } catch (error) {
-      void vscode.window.showErrorMessage(vscode.l10n.t('Could not read folders: {0}', String(error)));
-      return undefined;
+    } catch {
+      // 容錯：若 _workbench.getRecentlyOpened 不可用，不中斷
     }
-    // S4.1R20（使用者）：原本把 `rootPath` 設為 `current`，選中後再呼叫 pickPaneRoot()→又彈一層 QuickPick，
-    // 造成「Browse for folder…」要點兩次才出資料夾對話框。改用獨立旗標一次直達 showOpenDialog。
-    items.push({ label: vscode.l10n.t('Browse for folder…'), rootPath: '', browse: true } as never);
-    const picked = await vscode.window.showQuickPick(items, { placeHolder: vscode.l10n.t('Choose a folder for this folder space') });
-    if (!picked) return undefined;
-    if ((picked as { browse?: boolean }).browse) return pickFolderDialog();
-    let stat: vscode.FileStat | undefined;
-    try { stat = await vscode.workspace.fs.stat(vscode.Uri.file(picked.rootPath)); } catch { /* missing paths are rejected below */ }
-    if (!stat) {
-      void vscode.window.showErrorMessage(vscode.l10n.t('The selected folder does not exist.'));
-      return undefined;
+    return [];
+  };
+
+  const browsePaneRoot = async (paneId: string): Promise<string | undefined> => {
+    const currentRoots = viewState.get(paneId).roots;
+    const globalRoots = store.getDefinitionsByOrigin('global').map(d => d.basePath);
+    const workspaceFolders = (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath);
+    const recentFolders = await getRecentlyOpenedFolders();
+
+    const candidates = collectCandidateFolders({
+      currentRoots,
+      globalRoots,
+      workspaceFolders,
+      recentFolders,
+    });
+
+    const validCandidates: string[] = [];
+    for (const p of candidates) {
+      try {
+        const stat = await vscode.workspace.fs.stat(vscode.Uri.file(p));
+        if (stat.type & vscode.FileType.Directory) {
+          validCandidates.push(p);
+        }
+      } catch {
+        // 略過不存在或非目錄路徑
+      }
     }
-    if (!(stat.type & vscode.FileType.Directory)) {
-      void vscode.window.showErrorMessage(vscode.l10n.t('The selected path is not a folder.'));
-      return undefined;
-    }
-    return picked.rootPath;
+
+    type FolderItem = vscode.QuickPickItem & { rootPath?: string; browse?: boolean };
+
+    const items: FolderItem[] = validCandidates.map(p => ({
+      label: `$(folder) ${path.basename(p) || p}`,
+      description: p,
+      rootPath: p,
+    }));
+
+    items.push({
+      label: `$(folder-opened) ${vscode.l10n.t('Browse for folder…')}`,
+      description: vscode.l10n.t('Select a folder from dialog'),
+      browse: true,
+    });
+
+    return new Promise<string | undefined>((resolve) => {
+      const qp = vscode.window.createQuickPick<FolderItem>();
+      qp.title = vscode.l10n.t('Add Folder to Space');
+      qp.placeholder = vscode.l10n.t('Choose a folder, or type a valid folder path');
+      qp.items = items;
+      qp.ignoreFocusOut = true;
+
+      let resolved = false;
+      const finish = (result?: string) => {
+        if (!resolved) {
+          resolved = true;
+          resolve(result);
+        }
+        qp.dispose();
+      };
+
+      qp.onDidAccept(async () => {
+        const selected = qp.selectedItems[0];
+        if (selected) {
+          if (selected.browse) {
+            qp.dispose();
+            resolved = true;
+            resolve(await pickFolderDialog());
+          } else {
+            finish(selected.rootPath);
+          }
+          return;
+        }
+
+        const input = qp.value.trim();
+        if (!input) {
+          finish(undefined);
+          return;
+        }
+
+        let targetPath = input;
+        if (targetPath.startsWith('~')) {
+          targetPath = path.join(os.homedir(), targetPath.slice(1));
+        }
+        targetPath = path.resolve(targetPath);
+
+        try {
+          const stat = await vscode.workspace.fs.stat(vscode.Uri.file(targetPath));
+          if (stat.type & vscode.FileType.Directory) {
+            finish(targetPath);
+            return;
+          }
+        } catch {
+          // not a valid folder
+        }
+
+        void vscode.window.showErrorMessage(vscode.l10n.t('The entered path is not a valid folder.'));
+        finish(undefined);
+      });
+
+      qp.onDidHide(() => finish(undefined));
+      qp.show();
+    });
   };
 
   const setSortForPane = async (paneId: string): Promise<void> => {
@@ -1010,13 +1112,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await paneChanged(paneId);
   };
 
-  const switchRootForPane = async (paneId: string): Promise<void> => {
-    const chosen = await browsePaneRoot(paneId);
-    if (!chosen) return;
-    await viewState.switchRoot(paneId, chosen);
-    await paneChanged(paneId);
-  };
-
   const addRootForPane = async (paneId: string, given?: string): Promise<void> => {
     // `given`＝明確路徑（比照 `addSpace` 的 given 參數，供自動化驗證命令接線）。
     const chosen = given ?? await browsePaneRoot(paneId);
@@ -1058,6 +1153,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await syncPaneContexts();
   };
 
+  const isRootNode = (node: unknown): boolean => {
+    if (!node || typeof node !== 'object') return false;
+    const c = node as { definition?: unknown; contextValue?: string };
+    return Boolean(c.definition) || (typeof c.contextValue === 'string' && c.contextValue.startsWith('codeFolderSpaces.spaceRoot'));
+  };
+
   const expandLevelForPane = async (paneId: string): Promise<void> => {
     const runtime = paneRuntime.get(paneId);
     if (!runtime) return;
@@ -1067,12 +1168,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await settleProvider(runtime.provider);
     if (paneRuntime.get(paneId) !== runtime || runtime.provider.scope !== scopeBefore) return;
     const selection = runtime.treeView.selection[0];
-    const info = nodeInfo(selection);
-    // OP-8：從選取的資料夾（無則 pane root）起，逐層找出「最淺且尚未展開」的資料夾並展開；
-    // 每按一次加深一層（全部已展開則 no-op）。
+    const isRoot = Boolean(selection && isRootNode(selection));
+    // 若未選中任何 root path，對所有的 root path 執行逐層展開
     const expanded = expandedSet(paneId);
-    const isOpen = (node: vscode.TreeItem): boolean => !!node.id && expanded.has(node.id);
-    let level: Array<SpaceRootNode | SpaceEntryNode> = selection && info?.isDirectory ? [selection as SpaceRootNode | SpaceEntryNode] : await runtime.provider.getChildren();
+    const isOpen = (node: vscode.TreeItem): boolean => !node.id || expanded.has(node.id);
+    let level: Array<SpaceRootNode | SpaceEntryNode> = isRoot
+      ? [selection as SpaceRootNode | SpaceEntryNode]
+      : await runtime.provider.getChildren();
     for (let depth = 0; depth < 64 && level.length > 0; depth++) {
       const toExpand = level.filter(node => node.collapsibleState !== vscode.TreeItemCollapsibleState.None && !isOpen(node));
       if (toExpand.length > 0) {
@@ -1094,8 +1196,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       return;
     }
     await viewState.setMode('tree');
+    await viewState.setView('pane1', VIEW_PRESETS[getSinglePaneDefaultPreset()]);
     syncPaneViews();
     await syncPaneContexts();
+    await syncContext();
   };
 
   /**
@@ -1128,10 +1232,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const collapseAllForPane = async (paneId: string): Promise<void> => {
     const runtime = paneRuntime.get(paneId);
     if (!runtime) return;
-    const [root] = await runtime.provider.getChildren();
-    if (!root) return; // 無 root／scope 時不送出作用於「目前焦點 list」的全域命令
-    await runtime.treeView.reveal(root, { select: false, focus: true });
-    await vscode.commands.executeCommand('list.collapseAll');
+    const roots = (await runtime.provider.getChildren()) as Array<SpaceRootNode | SpaceEntryNode>;
+    if (roots.length === 0) return;
+
+    const selection = runtime.treeView.selection[0];
+    const targetRoots = (selection && isRootNode(selection))
+      ? [selection as SpaceRootNode | SpaceEntryNode]
+      : roots;
+
+    for (const root of targetRoots) {
+      await runtime.treeView.reveal(root, { select: false, focus: false, expand: false });
+      await vscode.commands.executeCommand('list.collapseAll');
+    }
+
     expandedSet(paneId).clear();
     collapsedPanes.add(paneId);
     await setCollapsedContext(paneId);
@@ -1239,14 +1352,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     if (!folder) return;
     if (viewState.getMode() !== 'dual') {
       await viewState.setMode('dual');
-      await viewState.setView('pane1', VIEW_PRESETS.Navigate);
+      await viewState.setView('pane1', VIEW_PRESETS[getDualPane1DefaultPreset()]);
+      await viewState.setView('pane2', VIEW_PRESETS[getDualPane2DefaultPreset()]);
+      await viewState.switchRoot('pane2', folder);
       syncPaneViews();
       await syncPaneContexts();
+    } else {
+      await viewState.switchRoot('pane2', folder);
+      applyPaneScope('pane2');
+      paneRuntime.get('pane2')?.provider.refresh();
+      await syncPaneContexts();
     }
-    await viewState.switchRoot('pane2', folder);
-    applyPaneScope('pane2');
-    paneRuntime.get('pane2')?.provider.refresh();
-    await syncPaneContexts();
     await syncContext();
   };
 
@@ -1260,22 +1376,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.tree', async () => {
       if (viewState.getMode() === 'tree') return;
       await viewState.setMode('tree');
-      // 切換 mode 刻意覆寫 pane1 檢視，讓 Tree 模式固定回到 Explorer。
-      await viewState.setView('pane1', VIEW_PRESETS.Explorer);
+      await viewState.setView('pane1', VIEW_PRESETS[getSinglePaneDefaultPreset()]);
       syncPaneViews();
       await syncPaneContexts();
       await syncContext();
     }),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.dual', async () => {
       if (viewState.getMode() === 'dual') return;
-      // R6 曾因 pane2 drillUp 未顯示而放寬 pane1 條件；本輪按最新指示，dual 的 pane1 不顯示 drillUp（pane2 保留）。
-      // 使用者要求：切入 dual 時 pane1 回到原 roots；pane2 保留自己的 drill 狀態。
       if (viewState.get('pane1').drillStack.length > 0) await viewState.resetRoot('pane1');
       await viewState.setMode('dual');
-      // 切換 mode 刻意覆寫 pane1 檢視，讓 Dual 模式固定使用 Navigate。
-      await viewState.setView('pane1', VIEW_PRESETS.Navigate);
-      // v2.1（使用者）：進入 Dual 不再重設 pane2 檢視；預設值（flat 第 1 層檔案清單）由 layout 預設提供，
-      // 使用者切換過的扁平／巢狀狀態跨 session 記憶（cascade 只換 root、不改 view）。
+      await viewState.setView('pane1', VIEW_PRESETS[getDualPane1DefaultPreset()]);
+      await viewState.setView('pane2', VIEW_PRESETS[getDualPane2DefaultPreset()]);
       syncPaneViews();
       await syncPaneContexts();
       await syncContext();
@@ -1313,8 +1424,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     // v2.1（使用者）：VS Code 的 extension menus 不提供子選單勾號，改用「已選項目顯示 ✓ 前綴」的成對命令。
     // `.checked` 變體只負責顯示（由 when 控制何時可見），執行時轉回原命令，行為完全相同。
     // 以字面 id 逐一註冊（命令 parity 檢查為靜態掃描，動態組字串不會被辨識）。
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.tree.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree')),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.dual.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.dual')),
+    // Dual Pane ✓ 為已勾選狀態：再次點擊即取消 Dual，退回 Tree（mode.tree 僅作內部 handler，不顯示於任何選單）。
+    vscode.commands.registerCommand('codeFolderSpaces.pane1.mode.dual.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.mode.tree')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.name.asc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.name.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.name.desc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.mtime.asc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.mtime.asc')),
@@ -1323,7 +1434,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     vscode.commands.registerCommand('codeFolderSpaces.pane1.sort.ctime.desc.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane1.sort.ctime.desc')),
     vscode.commands.registerCommand('codeFolderSpaces.pane2.toggleNested.checked', () => vscode.commands.executeCommand('codeFolderSpaces.pane2.toggleNested')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.workspaceFolders', () => toggleWorkspaceRoots()),
-    vscode.commands.registerCommand('codeFolderSpaces.pane1.switchRoot', () => switchRootForPane('pane1')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.resetLayout', () => vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout')),
     vscode.commands.registerCommand('codeFolderSpaces.pane1.addRoot', () => addRootForPane('pane1')),
     vscode.commands.registerCommand('codeFolderSpaces.focusMainPane', async () => {
@@ -1452,7 +1562,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await paneChanged(info.paneId);
     }),
     vscode.commands.registerCommand('codeFolderSpaces.drillUp', (node?: unknown) => drillUpForPane(targetPaneId(node))),
-    vscode.commands.registerCommand('codeFolderSpaces.switchRoot', (node?: unknown) => switchRootForPane(targetPaneId(node))),
+    vscode.commands.registerCommand('codeFolderSpaces.openWorkspace', async (node?: unknown) => {
+      const uri = selectedUri(node);
+      if (!uri) return;
+      await vscode.commands.executeCommand('vscode.openFolder', uri, false);
+    }),
+    vscode.commands.registerCommand('codeFolderSpaces.openWorkspaceInNewWindow', async (node?: unknown) => {
+      const uri = selectedUri(node);
+      if (!uri) return;
+      await vscode.commands.executeCommand('vscode.openFolder', uri, true);
+    }),
     vscode.commands.registerCommand('codeFolderSpaces.filter', () => filterForPane(primaryPaneId())),
     vscode.commands.registerCommand('codeFolderSpaces.clearFilter', async () => {
       await viewState.clearFilter(primaryPaneId());
@@ -1564,15 +1683,36 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   return {
     version,
     getSpaces: () => store.getDefinitions().map((definition) => ({ name: definition.name, basePath: definition.basePath, origin: originOf(definition) })),
-    getPanes: () => viewState.getEnabledPaneIds().map(id => ({
-      id, root: rootOf(id), roots: [...viewState.get(id).roots], mode: viewState.getMode(), slot: paneSlotOf(id),
-      // v2.1：公開檢視設定與 pane2 巢狀狀態，供自動化驗證（UI 本身不依賴此欄位）。
-      view: { ...effectiveView(viewState.get(id)) },
-      title: id === 'pane1' && viewState.getMode() === 'tree'
-        ? paneTitleFor({ workspaceName: vscode.workspace.workspaceFolders?.length ? vscode.workspace.name : undefined, rootCount: viewState.get('pane1').roots.length })
-        : undefined,
-      nested: isPane2Nested(effectiveView(viewState.get(id))),
-    })),
+    getPanes: () => viewState.getEnabledPaneIds().map(id => {
+      const mode = viewState.getMode();
+      const pane = viewState.get(id);
+      const definitions = paneDefinitionsFor(id);
+      const titleResult = computePaneTitleAndHint({
+        mode,
+        roots: pane.roots,
+        drillRoot: pane.drillRoot,
+        hasDrillStack: pane.drillStack.length > 0,
+        definitionName: definitions[0]?.name,
+      });
+      return {
+        id, root: rootOf(id), roots: [...pane.roots], mode, slot: paneSlotOf(id),
+        view: { ...effectiveView(pane) },
+        title: titleResult.displayName,
+        hint: titleResult.hint,
+        nested: isPane2Nested(effectiveView(pane)),
+      };
+    }),
+    getContainerHint: () => {
+      const pane = viewState.get('pane1');
+      const titleResult = computePaneTitleAndHint({
+        mode: viewState.getMode(),
+        roots: pane.roots,
+        drillRoot: pane.drillRoot,
+        hasDrillStack: pane.drillStack.length > 0,
+        definitionName: paneDefinitionsFor('pane1')[0]?.name,
+      });
+      return titleResult.hint;
+    },
   };
 }
 

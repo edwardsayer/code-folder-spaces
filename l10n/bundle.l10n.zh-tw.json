@@ -98,7 +98,10 @@
   "Select view layout": "選擇檢視配置",
   "Add Folder Space…": "新增資料夾空間…",
   "Workspace Folders…": "工作區資料夾…",
-  "Switch Root…": "切換根目錄…",
+  "Select a folder from dialog": "從對話框選取資料夾",
+  "Add Folder to Space": "新增資料夾到空間",
+  "Choose a folder, or type a valid folder path": "選擇資料夾，或輸入合法的資料夾路徑",
+  "The entered path is not a valid folder.": "輸入的路徑不是合法的資料夾。",
   "Reset Layout": "重設配置",
   "Close Folder Space 2": "關閉 Folder Space 2",
   "Open a folder or workspace before unmarking a global root.": "請先開啟資料夾或 workspace，才能取消全域標記。"

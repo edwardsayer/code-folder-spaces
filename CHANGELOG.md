@@ -2,6 +2,21 @@
 
 All notable changes to Folder Spaces are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Removed the pane1 **View** submenu and the `pane1.mode.tree.checked` command. **Dual Pane** / **Dual Pane ✓** are now a state-paired menu item directly in the pane1 title menu; clicking the checked item returns to Tree mode.
+- Added a new extension icon (`assets/icon.png`, source `assets/icon.svg`) and a codicon-style single-color Activity Bar icon (`assets/spaces.svg`).
+- Removed **Switch Root…** (`codeFolderSpaces.switchRoot` / `codeFolderSpaces.pane1.switchRoot`). Pane roots are changed by **Add Folder to Space…**, **Drill Into Folder**, the pane cascade, or **Activate Child Space**.
+- **Add Folder to Space…** now offers a single searchable picker: candidate folders (parent folders of the current roots, recently opened folders) plus a **Browse for folder…** entry, and accepts a typed path (with `~` expansion). Workspace/project subfolders are not listed — use **Drill Into Folder** for those.
+- Pane titles: no description in either mode. In Dual mode pane1 and pane2 titles are the last path segment (or **Spaces** when pane1 has more than one root and is not drilled); in Tree mode the container title stays **Folder Spaces**. `getPanes()` now also exposes `hint` (full path) and a new `getContainerHint()` returns pane1's hint.
+- Pane1 title bar regained **Collapse All** / **Expand Level**; **Expand Level** now expands every root one level when no root is selected, or one more level under the selected root.
+- Pane1 can now drill into folders in Dual mode (Return to Parent is no longer limited to Tree mode).
+- `.code-workspace` files get **Open Workspace** / **Open Workspace in New Window** inline actions in any pane.
+- Added three settings: `codeFolderSpaces.defaultPreset.singlePane`, `.dualPane.pane1` and `.dualPane.pane2`, applied when switching between Tree and Dual mode.
+- Root path comparison is now case-insensitive on Windows for drill/filter state, so casing differences no longer drop pane state.
+
 ## [0.1.0] — 2026-10-19
 
 ### Breaking Changes

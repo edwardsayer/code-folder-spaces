@@ -32,11 +32,11 @@ suite('擴充套件啟用', () => {
     assert.ok(!commands.has('codeFolderSpaces.pane1.toggleNested'));
     assert.ok(commands.has('codeFolderSpaces.pane2.toggleNested'));
     const menus = manifest.menus as Record<string, Array<{ command?: string; toggled?: string; when?: string }>>;
-    // v2.1：子選單以「✓ 前綴 + 成對命令 + when」呈現勾選狀態；VS Code 不渲染 extension 子選單的 toggled。
-    assert.equal(menus['codeFolderSpaces.pane1.view'].length, 4);
+    // v22-R1（使用者）：View 子選單取消，Dual Pane／Dual Pane ✓ 成對命令直接放進 pane1 view/title。
+    assert.equal(menus['codeFolderSpaces.pane1.view'], undefined, 'pane1 View 子選單應已移除（v22-R1）');
     assert.equal(menus['codeFolderSpaces.pane1.sort'].length, 12);
     assert.equal(menus['codeFolderSpaces.pane2.view'], undefined, 'pane2 View 子選單應已移除');
-    for (const id of ['codeFolderSpaces.pane1.view', 'codeFolderSpaces.pane1.sort']) {
+    for (const id of ['codeFolderSpaces.pane1.sort']) {
       const items = menus[id];
       assert.ok(items.every(item => !item.toggled), `${id} 不應再使用 toggled`);
       assert.ok(items.every(item => Boolean(item.when)), `${id} 每個項目均需 when`);
@@ -50,8 +50,18 @@ suite('擴充套件啟用', () => {
     // v21-R2（使用者）：Activate Child Space 不再出現在 pane1 的 view/title（文字按鈕會擠壓標題列）。
     assert.ok(!title.some(item => item.command === 'codeFolderSpaces.pane1.activateChild'));
     assert.ok(commands.has('codeFolderSpaces.pane1.activateChild'), '命令本身仍需保留');
-    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.drillUp' && item.when?.includes('mode == tree')));
+    // v22-R1（使用者）：pane1 在 dual 模式下亦可 drilldown，drillUp 不再限制 mode == tree，只要 canDrillUp 即可顯示。
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.drillUp' && item.when?.includes('pane1.canDrillUp') && !item.when?.includes('mode == tree')));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.drillUp' && item.group === 'navigation@0'));
+    // v22-R1（使用者）：移除 switchRoot 功能。
+    assert.ok(!commands.has('codeFolderSpaces.switchRoot'), 'switchRoot 已移除');
+    assert.ok(!commands.has('codeFolderSpaces.pane1.switchRoot'), 'pane1.switchRoot 已移除');
+    // v22-R1（使用者）：.code-workspace 檔案提供 Open Workspace 與 Open Workspace in New Window inline 按鈕。
+    assert.ok(commands.has('codeFolderSpaces.openWorkspace'), 'openWorkspace 必須註冊');
+    assert.ok(commands.has('codeFolderSpaces.openWorkspaceInNewWindow'), 'openWorkspaceInNewWindow 必須註冊');
+    // v22-R1（使用者）：pane1 加回 collapseAll / expandAll。
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.collapseAll'));
+    assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane1.expandAll'));
     // v2.1：Toggle Nested Files 直接掛在 pane2 的 view/title（成對），不再走子選單。
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.toggleNested' && item.group === '3_view@1'));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.toggleNested.checked' && item.group === '3_view@1'));
@@ -64,6 +74,16 @@ suite('擴充套件啟用', () => {
     assert.match(String(inlineActivate!.when), /view == codeFolderSpaces\.pane1/);
     assert.match(String(inlineActivate!.when), /viewItem == codeFolderSpaces\.folder/);
     assert.match(String(inlineActivate!.when), /spaceRoot/);
+    const activateCmd = (manifest.commands as Array<{ command: string; icon?: string }>).find(c => c.command === 'codeFolderSpaces.activateChildNode');
+    assert.equal(activateCmd?.icon, '$(arrow-right)', 'activateChildNode 圖示需為 $(arrow-right)');
+
+    // v22-R1（使用者）：.code-workspace 檔案提供 Open Workspace 與 Open Workspace in New Window inline 按鈕
+    const inlineOpenWs = itemContext.find(item => item.command === 'codeFolderSpaces.openWorkspace');
+    const inlineOpenWsNew = itemContext.find(item => item.command === 'codeFolderSpaces.openWorkspaceInNewWindow');
+    assert.ok(inlineOpenWs && String(inlineOpenWs.group).startsWith('inline@'), 'openWorkspace 需為 inline 動作');
+    assert.ok(inlineOpenWsNew && String(inlineOpenWsNew.group).startsWith('inline@'), 'openWorkspaceInNewWindow 需為 inline 動作');
+    assert.match(String(inlineOpenWs!.when), /\.code-workspace/);
+    assert.match(String(inlineOpenWsNew!.when), /\.code-workspace/);
     // v21-R5：Mark／Unmark 由節點 contextValue 決定（不再依賴選取驅動的 context key）。
     assert.equal(itemContext.find(item => item.command === 'codeFolderSpaces.root.markAsGlobal')?.when, 'viewItem == codeFolderSpaces.spaceRoot');
     assert.equal(itemContext.find(item => item.command === 'codeFolderSpaces.root.unmarkGlobal')?.when, 'viewItem == codeFolderSpaces.spaceRoot.global');

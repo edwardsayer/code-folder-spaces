@@ -179,7 +179,10 @@ export class SpaceEntryNode extends vscode.TreeItem {
     this.resourceUri = uri;
     // OP-11：無子項的資料夾（端點）以小圓角矩形圖示標示（對照 Obsidian is-terminal-folder）；有子項者沿用原生 twisty＋主題圖示。
     if (isDirectory && !hasChildren && leafFolderIcon) this.iconPath = leafFolderIcon;
-    this.contextValue = isDirectory ? 'codeFolderSpaces.folder' : 'codeFolderSpaces.file';
+    const isWorkspace = !isDirectory && uri.fsPath.toLowerCase().endsWith('.code-workspace');
+    this.contextValue = isDirectory
+      ? 'codeFolderSpaces.folder'
+      : (isWorkspace ? 'codeFolderSpaces.file.code-workspace' : 'codeFolderSpaces.file');
     this.tooltip = uri.fsPath;
     if (!isDirectory) {
       this.command = {

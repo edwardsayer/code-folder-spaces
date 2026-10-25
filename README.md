@@ -1,5 +1,7 @@
 # Folder Spaces for VS Code
 
+![Icon](assets/icon.png)
+
 **Focused, folder-scoped file navigation for Visual Studio Code.** Folder Spaces provides one or two native tree views for the folders you want to work in, without the noise of the whole workspace.
 
 > **Version 0.1.0.** Folder Spaces has two layouts: **Tree** (one pane) and **Dual** (two vertically arranged panes). The panes are intentionally asymmetric and can be configured independently. See [Breaking changes](#breaking-changes-from-v1x) before upgrading from v1.x.
@@ -12,8 +14,8 @@ VS Code's built-in Explorer always shows the entire workspace. Folder Spaces pro
 
 - **Tree** shows pane1 as a single folder tree.
 - In Tree mode the pane title shows the workspace or project folder name (with a `+ n` suffix when there are several roots) or **Global** when no folder is open.
-- **Dual** shows pane1 above pane2. Pane1 is the control center: its title-bar actions and native submenus (**View:**, **Sort:**) manage layout, roots, workspace folders, sorting and other navigation. Pane2 has a smaller, basic-operation menu (switching the nested-file listing, filtering, collapse/expand, refresh and close).
-- Menu items that represent a current state are marked with a trailing **✓**: the **View:** and **Sort:** submenus in pane1 and **Toggle Nested Files** in pane2 (VS Code offers no native checkmark API for extension menus, so the marker is part of the label and sits after the text so labels stay aligned).
+- **Dual** shows pane1 above pane2. Pane1 is the control center: its title-bar actions and the **Dual Pane** toggle and the native **Sort:** submenu manage layout, roots, workspace folders, sorting and other navigation. Pane2 has a smaller, basic-operation menu (switching the nested-file listing, filtering, collapse/expand, refresh and close).
+- Menu items that represent a current state are marked with a trailing **✓**: **Dual Pane** and the **Sort:** submenu in pane1 and **Toggle Nested Files** in pane2 (VS Code offers no native checkmark API for extension menus, so the marker is part of the label and sits after the text so labels stay aligned).
 - Pane2 starts as a flat **first-level file list**; **Toggle Nested Files** in its title bar expands it to files from all levels (still a flat listing).
 - The panes are deliberately **specialized and asymmetric**; pane2 is not a duplicate control surface. Pane1 cannot be closed. Closing pane2 returns to Tree mode.
 - In Dual mode, selecting a folder in pane1 navigates pane2 into that folder. Pane2 has no root switcher of its own; its root comes from that cascade (the `Activate Child Space` command remains available but is not shown in the title bar).
@@ -75,10 +77,12 @@ Example:
 Pane-specific actions live in each pane's title bar, submenus and context menus, and most of them are intentionally hidden from the Command Palette. Common actions include:
 
 - **Drill Into Folder** / **Activate Child Space** (inline buttons on every folder row in pane1; Activate Child Space opens Dual if needed and uses that folder as pane2's root)
-- **Add Folder…** / **Remove Root**
-- **View: Tree** / **View: Dual** (pane1 submenu; the active one is shown with a ✓ prefix)
+- **Add Folder to Space…** / **Remove Root**
+- **Dual Pane** / **Dual Pane ✓** (pane1 menu; only one of the pair is shown depending on state; clicking toggles between Tree and Dual)
+- **Collapse All** / **Expand Level** (pane1 title bar; Expand Level reveals one more level of every root when nothing is selected, or one more level under the selected root)
 - **Filter by Path…** / **Clear Filter** / **Return to Parent**
-- **Switch Root…** / **Refresh** / **Reset Pane Layout**
+- **Refresh** / **Reset Pane Layout**
+- **Open Workspace** / **Open Workspace in New Window** (inline buttons on `.code-workspace` rows in any pane)
 - **Toggle Nested Files** (pane2 title bar)
 - **Mark as Global** / **Unmark Global** (space-root context menu)
 

@@ -19,7 +19,9 @@ export function normalizeSpaceKey(basePath: string): string {
 function samePath(a: string, b: string): boolean { return normalizeSpaceKey(a) === normalizeSpaceKey(b); }
 
 function isPathWithin(candidate: string, parent: string): boolean {
-  const relative = path.relative(parent, candidate);
+  const normCandidate = process.platform === 'win32' ? path.resolve(candidate).toLowerCase() : path.resolve(candidate);
+  const normParent = process.platform === 'win32' ? path.resolve(parent).toLowerCase() : path.resolve(parent);
+  const relative = path.relative(normParent, normCandidate);
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 

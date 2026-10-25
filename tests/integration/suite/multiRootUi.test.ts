@@ -227,12 +227,18 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
     const commands = new Set(titleItems.map(item => String(item.command)));
     const submenus = new Set(titleItems.map(item => String(item.submenu)));
     assert.ok(commands.has('codeFolderSpaces.pane1.addRoot'), 'pane1 應有 per-pane 的 addRoot 入口');
-    assert.ok(submenus.has('codeFolderSpaces.pane1.view'), 'pane1 應有原生 view submenu');
+    // v22-R1（使用者）：View 子選單取消，改為 Dual Pane／Dual Pane ✓ 成對命令直接掛在 view/title。
+    assert.ok(!submenus.has('codeFolderSpaces.pane1.view'), 'pane1 不應再有 view submenu（v22-R1 移除）');
     assert.ok(submenus.has('codeFolderSpaces.pane1.sort'), 'pane1 應有原生 sort submenu');
+    assert.ok(commands.has('codeFolderSpaces.pane1.mode.dual'), 'pane1 應有 Dual Pane 命令掛在 view/title');
+    assert.ok(commands.has('codeFolderSpaces.pane1.mode.dual.checked'), 'pane1 應有 Dual Pane ✓ 命令掛在 view/title');
     assert.ok(!submenus.has('codeFolderSpaces.pane1.more'), 'pane1 不應再有 more submenu（項目已直接進入「...」）');
-    for (const action of ['workspaceFolders', 'switchRoot', 'resetLayout']) {
+    for (const action of ['workspaceFolders', 'resetLayout']) {
       assert.ok(commands.has(`codeFolderSpaces.pane1.${action}`), `pane1 的 ${action} 應直接掛在 view/title`);
     }
+    assert.ok(!commands.has('codeFolderSpaces.pane1.switchRoot'), 'pane1 不應再有 switchRoot（已移除）');
+    assert.ok(commands.has('codeFolderSpaces.pane1.collapseAll'), 'pane1 應有 collapseAll 掛在 view/title');
+    assert.ok(commands.has('codeFolderSpaces.pane1.expandAll'), 'pane1 應有 expandAll 掛在 view/title');
     assert.ok(!submenus.has('codeFolderSpaces.pane2.more'), 'pane2 不應有 more submenu');
   });
 

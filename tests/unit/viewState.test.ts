@@ -18,6 +18,15 @@ describe('viewState compatibility layer', () => {
     expect(rootForUri(['/a'], '/other/file.txt')).toBeNull();
   });
 
+  it('Windows 上 isPathWithin 對大小寫不敏感（drill／filter 不因大小寫差異失效）', () => {
+    // v22-R1：路徑比較在 win32 先做 resolve + toLowerCase，避免使用者以不同大小寫輸入時失去 drill 守門。
+    if (process.platform !== 'win32') return;
+    const parent = 'C:\\Repo\\Project';
+    const child = 'c:\\repo\\project\\src';
+    expect(rootForUri([parent], child)).toBe(parent);
+    expect(classifySpaceRename([parent], child)).toEqual({ kind: 'inside-space', basePath: parent });
+  });
+
   it('classifies configured root renames', () => {
     expect(classifySpaceRename(['/a'], '/a')).toEqual({ kind: 'space-root' });
     expect(classifySpaceRename(['/a'], '/a/child')).toEqual({ kind: 'inside-space', basePath: '/a' });

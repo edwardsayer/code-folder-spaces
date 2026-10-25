@@ -98,7 +98,10 @@
   "Select view layout": "Select view layout",
   "Add Folder Space…": "Add Folder Space…",
   "Workspace Folders…": "Workspace Folders…",
-  "Switch Root…": "Switch Root…",
+  "Select a folder from dialog": "Select a folder from dialog",
+  "Add Folder to Space": "Add Folder to Space",
+  "Choose a folder, or type a valid folder path": "Choose a folder, or type a valid folder path",
+  "The entered path is not a valid folder.": "The entered path is not a valid folder.",
   "Reset Layout": "Reset Layout",
   "Close Folder Space 2": "Close Folder Space 2",
   "Open a folder or workspace before unmarking a global root.": "Open a folder or workspace before unmarking a global root."

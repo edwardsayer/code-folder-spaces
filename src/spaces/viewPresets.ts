@@ -22,6 +22,9 @@ export const VIEW_PRESETS: Readonly<Record<ViewPresetName, ViewPreset>> = {
 };
 
 export const DEFAULT_VIEW_PRESET: ViewPresetName = 'Explorer';
+export const DEFAULT_SINGLE_PANE_PRESET: ViewPresetName = 'Explorer';
+export const DEFAULT_DUAL_PANE1_PRESET: ViewPresetName = 'Navigate';
+export const DEFAULT_DUAL_PANE2_PRESET: ViewPresetName = 'List';
 
 /**
  * pane2 的「巢狀檔案」切換（v2.1，使用者定義）。

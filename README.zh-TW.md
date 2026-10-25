@@ -1,5 +1,7 @@
 # Folder Spaces for VS Code
 
+![Icon](assets/icon.png)
+
 **專注於資料夾範圍的 VS Code 檔案導覽。** Folder Spaces 提供一個或兩個原生樹狀檢視，專注瀏覽你要處理的資料夾，不受整個工作區的雜訊干擾。
 
 > **版本 0.1.0。** Folder Spaces 提供兩種版面：**Tree**（單一窗格）與 **Dual**（上下兩個窗格）。兩個窗格刻意採不對稱設計，且可各自特化。從 v1.x 升級前請先閱讀[重大變更](#與-v1x-的重大變更)。
@@ -12,8 +14,8 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 
 - **Tree** 僅顯示 pane1 的單一資料夾樹。
 - Tree 模式的面板標題會顯示 workspace／專案資料夾名稱（多個 root 時加上 `+ n`），沒有開啟資料夾時顯示 **Global**。
-- **Dual** 顯示上下排列的 pane1 與 pane2。pane1 是控制中心：可透過標題列操作與原生子選單（**View:**、**Sort:**）管理版面、根目錄、工作區資料夾、排序及其他導覽。pane2 的選單較精簡，只提供基本操作（巢狀檔案清單切換、過濾、收合／展開、重新整理及關閉）。
-- 代表目前狀態的選單項目會加上**尾綴 ✓**：pane1 的 **View:**／**Sort:** 子選單與 pane2 的 **Toggle Nested Files**（VS Code 未提供擴充套件原生勾號 API，故標記是標題的一部分；放在文字之後，標題起點不會被推擠）。
+- **Dual** 顯示上下排列的 pane1 與 pane2。pane1 是控制中心：可透過標題列操作與**Dual Pane** 切換項與原生 **Sort:** 子選單管理版面、根目錄、工作區資料夾、排序及其他導覽。pane2 的選單較精簡，只提供基本操作（巢狀檔案清單切換、過濾、收合／展開、重新整理及關閉）。
+- 代表目前狀態的選單項目會加上**尾綴 ✓**：pane1 的 **Dual Pane** 與 **Sort:** 子選單，以及 pane2 的 **Toggle Nested Files**（VS Code 未提供擴充套件原生勾號 API，故標記是標題的一部分；放在文字之後，標題起點不會被推擠）。
 - pane2 預設是扁平的**第一層檔案清單**；按標題列的 **Toggle Nested Files** 會展開為所有層級的檔案（仍是扁平清單）。
 - 兩個窗格刻意設計為**可特化且不對稱**；pane2 並非完整複製 pane1 的控制項。pane1 不可關閉；關閉 pane2 會回到 Tree 模式。
 - 在 Dual 模式中，pane1 選取資料夾會讓 pane2 導覽至該資料夾。pane2 沒有自己的根目錄切換器，其根目錄來自上述連動（`Activate Child Space` 命令仍保留，但不再顯示於標題列）。
@@ -75,10 +77,12 @@ VS Code 內建 Explorer 一律呈現整個工作區。Folder Spaces 讓你專注
 窗格專屬操作位於各窗格的標題列、子選單與右鍵選單；大部分刻意不在命令選擇區顯示。常用操作包括：
 
 - **Drill Into Folder**／**Activate Child Space**（pane1 每個資料夾列右側的 inline 按鈕；Activate Child Space 會在需要時開啟 Dual，並把該資料夾設為 pane2 root）
-- **Add Folder…**／**Remove Root**（新增資料夾／移除根目錄）
-- **View: Tree**／**View: Dual**（pane1 子選單；目前選項以 ✓ 前綴顯示）
+- **Add Folder to Space…**／**Remove Root**（新增資料夾到空間／移除根目錄）
+- **Dual Pane**／**Dual Pane ✓**（pane1 選單；依狀態擇一顯示，點擊在 Tree 與 Dual 間切換）
+- **Collapse All**／**Expand Level**（pane1 標題列；未選取時展開每個 root 的下一層，選取 root 時只展開該 root 的下一層）
 - **Filter by Path…**／**Clear Filter**／**Return to Parent**（過濾／清除／返回上層）
-- **Switch Root…**／**Refresh**／**Reset Pane Layout**（切換根目錄／重新整理／重設版面）
+- **Refresh**／**Reset Pane Layout**（重新整理／重設版面）
+- **Open Workspace**／**Open Workspace in New Window**（任何 pane 的 `.code-workspace` 檔案列 inline 按鈕）
 - **Toggle Nested Files**（pane2 標題列）
 - **Mark as Global**／**Unmark Global**（空間根目錄右鍵選單）
 

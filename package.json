@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "publisher": "edwardsayer",
   "license": "MIT",
+  "icon": "assets/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -36,7 +37,7 @@
         {
           "id": "code-folder-spaces",
           "title": "%container.title%",
-          "icon": "assets/icon.svg"
+          "icon": "assets/spaces.svg"
         }
       ]
     },
@@ -60,12 +61,12 @@
       {
         "view": "codeFolderSpaces.pane1",
         "contents": "%viewsWelcome.empty%",
-        "when": "!codeFolderSpaces.hasSpaces"
+        "when": "!codeFolderSpaces.pane1.hasRoot && !codeFolderSpaces.hasSpaces"
       },
       {
         "view": "codeFolderSpaces.pane2",
         "contents": "%viewsWelcome.empty%",
-        "when": "!codeFolderSpaces.hasSpaces"
+        "when": "!codeFolderSpaces.pane2.hasRoot && !codeFolderSpaces.hasSpaces"
       }
     ],
     "commands": [
@@ -120,7 +121,7 @@
       {
         "command": "codeFolderSpaces.drillDown",
         "title": "%command.drillDown.title%",
-        "icon": "$(debug-step-into)",
+        "icon": "$(arrow-down)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -131,13 +132,7 @@
       {
         "command": "codeFolderSpaces.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(debug-step-out)",
-        "category": "%category.folderSpaces%"
-      },
-      {
-        "command": "codeFolderSpaces.switchRoot",
-        "title": "%command.switchRoot.title%",
-        "icon": "$(folder-opened)",
+        "icon": "$(arrow-up)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -308,7 +303,7 @@
       {
         "command": "codeFolderSpaces.pane1.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(debug-step-out)",
+        "icon": "$(arrow-up)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -326,7 +321,7 @@
       {
         "command": "codeFolderSpaces.pane2.drillUp",
         "title": "%command.drillUp.title%",
-        "icon": "$(debug-step-out)",
+        "icon": "$(arrow-up)",
         "category": "%category.folderSpaces%"
       },
       {
@@ -378,16 +373,8 @@
         "title": "%command.pane1.workspaceFolders.title%"
       },
       {
-        "command": "codeFolderSpaces.pane1.switchRoot",
-        "title": "%command.switchRoot.title%"
-      },
-      {
         "command": "codeFolderSpaces.pane1.resetLayout",
         "title": "%command.pane.resetLayout.title%"
-      },
-      {
-        "command": "codeFolderSpaces.pane1.mode.tree.checked",
-        "title": "%command.pane1.mode.tree.checked.title%"
       },
       {
         "command": "codeFolderSpaces.pane1.mode.dual.checked",
@@ -420,6 +407,18 @@
       {
         "command": "codeFolderSpaces.pane2.toggleNested.checked",
         "title": "%command.pane2.toggleNested.checked.title%"
+      },
+      {
+        "command": "codeFolderSpaces.openWorkspace",
+        "title": "%command.openWorkspace.title%",
+        "icon": "$(root-folder)",
+        "category": "%category.folderSpaces%"
+      },
+      {
+        "command": "codeFolderSpaces.openWorkspaceInNewWindow",
+        "title": "%command.openWorkspaceInNewWindow.title%",
+        "icon": "$(empty-window)",
+        "category": "%category.folderSpaces%"
       }
     ],
     "keybindings": [
@@ -944,15 +943,7 @@
           "when": "false"
         },
         {
-          "command": "codeFolderSpaces.pane1.switchRoot",
-          "when": "false"
-        },
-        {
           "command": "codeFolderSpaces.pane1.resetLayout",
-          "when": "false"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.mode.tree.checked",
           "when": "false"
         },
         {
@@ -990,13 +981,31 @@
         {
           "command": "codeFolderSpaces.activateChildNode",
           "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.openWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "codeFolderSpaces.openWorkspaceInNewWindow",
+          "when": "false"
         }
       ],
       "view/title": [
         {
           "command": "codeFolderSpaces.pane1.drillUp",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode == tree && codeFolderSpaces.pane1.canDrillUp",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.canDrillUp",
           "group": "navigation@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.collapseAll",
+          "when": "view == codeFolderSpaces.pane1 && !codeFolderSpaces.pane1.collapsed",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.expandAll",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.collapsed",
+          "group": "navigation@2"
         },
         {
           "command": "codeFolderSpaces.pane1.filter",
@@ -1054,8 +1063,13 @@
           "group": "4_close@1"
         },
         {
-          "submenu": "codeFolderSpaces.pane1.view",
-          "when": "view == codeFolderSpaces.pane1",
+          "command": "codeFolderSpaces.pane1.mode.dual",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode != dual",
+          "group": "1_view@1"
+        },
+        {
+          "command": "codeFolderSpaces.pane1.mode.dual.checked",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode == dual",
           "group": "1_view@1"
         },
         {
@@ -1067,11 +1081,6 @@
           "command": "codeFolderSpaces.pane1.workspaceFolders",
           "when": "view == codeFolderSpaces.pane1",
           "group": "4_actions@1"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.switchRoot",
-          "when": "view == codeFolderSpaces.pane1",
-          "group": "4_actions@2"
         },
         {
           "command": "codeFolderSpaces.pane1.resetLayout",
@@ -1090,6 +1099,16 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "codeFolderSpaces.openWorkspace",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && viewItem == codeFolderSpaces.file.code-workspace",
+          "group": "inline@1"
+        },
+        {
+          "command": "codeFolderSpaces.openWorkspaceInNewWindow",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && viewItem == codeFolderSpaces.file.code-workspace",
+          "group": "inline@2"
+        },
         {
           "command": "codeFolderSpaces.drillDown",
           "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem =~ /^codeFolderSpaces\\.spaceRoot/)",
@@ -1137,17 +1156,17 @@
         },
         {
           "command": "codeFolderSpaces.renameEntry",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
           "group": "1_modification@3"
         },
         {
           "command": "codeFolderSpaces.moveTo",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
           "group": "1_modification@4"
         },
         {
           "command": "codeFolderSpaces.deleteEntry",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
           "group": "1_modification@5"
         },
         {
@@ -1191,28 +1210,6 @@
           "command": "codeFolderSpaces.openInFolderSpaces",
           "when": "resourceScheme == file && !explorerResourceIsRoot && explorerResourceIsFolder && !listMultiSelection",
           "group": "navigation@100"
-        }
-      ],
-      "codeFolderSpaces.pane1.view": [
-        {
-          "command": "codeFolderSpaces.pane1.mode.tree",
-          "group": "navigation@1",
-          "when": "codeFolderSpaces.mode != tree"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.mode.tree.checked",
-          "group": "navigation@1",
-          "when": "codeFolderSpaces.mode == tree"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.mode.dual",
-          "group": "navigation@2",
-          "when": "codeFolderSpaces.mode != dual"
-        },
-        {
-          "command": "codeFolderSpaces.pane1.mode.dual.checked",
-          "group": "navigation@2",
-          "when": "codeFolderSpaces.mode == dual"
         }
       ],
       "codeFolderSpaces.pane1.sort": [
@@ -1398,14 +1395,55 @@
           "type": "boolean",
           "default": true,
           "description": "%configuration.followWorkspaceDirectory.description%"
+        },
+        "codeFolderSpaces.defaultPreset.singlePane": {
+          "type": "string",
+          "enum": [
+            "Explorer",
+            "Navigate",
+            "Columns",
+            "Context",
+            "Contents",
+            "Files",
+            "List",
+            "Items"
+          ],
+          "default": "Explorer",
+          "description": "%configuration.defaultPreset.singlePane.description%"
+        },
+        "codeFolderSpaces.defaultPreset.dualPane.pane1": {
+          "type": "string",
+          "enum": [
+            "Explorer",
+            "Navigate",
+            "Columns",
+            "Context",
+            "Contents",
+            "Files",
+            "List",
+            "Items"
+          ],
+          "default": "Navigate",
+          "description": "%configuration.defaultPreset.dualPane.pane1.description%"
+        },
+        "codeFolderSpaces.defaultPreset.dualPane.pane2": {
+          "type": "string",
+          "enum": [
+            "Explorer",
+            "Navigate",
+            "Columns",
+            "Context",
+            "Contents",
+            "Files",
+            "List",
+            "Items"
+          ],
+          "default": "List",
+          "description": "%configuration.defaultPreset.dualPane.pane2.description%"
         }
       }
     },
     "submenus": [
-      {
-        "id": "codeFolderSpaces.pane1.view",
-        "label": "%submenu.pane1.view%"
-      },
       {
         "id": "codeFolderSpaces.pane1.sort",
         "label": "%submenu.pane1.sort%"

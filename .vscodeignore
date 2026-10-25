@@ -12,6 +12,8 @@ coverage/
 test-results/
 .vscode-test/
 .github/
+assets/backup-box/
+assets/backup-stack/
 
 # Build artifacts that should not ship
 out/
