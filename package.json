@@ -6,6 +6,14 @@
   "publisher": "edwardsayer",
   "license": "MIT",
   "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edwardsayer/code-folder-spaces.git"
+  },
+  "bugs": {
+    "url": "https://github.com/edwardsayer/code-folder-spaces/issues"
+  },
+  "homepage": "https://github.com/edwardsayer/code-folder-spaces#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -1646,7 +1654,7 @@
     "build:tests": "node esbuild.tests.mjs",
     "test:integration": "npm run build && npm run build:tests && vscode-test --config .vscode-test.mjs",
     "test:unit:watch": "vitest",
-    "package:vsix": "node esbuild.mjs --production && vsce package --no-rewrite-relative-links --allow-missing-repository",
+    "package:vsix": "node esbuild.mjs --production && vsce package",
     "check:project": "node scripts/check-project.mjs",
     "render:icon": "node scripts/render-icon.mjs",
     "check": "npm run typecheck && npm run test:unit && npm run build && npm run check:project && node scripts/check-command-parity.mjs"
