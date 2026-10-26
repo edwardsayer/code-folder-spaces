@@ -15,6 +15,13 @@ test-results/
 assets/backup-box/
 assets/backup-stack/
 
+# README screenshots (never ship)
+# README 以外掛圖形式引用（vsce 會把相對路徑改寫成 GitHub raw URL），
+# Marketplace 與 VS Code 詳情頁都從遠端載入，不讀 VSIX 內的檔案。
+# 保留在 repo 供 README 使用，但不進包（先前佔 VSIX 92% 體積）。
+# 前提：repo 必須是 public，否則 raw URL 會 404。
+assets/screenshots/
+
 # Build artifacts that should not ship
 out/
 .vscode-test.mjs
