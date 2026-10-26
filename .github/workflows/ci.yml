@@ -19,7 +19,7 @@ jobs:
   # 快速門檻：不啟動 VS Code，只跑型別、單元測試、建置與 manifest／i18n／命令契約。
   checks:
     name: checks
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -49,7 +49,7 @@ jobs:
   # 矩陣在「支援下限」與「最新穩定版」兩端各跑一次，確保 engines.vscode 宣告不是空話。
   integration:
     name: integration (${{ matrix.vscode }})
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -70,14 +70,19 @@ jobs:
       - run: npm ci
 
       # VS Code 在 Linux 需要這些共用函式庫才能啟動（xvfb-run 只負責虛擬顯示）。
+      # 套件名在 Ubuntu 22.04 與 24.04 之間不同（24.04 起部分套件改為 *t64）。
+      # 這裡用 apt-cache 偵測後綴，避免 runner 版本升級時整套 CI 失效（曾因寫死 t64 而失敗）。
       - name: Install VS Code runtime libraries
         run: |
           sudo apt-get update
+          T64=""
+          if apt-cache show libasound2t64 >/dev/null 2>&1; then T64="t64"; fi
+          echo "using t64 suffix: '${T64:-none}'"
           sudo apt-get install -y --no-install-recommends \
             xvfb \
-            libasound2t64 libatk-bridge2.0-0t64 libatk1.0-0t64 libatspi2.0-0t64 \
-            libcairo2 libcups2t64 libdbus-1-3 libdrm2 libgbm1 libglib2.0-0t64 \
-            libgtk-3-0t64 libnspr4 libnss3 libpango-1.0-0 libx11-6 libxcb1 \
+            libasound2${T64} libatk-bridge2.0-0${T64} libatk1.0-0${T64} libatspi2.0-0${T64} \
+            libcairo2 libcups2${T64} libdbus-1-3 libdrm2 libgbm1 libglib2.0-0${T64} \
+            libgtk-3-0${T64} libnspr4 libnss3 libpango-1.0-0 libx11-6 libxcb1 \
             libxcomposite1 libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2
 
       # 明確指定要測的 VS Code 版本；.vscode-test.mjs 會優先使用 VSCODE_TEST_VERSION，
@@ -101,7 +106,7 @@ jobs:
   # 打包衛生：確認 .vsix 不含原始碼、測試、開發目錄與 sourcemap，且不洩漏截圖。
   package:
     name: package
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
