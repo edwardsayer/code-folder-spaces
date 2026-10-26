@@ -8,7 +8,22 @@ Folder Spaces 在專屬的 Activity Bar 容器中加入一個或兩個原生樹�
 
 ![Tree 模式：單一窗格顯示兩個資料夾 root](assets/screenshots/tree-mode.png)
 
-> **版本 0.2.0。** 支援兩種版面：**Tree**（單一窗格）與 **Dual**（上下兩個窗格）。從 v1.x 升級前請先閱讀[與 v1.x 的重大變更](#與-v1x-的重大變更)。
+> **版本 0.2.1。** 支援兩種版面：**Tree**（單一窗格）與 **Dual**（上下兩個窗格）。從 v1.x 升級前請先閱讀[與 v1.x 的重大變更](#與-v1x-的重大變更)。
+
+## 安裝
+
+**從 VS Code Marketplace 安裝（建議）**
+
+1. 開啟擴充功能檢視（`Ctrl+Shift+X`），搜尋 **Folder Spaces**，或直接開啟[市集頁面](https://marketplace.visualstudio.com/items?itemName=edwardsayer.folder-spaces)。
+2. 選擇 **Install**；若 VS Code 提示需重新載入視窗，照做即可。
+
+命令列等價作法：`code --install-extension edwardsayer.folder-spaces`
+
+**以 VSIX 檔案安裝**：從命令面板執行 **Extensions: Install from VSIX…**，選擇 `folder-spaces-<version>.vsix`。
+
+> VSCodium／Cursor 使用者：目前尚未上架 Open VSX，請先以 VSIX 安裝。
+
+安裝後點選 Activity Bar 的 **Folder Spaces** 圖示，執行 **新增資料夾空間…** 選擇第一個要工作的資料夾。
 
 ## 為什麼使用 Folder Spaces
 

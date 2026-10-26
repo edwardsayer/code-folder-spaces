@@ -2,6 +2,14 @@
 
 All notable changes to Folder Spaces are documented in this file.
 
+## [0.2.1] — 2026-10-26
+
+### Documentation
+
+- Added an **Install** section to all three READMEs (English, 繁體中文, 简体中文): the VS Code Marketplace page, the `code --install-extension edwardsayer.folder-spaces` command, VSIX installation, and a first-run pointer to **Add Folder Space…**.
+- Documented that Open VSX is not available yet, so VSCodium and Cursor users should install the VSIX for now.
+- Recorded the first Marketplace release: `0.2.0` was published on 2026-10-26.
+
 ## [0.2.0] — 2026-10-26
 
 ### Breaking Changes

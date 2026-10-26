@@ -8,7 +8,22 @@ Folder Spaces adds one or two native tree views to its own Activity Bar containe
 
 ![Tree mode: two folder roots in a single pane](assets/screenshots/tree-mode.png)
 
-> **Version 0.2.0.** Two layouts are supported: **Tree** (one pane) and **Dual** (two stacked panes). Read [Breaking changes from v1.x](#breaking-changes-from-v1x) before upgrading.
+> **Version 0.2.1.** Two layouts are supported: **Tree** (one pane) and **Dual** (two stacked panes). Read [Breaking changes from v1.x](#breaking-changes-from-v1x) before upgrading.
+
+## Install
+
+**From the VS Code Marketplace (recommended)**
+
+1. Open the Extensions view (`Ctrl+Shift+X`) and search for **Folder Spaces**, or open the [Marketplace page](https://marketplace.visualstudio.com/items?itemName=edwardsayer.folder-spaces).
+2. Select **Install**, then reload the window if VS Code asks.
+
+Command line equivalent: `code --install-extension edwardsayer.folder-spaces`
+
+**From a VSIX file**: run **Extensions: Install from VSIX…** from the Command Palette and pick `folder-spaces-<version>.vsix`.
+
+> VSCodium and Cursor users: the extension is not on Open VSX yet, so install the VSIX file for now.
+
+Once installed, open the **Folder Spaces** icon in the Activity Bar and run **Add Folder Space…** to choose the first folder to work in.
 
 ## Why Folder Spaces
 
