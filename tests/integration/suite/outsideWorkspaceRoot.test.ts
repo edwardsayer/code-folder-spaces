@@ -120,14 +120,21 @@ suite('工作區外空間根', () => {
     const startedAt = Date.now();
     try {
       const script = 'const fs = require("node:fs"); for (const p of process.argv.slice(1)) fs.writeFileSync(p, "watcher diagnostic");';
+      // 在 Extension Host 裡 `process.execPath` 指向 Electron 執行檔，不是 node。
+      // 舊版 VS Code（實測 1.85.1）下直接 spawn 它會被 signal 終止（exit code -1），
+      // 導致本測試以「外部寫入者」失敗而非真正的 watcher 問題；新版本則恰好能跑。
+      // 用 ELECTRON_RUN_AS_NODE=1 讓同一個執行檔以 Node 模式執行，跨版本一致。
       const child = childProcess.spawn(process.execPath, [
         '-e', script, path.join(tmpRoot, outsideName), path.join(workspaceRoot, insideName),
-      ], { stdio: 'ignore' });
+      ], { stdio: 'ignore', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
       const exitCode = await new Promise<number>((resolve, reject) => {
         child.once('error', reject);
-        child.once('exit', (code) => resolve(code ?? -1));
+        child.once('exit', (code, signal) => {
+          if (signal) console.error(`[watcher diagnostic] child terminated by signal ${signal}`);
+          resolve(code ?? -1);
+        });
       });
-      assert.equal(exitCode, 0, 'external writer process must succeed');
+      assert.equal(exitCode, 0, `external writer process must succeed (exit=${exitCode})`);
       while (Date.now() - startedAt < 20_000 && observed.size < 2) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
