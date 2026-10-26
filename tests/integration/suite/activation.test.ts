@@ -49,6 +49,15 @@ suite('擴充套件啟用', () => {
       }
     }
     const title = manifest.menus['view/title'] as Array<{ command?: string; submenu?: string; when?: string; group?: string }>;
+    for (const pane of ['pane1', 'pane2']) {
+      for (const suffix of ['', '.checked']) {
+        const command = `codeFolderSpaces.${pane}.mode.dual${suffix}`;
+        const entry = title.find(item => item.command === command);
+        assert.ok(entry, `${command} 應出現在 view/title`);
+        assert.ok(entry.when?.includes(`codeFolderSpaces.${pane}.dualChecked`), `${command} when 必須依賴 ${pane}.dualChecked`);
+        assert.ok(!entry.when?.includes('codeFolderSpaces.mode'), `${command} when 不應依賴 codeFolderSpaces.mode`);
+      }
+    }
     // v21-R2（使用者）：Activate Child Space 不出現在 pane1 的 view/title（文字按鈕會擠壓標題列）。
     // v22-R2（C3）：無節點版命令已整併移除，僅保留節點版 activateChildNode。
     assert.ok(!title.some(item => item.command === 'codeFolderSpaces.activateChildNode'), '節點版不掛 view/title');

@@ -241,6 +241,9 @@ if (!pkg) {
             errors.push(`pane${pane} 的 view/title 成對項目缺少 when：${entry.command}`);
           } else {
             whens.push(entry.when);
+            if (entry.when.includes('codeFolderSpaces.mode') && !entry.when.includes('dualChecked')) {
+              errors.push(`成對 Dual Pane 的 when 必須以 dualChecked 可見性 context 為準，不可只看 mode：${entry.command}`);
+            }
           }
           if (entry.toggled) errors.push(`view/title 成對項目不應使用 toggled：${entry.command}`);
         }
