@@ -20,6 +20,7 @@ import { normalizeExcludeSetting, parseGitIgnore, shouldHideLikeExplorer, type G
 import { matchesAnyPattern } from './spaces/spaceConfig';
 import { PaneCascadeController } from './spaces/paneCascade';
 import { applyExternalPaneRoot } from './spaces/paneRootSwitch';
+import { canDrillUp as canDrillUpContext } from './spaces/drillContext';
 import { diffWatchers, planWatchers } from './spaces/watcherPlan';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
 import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack } from './spaces/spaceActions';
@@ -813,7 +814,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       const id = `pane${index}`;
       const state = enabledIds.has(id) ? viewState.get(id) : undefined;
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.hasFilter`, Boolean(state?.filter));
-      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.canDrillUp`, Boolean(state && state.drillStack.length > 0));
+      await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.canDrillUp`, canDrillUpContext(state));
       // 子選單的勾選狀態（toggled condition）。
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.preset`, state ? (matchPresetName(effectiveView(state)) ?? 'Custom') : '');
       await vscode.commands.executeCommand('setContext', `codeFolderSpaces.${id}.mode`, state ? effectiveView(state).mode : '');
