@@ -19,6 +19,7 @@ import { DEFAULT_FLAT_MAX_DEPTH } from './spaces/flatListing';
 import { normalizeExcludeSetting, parseGitIgnore, shouldHideLikeExplorer, type GitIgnoreRule } from './spaces/explorerVisibility';
 import { matchesAnyPattern } from './spaces/spaceConfig';
 import { PaneCascadeController } from './spaces/paneCascade';
+import { applyExternalPaneRoot } from './spaces/paneRootSwitch';
 import { diffWatchers, planWatchers } from './spaces/watcherPlan';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
 import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack } from './spaces/spaceActions';
@@ -605,14 +606,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
    * 因此這裡把「換 root + 清下鑽 + 兩種 context 同步 + 重繪」綁成單一入口。
    */
   const setPaneRootExternal = async (paneId: string, root: string): Promise<void> => {
-    await viewState.switchRoot(paneId, root);
-    expandedIds.delete(paneId);
-    applyPaneScope(paneId);
-    rebuildWatchers();
-    paneRuntime.get(paneId)?.provider.refresh();
-    await syncPaneContexts();
-    refreshParentLinkRow();
-    await syncContext();
+    await applyExternalPaneRoot({
+      switchRoot: async (id, nextRoot) => { await viewState.switchRoot(id, nextRoot); },
+      resetExpansion: id => { expandedIds.delete(id); },
+      applyScope: id => { applyPaneScope(id); },
+      rebuildWatchers,
+      refresh: id => { paneRuntime.get(id)?.provider.refresh(); },
+      syncPaneContexts,
+      refreshParentLinkRow,
+      syncContext,
+    }, paneId, root);
   };
 
   const repaintPane = (paneId: string): void => {
