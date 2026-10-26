@@ -8,7 +8,7 @@ Folder Spaces 在專屬的 Activity Bar 容器中加入一個或兩個原生樹�
 
 ![Tree 模式：單一窗格顯示兩個資料夾 root](assets/screenshots/tree-mode.png)
 
-> **版本 0.1.0。** 支援兩種版面：**Tree**（單一窗格）與 **Dual**（上下兩個窗格）。從 v1.x 升級前請先閱讀[與 v1.x 的重大變更](#與-v1x-的重大變更)。
+> **版本 0.2.0。** 支援兩種版面：**Tree**（單一窗格）與 **Dual**（上下兩個窗格）。從 v1.x 升級前請先閱讀[與 v1.x 的重大變更](#與-v1x-的重大變更)。
 
 ## 為什麼使用 Folder Spaces
 

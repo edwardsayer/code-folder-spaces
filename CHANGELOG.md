@@ -2,14 +2,20 @@
 
 All notable changes to Folder Spaces are documented in this file.
 
-## [Unreleased]
+## [0.2.0] — 2026-10-26
+
+### Breaking Changes
+
+- **Extension identity renamed**: `edwardsayer.code-folder-spaces` → **`edwardsayer.folder-spaces`**; the package name is now `folder-spaces` and the VSIX artefact is `folder-spaces-<version>.vsix`. Existing installations are treated as a different extension and must be installed again (settings keys and the `layout.v1` state are unaffected). The legacy `~/.code-folder-spaces` migration directory is intentionally unchanged.
+- Removed the pane1 **View** submenu and the `pane1.mode.tree.checked` command; **Dual Pane** / **Dual Pane ✓** are a state-paired item in the pane1 title menu and the checked item returns to Tree mode.
+- Removed **Switch Root…** (`codeFolderSpaces.switchRoot` / `codeFolderSpaces.pane1.switchRoot`). Pane roots change through **Add Folder to Space…**, **Drill Into Folder**, the pane cascade or **Activate Child Space**.
+- Removed the redundant node-less `codeFolderSpaces.pane1.activateChild` command. Pane2 roots are set only by the pane cascade or `Activate Child Space` (`codeFolderSpaces.activateChildNode`).
+- Removed **Reset Pane Layout** from user-facing views and menus (superseded by Dual Pane and Refresh).
+- Removed Pane 2 **Collapse All** / **Expand All** and the Pane 1 right-click **Drill Into Folder** item (the row inline button remains).
 
 ### Added
 
 - Added `codeFolderSpaces.pane2.sort.*` commands and a native **Sort** submenu to pane2 with paired checkmark items (matching pane1's sort capabilities). The total contributed command count is now 83.
-
-### Added
-
 - Added paired `Dual Pane` and `Dual Pane ✓` on both Spaces and Files panes, synchronizing directly with UI visibility: if either pane is hidden from the container menu, the remaining pane shows an unchecked `Dual Pane` action that immediately unhides and restores the missing pane.
 - Added `codeFolderSpaces.pane2.toggleViewMode` on Pane 2's title bar, cycling across three view modes: **Explorer** (default in Dual mode, lazy-loaded tree with in-place drill-down and leaf folder icons), **File List** (flat first-level files), and **Nested File List** (flat recursive files).
 - Added `codeFolderSpaces.pane2.mode.dual.checked` on Pane 2's menu as an exit button to easily return to Tree mode if Pane 1 is hidden.
@@ -25,9 +31,7 @@ All notable changes to Folder Spaces are documented in this file.
 - Renamed Pane 2's **Close Space** action to **Close Pane** (`Close Pane` / `關閉窗格`).
 - Removed **Drill Into Folder** from the treeview item context menu (`view/item/context`), keeping only the row inline button to avoid redundant context-menu clutter.
 - Refined the extension icon (`assets/icon.svg`, `assets/icon.png`): changed the purple badge stroke to a clean white outline (Scheme A) for seamless contrast on both light and dark themes, adjusted the front folder crease line to be brighter, bolder and positioned at ~1/3 below the folder border towards the badge, and added a matching subtle crease line on the back golden folder.
-- Fixed: **Collapse All** now reliably collapses all roots and nested folders in multi-root setups by focusing the TreeView and collapsing all roots unconditionally regardless of item selection.
 - Removed the pane1 **View** submenu and the `pane1.mode.tree.checked` command. **Dual Pane** / **Dual Pane ✓** are now a state-paired menu item directly in the pane1 title menu; clicking the checked item returns to Tree mode.
-- Added a new extension icon (`assets/icon.png`, source `assets/icon.svg`) and a codicon-style single-color Activity Bar icon (`assets/spaces.svg`).
 - Removed **Switch Root…** (`codeFolderSpaces.switchRoot` / `codeFolderSpaces.pane1.switchRoot`). Pane roots are changed by **Add Folder to Space…**, **Drill Into Folder**, the pane cascade, or **Activate Child Space**.
 - **Add Folder to Space…** now offers a single searchable picker: candidate folders (parent folders of the current roots, recently opened folders) plus a **Browse for folder…** entry, and accepts a typed path (with `~` expansion). Workspace/project subfolders are not listed — use **Drill Into Folder** for those.
 - Pane titles: no description in either mode. In Dual mode pane1 and pane2 titles are the last path segment (or **Spaces** when pane1 has more than one root and is not drilled); in Tree mode the container title stays **Folder Spaces**. `getPanes()` now also exposes `hint` (full path) and a new `getContainerHint()` returns pane1's hint.
@@ -37,8 +41,17 @@ All notable changes to Folder Spaces are documented in this file.
 - Added three settings: `codeFolderSpaces.defaultPreset.singlePane`, `.dualPane.pane1` and `.dualPane.pane2`, applied when switching between Tree and Dual mode.
 - Root path comparison is now case-insensitive on Windows for drill/filter state, so casing differences no longer drop pane state.
 - Removed the redundant node-less `codeFolderSpaces.pane1.activateChild` command (no UI entry point since v2.1). Pane2's root is set only by the pane cascade or the `Activate Child Space` inline button (`codeFolderSpaces.activateChildNode`). The contributed command count is now 71.
-- Fixed: folders added with **Add Folder to Space…** in an empty window (no folder/workspace open) were silently dropped on reload. Empty windows now keep the pane roots and only merge in the global roots.
 
+### Fixed
+
+- Fixed: **Collapse All** now reliably collapses all roots and nested folders in multi-root setups by focusing the TreeView and collapsing all roots unconditionally regardless of item selection.
+- Fixed: folders added with **Add Folder to Space…** in an empty window (no folder/workspace open) were silently dropped on reload. Empty windows now keep the pane roots and only merge in the global roots.
+- Added a GitHub Actions pipeline: typecheck/unit/build/project checks, integration tests under xvfb against VS Code **1.85.1** (the declared minimum) and current stable, plus VSIX packaging with hygiene assertions.
+
+### Documentation
+
+- Rewrote the README in English, Traditional Chinese and Simplified Chinese, with 11 fresh screenshots taken at a narrow viewport plus zoomed crops for menus.
+- The README screenshots are no longer bundled in the VSIX (they were 92% of its size); `vsce` rewrites the relative paths to GitHub raw URLs, so the repository must stay public.
 ## [0.1.0] — 2026-10-19
 
 ### Breaking Changes

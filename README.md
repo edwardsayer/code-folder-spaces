@@ -8,7 +8,7 @@ Folder Spaces adds one or two native tree views to its own Activity Bar containe
 
 ![Tree mode: two folder roots in a single pane](assets/screenshots/tree-mode.png)
 
-> **Version 0.1.0.** Two layouts are supported: **Tree** (one pane) and **Dual** (two stacked panes). Read [Breaking changes from v1.x](#breaking-changes-from-v1x) before upgrading.
+> **Version 0.2.0.** Two layouts are supported: **Tree** (one pane) and **Dual** (two stacked panes). Read [Breaking changes from v1.x](#breaking-changes-from-v1x) before upgrading.
 
 ## Why Folder Spaces
 
