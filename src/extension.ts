@@ -257,12 +257,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     state: {
       getMode: () => viewState.getMode(),
       // D74：父 pane 每次選取不同資料夾時寫入子 root（手動值自然被取代），不關閉 follow。
+      // v22-R7+（使用者）：只要是**從外部**重設 pane2 的 root（cascade／Activate Child Space）
+      // 就必須一併清掉下鑽狀態並刷新所有相關 context，不論觸發來源。
       switchRoot: async (paneId, root) => {
-        await viewState.switchRoot(paneId, root);
-        applyPaneScope(paneId);
-        rebuildWatchers();
-        await syncPaneContexts();
-        refreshParentLinkRow();
+        await setPaneRootExternal(paneId, root);
       },
       // S4.1R11-D6：守門以父 pane 的**全部** root 判定（審查 P1-2），
       // 否則多 root pane 選取 roots[1..N] 內的資料夾時 follow 不會連動。
@@ -593,6 +591,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     await syncPaneContexts();
     refreshParentLinkRow();
     await reconcilePaneRoots();
+    await syncContext();
+  };
+
+  /**
+   * v22-R7+（使用者）：**從外部**重設某個 pane 的 root（cascade、Activate Child Space
+   * 或任何非使用者自己下鑽造成的變更）。
+   *
+   * 不變量：root 被外部換掉時，舊的下鑽堆疊一律作廢——否則 pane2 的 root 已是新目錄，
+   * 但 `Return to Parent` 按鈕仍在，按下去會跳到與目前 root 無關的舊路徑。
+   * `LayoutStore.switchRoot()` 本身會 `clearDrill()`，漏的是**context key**：`canDrillUp`
+   * 只在 `syncContext()` 更新，先前 cascade 只跑 `syncPaneContexts()`，所以按鈕殘留。
+   * 因此這裡把「換 root + 清下鑽 + 兩種 context 同步 + 重繪」綁成單一入口。
+   */
+  const setPaneRootExternal = async (paneId: string, root: string): Promise<void> => {
+    await viewState.switchRoot(paneId, root);
+    expandedIds.delete(paneId);
+    applyPaneScope(paneId);
+    rebuildWatchers();
+    paneRuntime.get(paneId)?.provider.refresh();
+    await syncPaneContexts();
+    refreshParentLinkRow();
     await syncContext();
   };
 
@@ -1070,8 +1089,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         const selected = qp.selectedItems[0];
         if (selected) {
           if (selected.browse) {
-            qp.dispose();
+            // 先 dispose 再開對話框：dispose() 會同步觸發 onDidHide（已實測），
+            // 若先 dispose 而不先鎖住 resolved，onDidHide 會用 undefined 結掉這個 promise，
+            // 使用者選好的資料夾就被丟掉（Add Folder to Space… 看似失效）。
             resolved = true;
+            qp.dispose();
             resolve(await pickFolderDialog());
           } else {
             finish(selected.rootPath);
@@ -1395,15 +1417,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       await viewState.setMode('dual');
       await viewState.setView('pane1', VIEW_PRESETS[getDualPane1DefaultPreset()]);
       await viewState.setView('pane2', VIEW_PRESETS[getDualPane2DefaultPreset()]);
-      await viewState.switchRoot('pane2', folder);
       syncPaneViews();
-      await syncPaneContexts();
-    } else {
-      await viewState.switchRoot('pane2', folder);
-      applyPaneScope('pane2');
-      paneRuntime.get('pane2')?.provider.refresh();
-      await syncPaneContexts();
     }
+    // 不論是「先切 Dual 再設 root」或「已 Dual 直接設 root」，都走同一個外部換根入口，
+    // 確保下鑽狀態被清掉、context 被刷新（使用者：只要從外部重設 pane2 root 就應清 drill）。
+    await setPaneRootExternal('pane2', folder);
     await syncContext();
   };
 

@@ -87,6 +87,34 @@ suite('dual pane integration', () => {
     }
   ));
 
+  // 使用者 2026-10-26：只要從外部重設 pane2 的 root，就必須清掉下鑽狀態，
+  // 不論觸發來源是 cascade 還是 Activate Child Space。
+  test('cascade 重設 pane2 root 後清掉下鑽狀態', async () => withPaneCascade(
+    [alpha], [
+      { paneId: 'pane1', root: alpha },
+      { paneId: 'pane2', root: alpha, parentPaneId: 'pane1', follow: true },
+    ], async ({ state, runtimes, emit }) => {
+      await state.setMode('dual');
+      // 先讓 pane2 自己下鑽一層，建立 drillStack。
+      await state.drillDown('pane2', nested);
+      assert.equal(state.get('pane2').drillRoot, path.normalize(nested));
+      assert.ok(state.get('pane2').drillStack.length > 0);
+
+      emit('pane1', { uri: vscode.Uri.file(alpha), isDirectory: true });
+      // 等 cascade 真的跑完（debounce 100ms）：以 drillRoot 被清掉為訊號，
+      // 不可只等 runtime scope——drillDown 不會同步 runtime scope，會讓 waitFor 提前通過。
+      await waitFor(() => state.get('pane2').drillRoot === null);
+
+      const pane2 = state.get('pane2');
+      assert.equal(pane2.drillRoot, null, 'cascade 換 root 後 drillRoot 必須清空');
+      assert.deepEqual(pane2.drillStack, [], 'cascade 換 root 後 drillStack 必須清空');
+      assert.ok(
+        runtimes.get('pane2')!.scope?.root !== null && sameFixturePath(runtimes.get('pane2')!.scope!.root!, alpha),
+        'pane2 的實際顯示 root 應為 cascade 帶來的新 root'
+      );
+    }
+  ));
+
   test('resetting pane1 drill before dual preserves roots and pane2 drill', async () => withPaneProviders(
     [{ path: alpha, name: 'alpha' }], [
       { paneId: 'pane1', root: alpha }, { paneId: 'pane2', root: alpha },
