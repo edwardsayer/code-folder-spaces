@@ -1191,22 +1191,22 @@
         },
         {
           "command": "codeFolderSpaces.pane1.mode.dual",
-          "when": "view == codeFolderSpaces.pane1 && !codeFolderSpaces.pane1.dualChecked",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode != dual",
           "group": "1_view@1"
         },
         {
           "command": "codeFolderSpaces.pane1.mode.dual.checked",
-          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.pane1.dualChecked",
+          "when": "view == codeFolderSpaces.pane1 && codeFolderSpaces.mode == dual",
           "group": "1_view@1"
         },
         {
           "command": "codeFolderSpaces.pane2.mode.dual",
-          "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.dualChecked",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.mode != dual",
           "group": "1_view@1"
         },
         {
           "command": "codeFolderSpaces.pane2.mode.dual.checked",
-          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.dualChecked",
+          "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.mode == dual",
           "group": "1_view@1"
         },
         {
