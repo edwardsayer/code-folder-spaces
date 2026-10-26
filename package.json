@@ -1,5 +1,5 @@
 {
-  "name": "code-folder-spaces",
+  "name": "folder-spaces",
   "displayName": "%extension.displayName%",
   "description": "%extension.description%",
   "version": "0.1.0",
@@ -43,14 +43,14 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "code-folder-spaces",
+          "id": "folder-spaces",
           "title": "%container.title%",
           "icon": "assets/spaces.svg"
         }
       ]
     },
     "views": {
-      "code-folder-spaces": [
+      "folder-spaces": [
         {
           "id": "codeFolderSpaces.pane1",
           "name": "%view.pane1.name%",
@@ -343,7 +343,6 @@
         "title": "%command.pane2.toggleNested.title%",
         "icon": "$(list-flat)"
       },
-
       {
         "command": "codeFolderSpaces.pane1.sort.name.asc",
         "title": "%command.paneAction.sort.name.asc.title%"
@@ -979,7 +978,6 @@
           "command": "codeFolderSpaces.pane2.toggleNested",
           "when": "false"
         },
-
         {
           "command": "codeFolderSpaces.pane1.sort.name.asc",
           "when": "false"

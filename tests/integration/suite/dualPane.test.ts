@@ -148,7 +148,7 @@ suite('dual pane integration', () => {
   ));
 
   test('mode 切換與 pane2 close 自動套用 defaultPreset 設定', async () => {
-    const ext = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const ext = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(ext);
     const api = await ext.activate() as { getPanes(): Array<{ id: string; view: unknown; mode: string }> };
 

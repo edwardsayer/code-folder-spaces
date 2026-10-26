@@ -80,7 +80,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
   test('live 命令 paneN.root.remove 以被點擊節點的 rootPath 為標的（多 root 不可誤刪 activeRoot）', async () => {
     // 這是 handler 接線層的驗證：root 列的 inline X 會傳入被點擊的節點，
     // 若 handler 忽略節點而只移除 activeRoot（＝roots[0]），就會刪錯資料夾。
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     await extension.activate();
 
@@ -120,7 +120,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
   });
 
   test('OP-20 manifest：root inline remove gate 與 command id 符合契約', async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     const manifest = extension.packageJSON as { contributes?: { menus?: { 'view/item/context'?: Array<{ command?: string; when?: string; group?: string }> } } };
     const entries = manifest.contributes?.menus?.['view/item/context'] ?? [];
@@ -173,7 +173,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
   });
 
   test('P1-4：followWorkspaceDirectory 設定變更不改 layout/API pane shape', async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     await extension.activate();
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');
@@ -200,7 +200,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
   });
 
   test('術語與命令契約：pane 專屬 view/title 項目使用 per-pane id（D47）', async () => {
-    const pkg = vscode.extensions.getExtension('edwardsayer.code-folder-spaces')?.packageJSON as
+    const pkg = vscode.extensions.getExtension('edwardsayer.folder-spaces')?.packageJSON as
       { contributes?: { menus?: { 'view/title'?: Array<{ command?: string; submenu?: string; when?: string }> } } } | undefined;
     const titleItems = pkg?.contributes?.menus?.['view/title'] ?? [];
     assert.ok(titleItems.length > 0, 'manifest 應有 view/title 項目');
@@ -248,7 +248,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
 
   test('live 命令 pane2.root.remove 只操作 pane2（P1-1：不得錯路由到 pane1）', async () => {
     // view/item/context 的 root 列 X 使用 pane 專屬命令，避免 pane2 操作錯路由到 pane1。
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     await extension.activate();
 
@@ -279,7 +279,7 @@ suite('S4.1R11b root 入口與術語（多資料夾空間）', () => {
   });
 
   test('單 root 守門：不得移除唯一 root（P1-3：Palette 等路徑可繞過 canRemoveRoot）', async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     const api = await extension.activate() as { getPanes(): Array<{ id: string; root: string | null; roots: string[]; mode: 'tree' | 'dual'; slot: 'primary' | 'secondary' }> };
 

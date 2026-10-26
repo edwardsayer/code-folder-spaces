@@ -5,8 +5,8 @@ import * as vscode from 'vscode';
 
 suite('擴充套件啟用', () => {
   test('公開 API 與版本可用', async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
-    assert.ok(extension, '找不到 edwardsayer.code-folder-spaces 擴充套件');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
+    assert.ok(extension, '找不到 edwardsayer.folder-spaces 擴充套件');
     const exports = await extension.activate() as { version: unknown; getSpaces: () => unknown };
     assert.equal(typeof exports.version, 'string');
     assert.equal(exports.version, extension.packageJSON.version);
@@ -14,7 +14,7 @@ suite('擴充套件啟用', () => {
   });
 
   test('貢獻的指令均已註冊', async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     const commands = await vscode.commands.getCommands(true);
     for (const contribution of extension.packageJSON.contributes.commands ?? []) {
@@ -23,7 +23,7 @@ suite('擴充套件啟用', () => {
   });
 
   test('v2.1 成對勾號命令、pane2 巢狀切換與標題貢獻符合契約', async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     const manifest = extension.packageJSON.contributes;
     const commands = new Set((manifest.commands ?? []).map((item: { command: string }) => item.command));
@@ -112,7 +112,7 @@ suite('擴充套件啟用', () => {
   });
 
   test('manifest 包含 view 且已註冊 focus 命令', async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     const views = Object.values(extension.packageJSON.contributes.views as Record<string, Array<{ id: string; when?: string }>> ?? {}).flat();
     // v2-redesign（v2-R4）：固定 2 pane，不再有 pane3..8。
@@ -149,7 +149,7 @@ suite('擴充套件啟用', () => {
   });
 
   test('contributes 文字 placeholder 均存在於兩份語系檔', () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     const collect = (value: unknown): string[] => {
       if (typeof value === 'string') return [...value.matchAll(/%([^%]+)%/g)].map((match) => match[1]);

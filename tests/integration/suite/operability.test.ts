@@ -13,7 +13,7 @@ interface Api { getPanes(): PaneInfo[] }
 suite('可操作性（S4.1R5）', () => {
   let api: Api;
   suiteSetup(async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     api = await extension.activate() as Api;
   });
@@ -147,7 +147,7 @@ suite('v2 D4 就地下鑽（不再切換 preset）', () => {
 // S4.1R10（OP-15）：Follow Workspace Directory 連動。
 suite('OP-15 Follow Workspace Directory', () => {
   test('主窗格會自動跟隨當前開啟的 Workspace 第一個目錄', async () => {
-    const extension = vscode.extensions.getExtension('edwardsayer.code-folder-spaces');
+    const extension = vscode.extensions.getExtension('edwardsayer.folder-spaces');
     assert.ok(extension);
     // 重設乾淨的兩窗格配置
     await vscode.commands.executeCommand('codeFolderSpaces.pane.resetLayout');

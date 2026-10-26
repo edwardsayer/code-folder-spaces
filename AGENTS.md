@@ -2,7 +2,7 @@
 
 ## Overview
 
-`code-folder-spaces`（extension id `edwardsayer.code-folder-spaces`）：VS Code 版的 Folder Spaces。在專屬 Activity Bar 容器中提供**資料夾範圍的檔案總管空間**——每個空間以指定資料夾為根，只呈現該資料夾的樹狀內容。設計來源為 Obsidian 外掛 Folder Spaces；排除 Obsidian 專屬機制（leaf/view monkey-patch、popout window scoped 操作、folder-notes 生態），改以 VS Code Extension API 實作。
+`folder-spaces`（extension id **`edwardsayer.folder-spaces`**，2026-10-26 起不再帶 `code-` 前綴；容器 id `folder-spaces`）：VS Code 版的 Folder Spaces。在專屬 Activity Bar 容器中提供**資料夾範圍的檔案總管空間**——每個空間以指定資料夾為根，只呈現該資料夾的樹狀內容。設計來源為 Obsidian 外掛 Folder Spaces；排除 Obsidian 專屬機制（leaf/view monkey-patch、popout window scoped 操作、folder-notes 生態），改以 VS Code Extension API 實作。
 
 產品願景、功能優先序與 Stage 計畫見私有規劃：
 
@@ -70,8 +70,8 @@ node tools/vscode-debug.mjs close
 
 ## 作業規範：每輪 handoff 前打包試用 VSIX（使用者 2026-10-14 指示）
 
-- **每一輪完成 `/todo-handoff` 之前，必須執行一次 `npm run package:vsix`**，產出 `code-folder-spaces-<version>.vsix` 供使用者以「Install from VSIX」實機試用；Handoff 須記錄 VSIX 的檔名、時間、SHA256 與對應的 `dist/extension.js`（production）／產品 HEAD 與 working tree 狀態。
-- 打包前先把根目錄既有 `.vsix` 移至 `out/vsix-archive/`，以 `code-folder-spaces-<version>-<yyyymmdd-hhmm>.vsix` 命名備份，**不覆蓋、不刪除**舊檔；根目錄永遠只保留最新一份。`*.vsix` 已被 `.gitignore` 排除，不入版控。
+- **每一輪完成 `/todo-handoff` 之前，必須執行一次 `npm run package:vsix`**，產出 **`folder-spaces-<version>.vsix`**（vsce 依 `package.json` 的 `name` 命名）供使用者以「Install from VSIX」實機試用；Handoff 須記錄 VSIX 的檔名、時間、SHA256 與對應的 `dist/extension.js`（production）／產品 HEAD 與 working tree 狀態。
+- 打包前先把根目錄既有 `.vsix` 移至 `out/vsix-archive/`，以 `folder-spaces-<version>-<yyyymmdd-hhmm>.vsix` 命名備份，**不覆蓋、不刪除**舊檔；根目錄永遠只保留最新一份。`*.vsix` 已被 `.gitignore` 排除，不入版控。
 - 此打包**僅為試用**：不 bump 版本、不打 tag、不上傳，**不取代** pre-release gate；任何發布仍須依 `.agents/skills/pre-release-check/SKILL.md`。打包失敗須於 Handoff 揭露並不得宣稱已提供試用版。
 - 純規劃／文件輪（無產品 runtime 或 manifest 變更）可在 Handoff 明載「無新產物、沿用前一份 VSIX」並附其 SHA256，不重打包。
 
