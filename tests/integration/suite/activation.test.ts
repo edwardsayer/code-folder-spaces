@@ -69,6 +69,10 @@ suite('擴充套件啟用', () => {
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.viewMode.explorer' && item.group === 'navigation@2'));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.viewMode.fileList' && item.group === 'navigation@2'));
     assert.ok(title.some(item => item.command === 'codeFolderSpaces.pane2.viewMode.nestedFileList' && item.group === 'navigation@2'));
+    // v22-R6+（使用者）：Files pane 的 filter 按鈕移到「…」更多動作下拉旁，與 Spaces pane 的 navigation@3 一致。
+    for (const command of ['codeFolderSpaces.pane2.filter', 'codeFolderSpaces.pane2.clearFilter', 'codeFolderSpaces.pane1.filter', 'codeFolderSpaces.pane1.clearFilter']) {
+      assert.ok(title.some(item => item.command === command && item.group === 'navigation@3'), `${command} 應位於 navigation@3`);
+    }
     // v21-R5：pane1 每個資料夾列 always 顯示「Drill Into Folder」與「Activate Child Space」。
     assert.ok(commands.has('codeFolderSpaces.activateChildNode'), 'activateChildNode 必須註冊');
     const itemContext = (manifest.menus['view/item/context'] ?? []) as Array<{ command?: string; when?: string; group?: string }>;

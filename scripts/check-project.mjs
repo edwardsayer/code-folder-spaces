@@ -248,6 +248,16 @@ if (!pkg) {
           errors.push(`pane${pane} 的 view/title 成對項目 when 未互斥：${action}`);
         }
       }
+      // v22-R6+（使用者）：兩個 pane 的 filter／clearFilter 都必須在 navigation@3，
+      // 才會緊鄰「…」更多動作下拉選單（Spaces 與 Files 位置一致）。
+      for (const action of ['filter', 'clearFilter']) {
+        const entry = paneTitle.find((item) => item.command === `codeFolderSpaces.pane${pane}.${action}`);
+        if (!entry) {
+          errors.push(`pane${pane} 的 view/title 缺少 codeFolderSpaces.pane${pane}.${action}`);
+        } else if (entry.group !== 'navigation@3') {
+          errors.push(`pane${pane} 的 ${action} 必須在 navigation@3（與 … 下拉選單相鄰），實際為 ${entry.group ?? '(未設定)'}`);
+        }
+      }
     }
 
     // v21-R5：pane1 資料夾列 always 顯示「下鑽 + 啟用子空間」；Mark/Unmark 由節點 contextValue 決定。

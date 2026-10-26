@@ -1157,12 +1157,12 @@
         {
           "command": "codeFolderSpaces.pane2.filter",
           "when": "view == codeFolderSpaces.pane2 && !codeFolderSpaces.pane2.hasFilter",
-          "group": "navigation@1"
+          "group": "navigation@3"
         },
         {
           "command": "codeFolderSpaces.pane2.clearFilter",
           "when": "view == codeFolderSpaces.pane2 && codeFolderSpaces.pane2.hasFilter",
-          "group": "navigation@1"
+          "group": "navigation@3"
         },
         {
           "command": "codeFolderSpaces.pane2.viewMode.explorer",
