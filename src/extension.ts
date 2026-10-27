@@ -1687,6 +1687,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
         return;
       }
       await openRootInPane1(uri.fsPath);
+      // S6R4（R4/C16）：從 Explorer 右鍵執行後，使用者期待「切到 Folder Spaces 並看到該資料夾」。
+      // 只建立 root 不會啟用容器（容器收合／隱藏時畫面完全沒反應），因此顯式聚焦 pane1 並 reveal 該 root 列。
+      await showPane('pane1');
+      const runtime = pane1();
+      if (runtime) {
+        const node = await runtime.provider.findNodeByPath(uri.fsPath);
+        if (node) {
+          try {
+            await runtime.treeView.reveal(node, { select: false, focus: false, expand: false });
+          } catch {
+            // reveal 失敗不應中斷命令（例如 view 被使用者隱藏時）。
+          }
+        }
+      }
     }),
     // 可選參數（資料夾路徑字串或 Uri）供自動化／其他命令略過原生對話框。
     vscode.commands.registerCommand('codeFolderSpaces.addSpace', async (target?: unknown) => {

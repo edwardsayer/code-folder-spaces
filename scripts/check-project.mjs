@@ -105,9 +105,7 @@ const requiredPaths = [
   'src/extension.ts',
   'package.json',
   'package.nls.json',
-  'package.nls.zh-tw.json',
   'l10n/bundle.l10n.json',
-  'l10n/bundle.l10n.zh-tw.json',
   'README.md',
   'README.zh-TW.md',
   'CHANGELOG.md',
@@ -349,36 +347,36 @@ if (!pkg) {
   }
 
   const nls = readJson('package.nls.json') ?? {};
-  const nlsZh = readJson('package.nls.zh-tw.json') ?? {};
   for (const match of JSON.stringify(pkg).matchAll(/%([\w.-]+)%/g)) {
     if (!(match[1] in nls)) errors.push(`package.nls.json 缺少 manifest 引用 key：${match[1]}`);
   }
-  const missing = Object.keys(nls).filter((key) => !(key in nlsZh));
-  const extra = Object.keys(nlsZh).filter((key) => !(key in nls));
-  if (missing.length) {
-    errors.push(`package.nls.zh-tw.json 缺少 ${missing.length} 個 key：${missing.slice(0, 5).join(', ')}`);
-  }
-  if (extra.length) {
-    errors.push(`package.nls.zh-tw.json 有 ${extra.length} 個多餘 key：${extra.slice(0, 5).join(', ')}`);
-  }
-
   const bundle = readJson('l10n/bundle.l10n.json') ?? {};
-  const bundleZh = readJson('l10n/bundle.l10n.zh-tw.json') ?? {};
-  const bundleMissing = Object.keys(bundle).filter((key) => !(key in bundleZh));
-  const bundleExtra = Object.keys(bundleZh).filter((key) => !(key in bundle));
-  if (bundleMissing.length) {
-    errors.push(`l10n/bundle.l10n.zh-tw.json 缺少 ${bundleMissing.length} 個訊息`);
-  }
-  if (bundleExtra.length) {
-    errors.push(`l10n/bundle.l10n.zh-tw.json 有 ${bundleExtra.length} 個多餘訊息`);
-  }
+
+  // S6R4（R6）：語系 catalog 改為自動列舉——manifest 用 `package.nls.<locale>.json`、
+  // runtime 用 `l10n/bundle.l10n.<locale>.json`；新增語系不必再改本檢查器。
+  const catalogFiles = (dir, prefix) => fs.readdirSync(dir)
+    .filter((name) => name.startsWith(prefix) && name.endsWith('.json'))
+    .sort();
+  const localeOf = (name, prefix) => name.slice(prefix.length, name.length - '.json'.length);
+  const nlsLocales = catalogFiles(root, 'package.nls.')
+    .map((name) => ({ file: name, locale: localeOf(name, 'package.nls.') }));
+  const bundleLocales = catalogFiles(path.join(root, 'l10n'), 'bundle.l10n.')
+    .map((name) => ({ file: `l10n/${name}`, locale: localeOf(name, 'bundle.l10n.') }));
+  if (nlsLocales.length === 0) errors.push('找不到任何 package.nls.<locale>.json 語系檔');
+  if (bundleLocales.length === 0) errors.push('找不到任何 l10n/bundle.l10n.<locale>.json 語系檔');
 
   // 只比較 placeholder 集合，允許翻譯調整參數順序或重複引用。
   const placeholders = value => [...new Set(value.match(/\{\d+\}/g) ?? [])].sort().join(',');
-  for (const [file, source, translated] of [
-    ['package.nls.zh-tw.json', nls, nlsZh],
-    ['l10n/bundle.l10n.zh-tw.json', bundle, bundleZh],
-  ]) {
+
+  const compareCatalog = (file, source, translated) => {
+    const missing = Object.keys(source).filter((key) => !(key in translated));
+    const extra = Object.keys(translated).filter((key) => !(key in source));
+    if (missing.length) {
+      errors.push(`${file} 缺少 ${missing.length} 個 key：${missing.slice(0, 5).join(', ')}`);
+    }
+    if (extra.length) {
+      errors.push(`${file} 有 ${extra.length} 個多餘 key：${extra.slice(0, 5).join(', ')}`);
+    }
     for (const [key, value] of Object.entries(source)) {
       if (typeof value !== 'string' || typeof translated[key] !== 'string' || !translated[key].trim()) {
         errors.push(`${file} 訊息必須是非空字串：${key}`);
@@ -386,7 +384,10 @@ if (!pkg) {
         errors.push(`${file} placeholder 不一致：${key}`);
       }
     }
-  }
+  };
+
+  for (const { file } of nlsLocales) compareCatalog(file, nls, readJson(file) ?? {});
+  for (const { file } of bundleLocales) compareCatalog(file, bundle, readJson(file) ?? {});
 
   for (const file of listTypeScriptFiles(path.join(root, 'src'))) {
     for (const { file: relative, line, message } of scanL10nMessages(file, fs.readFileSync(file, 'utf8'))) {

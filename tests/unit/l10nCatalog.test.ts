@@ -57,7 +57,23 @@ describe('l10n catalog checker', () => {
     writeJson(root, 'l10n/bundle.l10n.zh-tw.json', { 'Moving {0} to {1}': '{0} → {1}', extra: '多餘' });
     const result = check(root);
     expect(result.status).toBe(1);
-    expect(result.output).toContain('多餘訊息');
+    expect(result.output).toContain('多餘 key');
+  });
+  // S6R4（R6）：語系 catalog 改為自動列舉，新增語系（zh-cn）也必須被同一套對稱與 placeholder 檢查涵蓋。
+  it('checks every discovered locale, not just zh-tw', () => {
+    const root = fixture();
+    writeJson(root, 'package.nls.zh-cn.json', { 'command.title': '命令' });
+    writeJson(root, 'l10n/bundle.l10n.zh-cn.json', { 'Moving {0} to {1}': '将 {2} 移动' });
+    const result = check(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('l10n/bundle.l10n.zh-cn.json placeholder 不一致');
+  });
+  it('rejects a locale catalog that misses keys', () => {
+    const root = fixture();
+    writeJson(root, 'package.nls.zh-cn.json', {});
+    const result = check(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('package.nls.zh-cn.json 缺少 1 個 key');
   });
   it('rejects missing translated messages', () => {
     const root = fixture();

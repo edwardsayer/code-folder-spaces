@@ -2,6 +2,21 @@
 
 All notable changes to Folder Spaces are documented in this file.
 
+## [0.2.2] — 2026-10-27
+
+### Added
+
+- **Simplified Chinese UI**: added `package.nls.zh-cn.json` and `l10n/bundle.l10n.zh-cn.json`, so manifests and runtime messages are localized when VS Code runs with a `zh-cn` language pack (previously only English and Traditional Chinese were available). Closes residual risk R6.
+
+### Fixed
+
+- **Open in Folder Spaces now reveals the pane**: running the Explorer context-menu action only added the folder to Pane 1, so with the container collapsed or hidden nothing appeared to happen. It now focuses the Folder Spaces view and reveals the added folder row. Closes residual risk R4.
+
+### Changed
+
+- `scripts/check-project.mjs` no longer hardcodes `zh-tw`: every `package.nls.<locale>.json` and `l10n/bundle.l10n.<locale>.json` is discovered automatically and checked for key symmetry, non-empty values and identical placeholder sets, so adding a locale cannot silently skip the catalog gate.
+- Unit tests cover the new locale discovery (`l10nCatalog.test.ts`).
+
 ## [0.2.1] — 2026-10-26
 
 ### Documentation
