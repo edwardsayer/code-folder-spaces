@@ -2,6 +2,20 @@
 
 All notable changes to Folder Spaces are documented in this file.
 
+## [0.2.3] — 2026-10-29
+
+### Fixed
+
+- **File-operation keyboard shortcuts work again**: the `when` clause of 49 keybindings used `viewItem`, which only exists as an overlay context for `view/item/context` menus and is therefore always false inside the keybinding service. As a result `ctrl+c` / `ctrl+x` / `ctrl+v` / `F2` / `Delete` never fired and file operations were only reachable from the context menu or the inline buttons. The selected node kind is now tracked per pane and exposed as `codeFolderSpaces.<pane>.focusItem`, which the keybindings test instead. Context-menu behaviour is unchanged (that is where `viewItem` works).
+- Removed the leftovers from the 8-pane era: 36 keybindings pointed at `pane3`…`pane8`, which no longer exist, and 15 `view/item/context` entries still matched `pane[1-8]`. Pane conditions are now reduced to the two panes that exist.
+- Dropped the `ctrl+n` binding for **New File**, which shadowed a core VS Code shortcut; the command and its menu entries remain. `contributes.keybindings` goes from 49 to 11 entries.
+
+### Changed
+
+- `scripts/check-project.mjs` now validates the locale file name shape (BCP 47) and requires the manifest (`package.nls.*`) and runtime (`l10n/bundle.l10n.*`) catalogs to cover the same locales, so a half-translated locale can no longer pass. A missing `l10n/` directory is reported as a readable check error instead of crashing the checker.
+- Keybindings are guarded against both regressions: `check-project.mjs` fails if a keybinding `when` uses `viewItem` or refers to a pane that is not contributed.
+- **Open in Folder Spaces** now has an automated integration test for its focus/reveal behaviour (it previously only had manual Extension Development Host evidence).
+
 ## [0.2.2] — 2026-10-27
 
 ### Added
