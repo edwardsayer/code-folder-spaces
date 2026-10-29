@@ -4,11 +4,11 @@
 
 `folder-spaces`（extension id **`edwardsayer.folder-spaces`**，2026-10-26 起不再帶 `code-` 前綴；容器 id `folder-spaces`）：VS Code 版的 Folder Spaces。在專屬 Activity Bar 容器中提供**資料夾範圍的檔案總管空間**——每個空間以指定資料夾為根，只呈現該資料夾的樹狀內容。設計來源為 Obsidian 外掛 Folder Spaces；排除 Obsidian 專屬機制（leaf/view monkey-patch、popout window scoped 操作、folder-notes 生態），改以 VS Code Extension API 實作。
 
-產品願景、功能優先序與 Stage 計畫見私有規劃：
+產品願景、功能優先序與歷史計畫見私有規劃（`dev/` 實體位於工作區私有 repo `dev/code-folder-spaces/`）：
 
-- `dev/planning/TODO.md`（唯一 canonical Stage 主控）
-- `dev/planning/feature-list-and-priorities.md`
-- `dev/planning/implementation-plan.md`
+- **現況與工作（唯一入口）**：`track-status`（見下方「規劃檔治理（track／stage）」）；`dev/planning/` 只放 `TRACK-{track}.md`、`STAGE-{track}.{stage}.md`、`BACKLOG.md`
+- `dev/archive/planning/implementation-plan.md`（**歷史**：S0–S6 階段計畫，2026-10-29 遷入）
+- `dev/archive/planning/feature-list-and-priorities.md`（**歷史**：F-01–F-59 功能清單與優先序）
 - `dev/specs/obsidian-folder-spaces-feature-review.md`（來源功能盤點與排除項）
 - `dev/specs/architecture-review-explorer-extensions.md`（兩個參考專案的架構分析與決策）
 
@@ -70,19 +70,45 @@ node tools/vscode-debug.mjs close
 
 ## 作業規範：每輪 handoff 前打包試用 VSIX（使用者 2026-10-14 指示）
 
-- **每一輪完成 `/todo-handoff` 之前，必須執行一次 `npm run package:vsix`**，產出 **`folder-spaces-<version>.vsix`**（vsce 依 `package.json` 的 `name` 命名）供使用者以「Install from VSIX」實機試用；Handoff 須記錄 VSIX 的檔名、時間、SHA256 與對應的 `dist/extension.js`（production）／產品 HEAD 與 working tree 狀態。
+- **每一輪完成 `/track-handoff` 之前，必須執行一次 `npm run package:vsix`**，產出 **`folder-spaces-<version>.vsix`**（vsce 依 `package.json` 的 `name` 命名）供使用者以「Install from VSIX」實機試用；該輪的 **stage 檔 §5 輪次記錄**須記錄 VSIX 的檔名、時間、SHA256 與對應的 `dist/extension.js`（production）／產品 HEAD 與 working tree 狀態。
 - 打包前先把根目錄既有 `.vsix` 移至 `out/vsix-archive/`，以 `folder-spaces-<version>-<yyyymmdd-hhmm>.vsix` 命名備份，**不覆蓋、不刪除**舊檔；根目錄永遠只保留最新一份。`*.vsix` 已被 `.gitignore` 排除，不入版控。
-- 此打包**僅為試用**：不 bump 版本、不打 tag、不上傳，**不取代** pre-release gate；任何發布仍須依 `.agents/skills/pre-release-check/SKILL.md`。打包失敗須於 Handoff 揭露並不得宣稱已提供試用版。
-- 純規劃／文件輪（無產品 runtime 或 manifest 變更）可在 Handoff 明載「無新產物、沿用前一份 VSIX」並附其 SHA256，不重打包。
+- 此打包**僅為試用**：不 bump 版本、不打 tag、不上傳，**不取代** pre-release gate；任何發布仍須依 `.agents/skills/pre-release-check/SKILL.md`。打包失敗須於輪次記錄揭露並不得宣稱已提供試用版。
+- 純規劃／文件輪（無產品 runtime 或 manifest 變更）可在輪次記錄明載「無新產物、沿用前一份 VSIX」並附其 SHA256，不重打包。
 
-## 規劃檔治理（TODO／Stage／Handoff）— 唯一權威
+## 規劃檔治理（track／stage）— 唯一權威
 
-- **流程權威**：全域 `/todo-ingest`、`/todo-feat`、`/todo-handoff` 三個 prompt（`E:\apps\pi\agent\prompts\`）。本節只寫本產品的落地規則，不重複 prompt 的步驟清單。
-- **規劃路徑**：`dev/planning/TODO.md` 為**唯一 canonical Stage 主控**（實體 `dev/code-folder-spaces/planning/`）；歸檔為 `dev/archive/handoffs/`、`dev/archive/stages/`；逐輪索引為 `dev/archive/handoffs/README.md`。
-- **TODO 內容規則**：只放現況與未完成事項；已完成輪次的交付細節、測試數字、hash、實測值**不回寫**；每輪必同步「最近完成輪次／active Stage 與狀態／Handoff `N/M`」；**硬性上限 150 行**，超過即違規，規劃 reviewer gate 應判 BLOCK。
-- **輪次與結案**：Handoff 上限 **6**，追加輪須**逐次**取得使用者核准（`v2-redesign` 用 8 輪為既有例外先例）；**純文件／規劃輪不計 Stage 輪次**；Stage 須工項全完成＋結案 gate 通過才可 `[done]` 改名歸檔，啟動下一個 Stage 須另取核准。
-- **耐久決策落 `dev/specs/`**：對話中定案的架構方向、使用者口頭指示、架構圖須在該輪 Handoff 前寫入 spec；spec 維護 `status` 與 `history`（異動摘要 ≤40 個中文字）。
-- **本節與 `dev/planning/TODO.md` 的關係**：TODO 只寫操作步驟與現況，規則條文以本節為準；兩者不得各自發展不同措辭。
+> **2026-10-29 起**：作業流程由全域 `/todo-*` prompt（`E:/apps/pi/agent/prompts/todo-*`）**改為 `/track-*`**。
+> `TODO.md` 與 `HANDOFF-*.md` 不再新增；既有檔案已依 `dev/planning/reviews/track-migration-manifest-20261029.md` 處置。
+
+- **流程權威**：全域 skill `track-feat`（立案）、`track-ingest`（開工對帳）、`track-handoff`（每輪交棒），規範為 `track-system`（皆在 `~/.agents/skills/`）。本節只寫本產品的落地規則，**不複製** skill 的步驟清單。
+- **呼叫方式**：`/track-feat`、`/track-ingest`、`/track-handoff` 由 **workspace 根** 的 `.pi/prompts/track-*.md` 提供（僅在以 workspace 根為 cwd 的 session 載入；在本產品目錄內請用 `/skill:track-feat` 等 skill 指令）。
+- **現況查詢（唯一入口，不維護手工索引）**：在本產品目錄直接執行 `track-status`（規劃目錄由 cwd 自動解析）：
+
+  ```bash
+  track-status --tracks      # 軌道總覽：worktree／狀態／stage 進度
+  track-status --track <t>   # 單軌 stage 清單
+  track-status --backlog     # 未立案需求池（planning/BACKLOG.md）
+  track-status --check       # 一致性檢查（交棒前必過）
+  ```
+
+  在 workspace 根目錄執行時須指定 `TRACK_ROOT=code-folder-spaces/dev`。
+- **規劃路徑**：`dev/planning/`（實體 `dev/code-folder-spaces/planning/`）只放 `TRACK-{track}.md`、`STAGE-{track}.{stage}.md`、`BACKLOG.md` 與 `reviews/`（歷史 gate 記錄）；歸檔為 `dev/archive/stages/`、`dev/archive/tracks/`；歷史 Handoff 凍結於 `dev/archive/handoffs/`。**檔名不含 status 與日期**（status 寫在 frontmatter 與 stage 檔 §1）。
+- **一 stage 一 round**：stage 是規劃單位，預估超過一輪就**拆 stage**，不在同一 stage 累積多輪；輪次記錄 append 在 stage 檔 `## 5. 輪次記錄`（標題 `### R{n}（YYYY-MM-DD）— 主題`），跨檔引用寫 `{track}/R{n}`，**每軌自 1 遞增**。
+- **§1 現況摘要自足**：新 session 只讀該段（狀態／進度／當前焦點／阻塞／下一步／最後更新）；歷史細節放 §5 或 git。
+- **結案與歸檔**：stage 達 `done`／`canceled` 後才搬入 `dev/archive/stages/`（**檔名不變**）；該軌所有 stage 皆終態才搬 `dev/archive/tracks/`。**啟動下一個 stage 須另取使用者核准**。
+- **未承諾項放 `BACKLOG.md`**：不確定要不要做的寫 backlog（需 review 才能升 `todo`），不要塞進 stage 工項清單。
+- **輪次預算**：單一 stage 以 1 輪為常態；追加輪須逐次取得使用者核准（歷史先例：`v2-redesign` 8 輪、`S4.1` 不設上限但仍須使用者宣告結案）。
+- **耐久決策落 `dev/specs/`**：對話中定案的架構方向、使用者口頭指示、架構圖須在該輪 handoff 前寫入 spec；spec 維護 `status` 與 `history`（異動摘要 ≤40 個中文字）。
+- **交棒 gate**：每輪依 `track-handoff` 跑完整 DoD（不得跳步、不得以舊結果取代）＋ `track-status --check` 必須回 `✅ 一致性檢查通過`；本輪規劃產出（TRACK／STAGE／specs）合併為**一次** reviewer gate。
+- **歷史（2026-10-29 前）**：`dev/archive/stages/[done]-stage-*`（10 份）為新制前的結案記錄，**無逐輪 `### R{n}`**（輪次內容在 Handoff），工具視為 `(unassigned)` 歷史，**不轉成新制 stage 檔、也不代填輪次**；`dev/archive/handoffs/`（75 份）與 `dev/archive/planning/`（歷史計畫）為凍結參考。索引與沿革見 `dev/archive/README.md`。
+
+## 發布現況與未驗清單（不得改稱 PASS）
+
+- **最新已驗版本**：**`0.2.2`**（Marketplace latest 與 Open VSX 均為 `0.2.2`，兩邊下載物與 gate 候選物 byte-identical）；tags `v0.2.0`／`v0.2.1`／`v0.2.2` 已推。**`0.2.2` 已消耗：任何修補須 bump `0.2.3` 並重跑 gate**。
+- **repo 須維持 public**：README 的 10 張圖片依賴 GitHub `raw/HEAD` URL。
+- **未驗（不得改稱 PASS）**：`engines.vscode ^1.85.0` 的 **macOS** 未測（使用者 2026-10-27 裁決不測；Windows 由使用者自行確認、Linux x64 由 CI 覆蓋）；實機僅測 **VSCodium 1.140**（本機 VS Code stable 安裝損壞）；**zh-CN 翻譯未逐條審校**（僅結構／placeholder 對稱＋抽樣）；空視窗 root 於「之後開啟資料夾專案」時會被合併規則丟棄（設計取捨，未實機驗）；空視窗 root 不自動寫 `spaces.global`；子選單勾號原生外觀需人工目視。
+- **已裁定、不再重議**：`package:vsix` 的 `--allow-missing-repository`／`--no-rewrite-relative-links` 豁免已移除；`archive/handoffs/` **不建** SHA256 清單；pane2 檢視記憶未實作（見 `dev/planning/BACKLOG.md` B-05）；manifest／l10n 死條目已清理；`package-lock.json` root 版本已對齊。
+- **明確不做**：F-41（空間分組／tags）、F-45（工作區外與 multi-root 深化）、F-54（公開 API 穩定化）。
 
 ## Definition of Done
 
