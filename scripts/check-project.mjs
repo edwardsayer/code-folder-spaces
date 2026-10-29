@@ -304,7 +304,7 @@ if (!pkg) {
       'codeFolderSpaces.pane.resetLayout',
     ]);
     const explicitPanesOf = (when) => [...new Set([...when.matchAll(/view == codeFolderSpaces\.(pane[1-2])/g)].map((match) => match[1]))];
-    const coversAllPanes = (when) => /view =~ \/\^codeFolderSpaces\.pane\[1-8\]\$\//.test(when);
+    const coversAllPanes = (when) => /view =~ \/\^codeFolderSpaces\.pane\[1-2\]\$\//.test(when);
     const embeddedPaneOf = (command) => (/codeFolderSpaces\.(pane[1-2])\./.exec(command) ?? [])[1];
     const checkPaneScoped = (items, where, hasNode) => {
       for (const item of items ?? []) {
@@ -329,6 +329,46 @@ if (!pkg) {
 
   for (const binding of pkg.contributes?.keybindings ?? []) {
     if (!contributedCommands.has(binding.command)) errors.push(`keybinding 指向未貢獻的 command：${binding.command}`);
+  }
+
+  // keys/R2 護欄（一）：keybinding 的 `when` **不得使用 `viewItem`**。
+  // `viewItem` 只存在於 view/item/context 選單求值用的 overlay context，在 keybinding 恆為 false，
+  // 寫了等於整個快捷鍵永不觸發（曾造成 48 筆檔案操作快捷鍵全數失效）。
+  for (const binding of pkg.contributes?.keybindings ?? []) {
+    const when = String(binding.when ?? '');
+    if (/\bviewItem\b/.test(when)) {
+      errors.push(
+        `keybinding 的 when 不得使用 viewItem（在 keybinding 恆為 false）：${binding.command} → 請改用 codeFolderSpaces.<pane>.focusItem`,
+      );
+    }
+  }
+
+  // keys/R2 護欄（二）：when 中引用的 pane 編號必須是真實貢獻的 view（防 8-pane 時代殘留再現）。
+  const contributedPaneIds = new Set(
+    Object.values(pkg.contributes?.views ?? {})
+      .flat()
+      .map((view) => (/^codeFolderSpaces\.(pane\d+)$/.exec(String(view?.id ?? '')) ?? [])[1])
+      .filter(Boolean),
+  );
+  const maxPaneIndex = Math.max(0, ...[...contributedPaneIds].map((id) => Number(id.replace('pane', ''))));
+  const whenStrings = [
+    ...(pkg.contributes?.keybindings ?? []).map((item) => ({ where: 'keybinding', command: item.command, when: String(item.when ?? '') })),
+    ...Object.entries(pkg.contributes?.menus ?? {}).flatMap(([menuId, items]) =>
+      (items ?? []).map((item) => ({ where: menuId, command: item.command, when: String(item.when ?? '') })),
+    ),
+  ];
+  for (const { where, command, when } of whenStrings) {
+    for (const match of when.matchAll(/codeFolderSpaces\.pane(\d+)\b/g)) {
+      if (Number(match[1]) > maxPaneIndex) {
+        errors.push(`${where} 的 when 引用了不存在的 pane${match[1]}（實際只貢獻 ${[...contributedPaneIds].join('／')}）：${command}`);
+      }
+    }
+    for (const match of when.matchAll(/codeFolderSpaces\.pane\[(\d+)-(\d+)\]/g)) {
+      const upper = Number(match[2]);
+      if (upper > maxPaneIndex) {
+        errors.push(`${where} 的 when 使用 pane[${match[1]}-${match[2]}] 範圍，上限超出實際貢獻的 pane${maxPaneIndex}：${command}`);
+      }
+    }
   }
 
   const engines = String(pkg.engines?.vscode ?? '').replace(/^[\^~]/, '');

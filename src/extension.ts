@@ -22,6 +22,7 @@ import { PaneCascadeController } from './spaces/paneCascade';
 import { applyExternalPaneRoot } from './spaces/paneRootSwitch';
 import { canDrillUp as canDrillUpContext } from './spaces/drillContext';
 import { diffWatchers, planWatchers } from './spaces/watcherPlan';
+import { focusItemKindOf } from './spaces/focusItem';
 import { copyTreeEntry, createTreeDragAndDropController } from './spaces/treeDragAndDrop';
 import { canModifyFiles, isAllowedSpaceRoot, isSafeMove, isSamePath, isValidEntryName, resolvePasteTarget, hasDrillStateWithinMovedSources, SpaceClipboard, UndoStack } from './spaces/spaceActions';
 import { disposeLogChannel, getLogChannel } from './util/log';
@@ -255,6 +256,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   /** 子窗格鏈結變更後，重繪它的父窗格（父列上的「→ Folder Space n」標記所在）。 */
   const refreshParentLinkRow = (): void => refreshLinkRows('pane1');
   const cascadeDisposables = new Map<string, vscode.Disposable>();
+  /** keys/R2：每 pane 的 focusItem 選取盤聽器（避免 syncPaneViews 重跑時重複註冊）。 */
+  const focusItemDisposables = new Map<string, vscode.Disposable>();
   const cascadeController = new PaneCascadeController({
     state: {
       getMode: () => viewState.getMode(),
@@ -440,6 +443,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
   const disposePane = (paneId: string): void => {
     cascadeDisposables.get(paneId)?.dispose();
     cascadeDisposables.delete(paneId);
+    focusItemDisposables.get(paneId)?.dispose();
+    focusItemDisposables.delete(paneId);
     const runtime = paneRuntime.get(paneId);
     if (!runtime) return;
     for (const disposable of runtime.disposables.reverse()) disposable.dispose();
@@ -448,6 +453,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     collapsedPanes.delete(paneId);
     expandedIds.delete(paneId);
     void setCollapsedContext(paneId);
+    void vscode.commands.executeCommand('setContext', `codeFolderSpaces.${paneId}.focusItem`, 'none');
   };
 
   const attachPaneCascade = (runtime: PaneRuntime): void => {
@@ -458,6 +464,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
       listener(info ? { uri: info.uri, isDirectory: info.isDirectory } : undefined);
     }));
     cascadeDisposables.set(runtime.id, disposable);
+  };
+
+  /**
+   * keys/R2：keybinding 的 `when` 不能用 `viewItem`（該 key 只存在於 `view/item/context`
+   * 選單求值用的 overlay context，在 keybinding 恆為 false）。改以每個 pane 自有的
+   * `codeFolderSpaces.<pane>.focusItem` 取代，值由節點 `contextValue` 推導（`focusItem.ts`）。
+   * 一律回寫（含無選取時的 `none`），避免殘留上一輪的值而誤觸發。
+   */
+  const attachFocusItemContext = (runtime: PaneRuntime): void => {
+    const paneId = runtime.id;
+    if (focusItemDisposables.has(paneId)) return;
+    const apply = (kind: string): void => {
+      void vscode.commands.executeCommand('setContext', `codeFolderSpaces.${paneId}.focusItem`, kind);
+    };
+    runtime.disposables.push(runtime.treeView.onDidChangeSelection(event => {
+      const selection = event.selection[0] as { contextValue?: string } | undefined;
+      apply(focusItemKindOf(selection?.contextValue));
+    }));
+    focusItemDisposables.set(paneId, new vscode.Disposable(() => apply('none')));
+    apply('none');
   };
 
   /**
@@ -536,6 +562,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Folder
     }
     for (const paneId of enabled) applyPaneScope(paneId);
     for (const runtime of paneRuntime.values()) attachPaneCascade(runtime);
+    // keys/R2：focusItem context key 跟隨選取變化（keybinding 不可用 `viewItem`）。
+    for (const runtime of paneRuntime.values()) attachFocusItemContext(runtime);
     rebuildWatchers();
   };
 

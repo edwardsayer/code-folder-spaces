@@ -491,73 +491,9 @@
     ],
     "keybindings": [
       {
-        "command": "codeFolderSpaces.newFile",
-        "key": "ctrl+n",
-        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane1"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.newFile",
-        "key": "ctrl+n",
-        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane2"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.newFile",
-        "key": "ctrl+n",
-        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane3"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.newFile",
-        "key": "ctrl+n",
-        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane4"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.newFile",
-        "key": "ctrl+n",
-        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane5"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.newFile",
-        "key": "ctrl+n",
-        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane6"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.newFile",
-        "key": "ctrl+n",
-        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane7"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.newFile",
-        "key": "ctrl+n",
-        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane8"
-        }
-      },
-      {
         "command": "codeFolderSpaces.copyEntry",
         "key": "ctrl+c",
-        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane1.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane1"
         }
@@ -565,63 +501,15 @@
       {
         "command": "codeFolderSpaces.copyEntry",
         "key": "ctrl+c",
-        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane2.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane2"
         }
       },
       {
-        "command": "codeFolderSpaces.copyEntry",
-        "key": "ctrl+c",
-        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane3"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.copyEntry",
-        "key": "ctrl+c",
-        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane4"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.copyEntry",
-        "key": "ctrl+c",
-        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane5"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.copyEntry",
-        "key": "ctrl+c",
-        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane6"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.copyEntry",
-        "key": "ctrl+c",
-        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane7"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.copyEntry",
-        "key": "ctrl+c",
-        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane8"
-        }
-      },
-      {
         "command": "codeFolderSpaces.cutEntry",
         "key": "ctrl+x",
-        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane1.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane1"
         }
@@ -629,63 +517,15 @@
       {
         "command": "codeFolderSpaces.cutEntry",
         "key": "ctrl+x",
-        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane2.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane2"
         }
       },
       {
-        "command": "codeFolderSpaces.cutEntry",
-        "key": "ctrl+x",
-        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane3"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.cutEntry",
-        "key": "ctrl+x",
-        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane4"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.cutEntry",
-        "key": "ctrl+x",
-        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane5"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.cutEntry",
-        "key": "ctrl+x",
-        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane6"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.cutEntry",
-        "key": "ctrl+x",
-        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane7"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.cutEntry",
-        "key": "ctrl+x",
-        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane8"
-        }
-      },
-      {
         "command": "codeFolderSpaces.pasteEntries",
         "key": "ctrl+v",
-        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane1.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane1"
         }
@@ -693,63 +533,15 @@
       {
         "command": "codeFolderSpaces.pasteEntries",
         "key": "ctrl+v",
-        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane2.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane2"
         }
       },
       {
-        "command": "codeFolderSpaces.pasteEntries",
-        "key": "ctrl+v",
-        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane3"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.pasteEntries",
-        "key": "ctrl+v",
-        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane4"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.pasteEntries",
-        "key": "ctrl+v",
-        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane5"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.pasteEntries",
-        "key": "ctrl+v",
-        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane6"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.pasteEntries",
-        "key": "ctrl+v",
-        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane7"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.pasteEntries",
-        "key": "ctrl+v",
-        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane8"
-        }
-      },
-      {
         "command": "codeFolderSpaces.renameEntry",
         "key": "f2",
-        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane1.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane1"
         }
@@ -757,63 +549,15 @@
       {
         "command": "codeFolderSpaces.renameEntry",
         "key": "f2",
-        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane2.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane2"
         }
       },
       {
-        "command": "codeFolderSpaces.renameEntry",
-        "key": "f2",
-        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane3"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.renameEntry",
-        "key": "f2",
-        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane4"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.renameEntry",
-        "key": "f2",
-        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane5"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.renameEntry",
-        "key": "f2",
-        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane6"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.renameEntry",
-        "key": "f2",
-        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane7"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.renameEntry",
-        "key": "f2",
-        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane8"
-        }
-      },
-      {
         "command": "codeFolderSpaces.deleteEntry",
         "key": "delete",
-        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane1 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane1.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane1"
         }
@@ -821,63 +565,15 @@
       {
         "command": "codeFolderSpaces.deleteEntry",
         "key": "delete",
-        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
+        "when": "focusedView == codeFolderSpaces.pane2 && listFocus && isWorkspaceTrusted && codeFolderSpaces.pane2.focusItem =~ /^(file|folder)$/",
         "args": {
           "paneId": "pane2"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.deleteEntry",
-        "key": "delete",
-        "when": "focusedView == codeFolderSpaces.pane3 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane3"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.deleteEntry",
-        "key": "delete",
-        "when": "focusedView == codeFolderSpaces.pane4 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane4"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.deleteEntry",
-        "key": "delete",
-        "when": "focusedView == codeFolderSpaces.pane5 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane5"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.deleteEntry",
-        "key": "delete",
-        "when": "focusedView == codeFolderSpaces.pane6 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane6"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.deleteEntry",
-        "key": "delete",
-        "when": "focusedView == codeFolderSpaces.pane7 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane7"
-        }
-      },
-      {
-        "command": "codeFolderSpaces.deleteEntry",
-        "key": "delete",
-        "when": "focusedView == codeFolderSpaces.pane8 && listFocus && isWorkspaceTrusted && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.folder)",
-        "args": {
-          "paneId": "pane8"
         }
       },
       {
         "command": "codeFolderSpaces.undoFileOperation",
         "key": "ctrl+z",
-        "when": "focusedView =~ /^codeFolderSpaces.pane[1-8]$/ && listFocus && isWorkspaceTrusted"
+        "when": "focusedView =~ /^codeFolderSpaces.pane[12]$/ && listFocus && isWorkspaceTrusted"
       }
     ],
     "menus": {
@@ -1234,17 +930,17 @@
       "view/item/context": [
         {
           "command": "codeFolderSpaces.openWorkspace",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && viewItem == codeFolderSpaces.file.code-workspace",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && viewItem == codeFolderSpaces.file.code-workspace",
           "group": "inline@1"
         },
         {
           "command": "codeFolderSpaces.openWorkspaceInNewWindow",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && viewItem == codeFolderSpaces.file.code-workspace",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && viewItem == codeFolderSpaces.file.code-workspace",
           "group": "inline@2"
         },
         {
           "command": "codeFolderSpaces.drillDown",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.folder || viewItem =~ /^codeFolderSpaces\\.spaceRoot/)",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && (viewItem == codeFolderSpaces.folder || viewItem =~ /^codeFolderSpaces\\.spaceRoot/)",
           "group": "inline@2"
         },
         {
@@ -1274,62 +970,62 @@
         },
         {
           "command": "codeFolderSpaces.newFile",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && isWorkspaceTrusted",
           "group": "1_modification@1"
         },
         {
           "command": "codeFolderSpaces.newFolder",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && isWorkspaceTrusted",
           "group": "1_modification@2"
         },
         {
           "command": "codeFolderSpaces.renameEntry",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
           "group": "1_modification@3"
         },
         {
           "command": "codeFolderSpaces.moveTo",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
           "group": "1_modification@4"
         },
         {
           "command": "codeFolderSpaces.deleteEntry",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && (viewItem == codeFolderSpaces.file || viewItem == codeFolderSpaces.file.code-workspace || viewItem == codeFolderSpaces.folder) && isWorkspaceTrusted",
           "group": "1_modification@5"
         },
         {
           "command": "codeFolderSpaces.undoFileOperation",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/ && isWorkspaceTrusted",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/ && isWorkspaceTrusted",
           "group": "1_modification@6"
         },
         {
           "command": "codeFolderSpaces.revealInExplorer",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/",
           "group": "2_navigation@1"
         },
         {
           "command": "codeFolderSpaces.revealFileInOS",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/",
           "group": "2_navigation@2"
         },
         {
           "command": "codeFolderSpaces.openInTerminal",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/",
           "group": "2_navigation@3"
         },
         {
           "command": "codeFolderSpaces.findInFolder",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/",
           "group": "2_navigation@4"
         },
         {
           "command": "codeFolderSpaces.copyFilePath",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/",
           "group": "3_clipboard@1"
         },
         {
           "command": "codeFolderSpaces.copyRelativeFilePath",
-          "when": "view =~ /^codeFolderSpaces.pane[1-8]$/",
+          "when": "view =~ /^codeFolderSpaces.pane[12]$/",
           "group": "3_clipboard@2"
         }
       ],
