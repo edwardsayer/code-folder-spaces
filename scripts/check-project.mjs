@@ -394,16 +394,53 @@ if (!pkg) {
 
   // S6R4（R6）：語系 catalog 改為自動列舉——manifest 用 `package.nls.<locale>.json`、
   // runtime 用 `l10n/bundle.l10n.<locale>.json`；新增語系不必再改本檢查器。
-  const catalogFiles = (dir, prefix) => fs.readdirSync(dir)
-    .filter((name) => name.startsWith(prefix) && name.endsWith('.json'))
-    .sort();
+  // tooling/R2：`l10n/` 缺目錄改回報設定錯誤（TH-02），locale 名稱格式與雙 catalog 語系成對另驗（TH-01）。
+  const catalogFiles = (dir, prefix) => {
+    // TH-02：目錄不存在時不得讓 readdirSync 的 ENOENT 變成未捕捉例外（會讓檢查器直接 crash）。
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter((name) => name.startsWith(prefix) && name.endsWith('.json'))
+      // 基礎 catalog（package.nls.json／bundle.l10n.json）沒有 locale 後綴，不屬於語系 catalog。
+      .filter((name) => name !== `${prefix}json`)
+      .sort();
+  };
   const localeOf = (name, prefix) => name.slice(prefix.length, name.length - '.json'.length);
+  // TH-01：locale 必須是 BCP 47 形狀（語言 2-3 字母，可帶 script／region／variant 子標籤）。
+  const localePattern = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i;
+  const checkLocaleName = (file, locale) => {
+    if (!localePattern.test(locale)) {
+      errors.push(`${file} 的 locale 名稱格式不合法（應為 BCP 47 形狀，例如 zh-tw／pt-br）：${locale || '(空)'}`);
+      return;
+    }
+    if (locale !== locale.toLowerCase()) {
+      warnings.push(`${file} 的 locale 名稱含大寫字母；VS Code 以 locale 小寫比對，建議改為全小寫：${locale}`);
+    }
+  };
+  const l10nDirectory = path.join(root, 'l10n');
+  const hasL10nDirectory = fs.existsSync(l10nDirectory);
+  if (!hasL10nDirectory) {
+    errors.push('找不到 l10n/ 目錄（package.json 已宣告 l10n，runtime catalog 必須位於 l10n/bundle.l10n.<locale>.json）');
+  }
   const nlsLocales = catalogFiles(root, 'package.nls.')
     .map((name) => ({ file: name, locale: localeOf(name, 'package.nls.') }));
-  const bundleLocales = catalogFiles(path.join(root, 'l10n'), 'bundle.l10n.')
+  const bundleLocales = catalogFiles(l10nDirectory, 'bundle.l10n.')
     .map((name) => ({ file: `l10n/${name}`, locale: localeOf(name, 'bundle.l10n.') }));
   if (nlsLocales.length === 0) errors.push('找不到任何 package.nls.<locale>.json 語系檔');
-  if (bundleLocales.length === 0) errors.push('找不到任何 l10n/bundle.l10n.<locale>.json 語系檔');
+  if (hasL10nDirectory && bundleLocales.length === 0) errors.push('找不到任何 l10n/bundle.l10n.<locale>.json 語系檔');
+  for (const { file, locale } of [...nlsLocales, ...bundleLocales]) checkLocaleName(file, locale);
+
+  // TH-01：manifest catalog 與 runtime catalog 的語系集合必須成對——只有一邊等於該語系半套
+  // （manifest 字串翻了、執行期訊息沒翻，或反之）。比對用小寫，大小寫差異另由 checkLocaleName 提醒。
+  const nlsLocaleNames = [...new Set(nlsLocales.map((item) => item.locale.toLowerCase()))].sort();
+  const bundleLocaleNames = [...new Set(bundleLocales.map((item) => item.locale.toLowerCase()))].sort();
+  const localesMissingBundle = nlsLocaleNames.filter((locale) => !bundleLocaleNames.includes(locale));
+  const localesMissingNls = bundleLocaleNames.filter((locale) => !nlsLocaleNames.includes(locale));
+  if (localesMissingBundle.length) {
+    errors.push(`以下語系有 package.nls.<locale>.json 但缺少 l10n/bundle.l10n.<locale>.json：${localesMissingBundle.join(', ')}`);
+  }
+  if (localesMissingNls.length) {
+    errors.push(`以下語系有 l10n/bundle.l10n.<locale>.json 但缺少 package.nls.<locale>.json：${localesMissingNls.join(', ')}`);
+  }
 
   // 只比較 placeholder 集合，允許翻譯調整參數順序或重複引用。
   const placeholders = value => [...new Set(value.match(/\{\d+\}/g) ?? [])].sort().join(',');

@@ -95,4 +95,48 @@ describe('l10n catalog checker', () => {
     expect(result.status).toBe(1);
     expect(result.output).toContain('manifest 引用 key');
   });
+  // tooling/R2 TH-01：locale 名稱格式（避免 zh_TW 這種底線寫法被靜默忽略）。
+  it('rejects a locale name that is not BCP 47 shaped', () => {
+    const root = fixture();
+    writeJson(root, 'package.nls.zh_TW.json', { 'command.title': '命令' });
+    writeJson(root, 'l10n/bundle.l10n.zh_TW.json', { 'Moving {0} to {1}': '{0} → {1}' });
+    const result = check(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('locale 名稱格式不合法');
+  });
+  it('warns about upper-case locales without failing', () => {
+    const root = fixture();
+    writeJson(root, 'package.nls.zh-CN.json', { 'command.title': '命令' });
+    writeJson(root, 'l10n/bundle.l10n.zh-CN.json', { 'Moving {0} to {1}': '{0} → {1}' });
+    const result = check(root);
+    expect(result.output).toContain('locale 名稱含大寫字母');
+    // 大寫只是建議：不得因此讓檢查失敗（成對比對已用小寫正規化）。
+    expect(result.status).toBe(0);
+  });
+  // tooling/R2 TH-01：兩類 catalog 的語系集合必須成對（只有一邊等於該語系半套）。
+  it('rejects a locale that only has a manifest catalog', () => {
+    const root = fixture();
+    writeJson(root, 'package.nls.ja.json', { 'command.title': 'コマンド' });
+    const result = check(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('package.nls.<locale>.json 但缺少 l10n/bundle.l10n.<locale>.json：ja');
+  });
+  it('rejects a locale that only has a runtime catalog', () => {
+    const root = fixture();
+    writeJson(root, 'l10n/bundle.l10n.ko.json', { 'Moving {0} to {1}': '{0} → {1}' });
+    const result = check(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('l10n/bundle.l10n.<locale>.json 但缺少 package.nls.<locale>.json：ko');
+  });
+  // tooling/R2 TH-02：l10n/ 缺目錄要走錯誤彙整，不得變成未捕捉例外。
+  it('reports a missing l10n directory instead of crashing', () => {
+    const root = fixture();
+    fs.rmSync(path.join(root, 'l10n'), { recursive: true, force: true });
+    const result = check(root);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain('[check-project] FAIL');
+    expect(result.output).toContain('找不到 l10n/ 目錄');
+    expect(result.output).not.toContain('ENOENT');
+    expect(result.output).not.toContain('readdirSync');
+  });
 });
