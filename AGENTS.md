@@ -104,10 +104,11 @@ node tools/vscode-debug.mjs close
 
 ## 發布現況與未驗清單（不得改稱 PASS）
 
-- **最新已驗版本**：**`0.2.2`**（Marketplace latest 與 Open VSX 均為 `0.2.2`，兩邊下載物與 gate 候選物 byte-identical）；tags `v0.2.0`／`v0.2.1`／`v0.2.2` 已推。**`0.2.2` 已消耗：任何修補須 bump `0.2.3` 並重跑 gate**。
-- **`0.2.3`：gate 已完成、未發布，且候選已作廢**。`dev/tests/pre-release/0.2.3/decision.md` = **PASS-with-risk**（2026-10-29 使用者接受風險，但明示不 tag、不 release）；候選 `folder-spaces-0.2.3.vsix` = 104,276 bytes、SHA-256 `73ce6a8fe80e1e43607d9efd42b7277b84a9733dddb396d3f8e0971dca95bde3`。**2026-10-31 使用者確認該候選作廢**（README 三語重寫會改變產品內容）→ 下一次發布一律「新版本 → 重新打包 → 重跑 gate → 新 `decision.md`」，**不得引用 0.2.3 的裁決**。程序與發布前核對見 `dev/workspace/docs/release-runbook.md` §6。
+- **最新已發布版本：`0.2.4`**（2026-11-01）——Marketplace 與 Open VSX 皆是；三通道（含 GitHub Release 附件）**byte-identical**，候選 `folder-spaces-0.2.4.vsix` = 110,096 bytes、SHA-256 `1de5945525ecf20204db5c70483cbf74b653f2590998482126092d9da82e8b87`。tags `v0.2.0`／`v0.2.1`／`v0.2.2`／`v0.2.4` 已推。**`0.2.4` 已消耗：任何修補須 bump 新版本並重跑 gate**。
+- **`0.2.3` 從未發布**：gate 曾為 PASS-with-risk，但使用者 2026-10-31 明示先不發布，該候選已作廢；其 keybinding 修復已隨 `0.2.4` 一併發布（`CHANGELOG.md [0.2.4]` 的 Notes）。
+- **發布物一致性（2026-11-01 定案）**：**一個版本只建置一次**，Marketplace／Open VSX／GitHub Release 全部上傳 gate 受測的同一顆 `.vsix`；`.github/workflows/ci.yml` **不建立 GitHub Release、不發布市集**（只有 `checks`／`integration`／`package`），Release 由本地 gate 後以 `gh release create` 建立。CI 重建的 `.vsix` 與候選不同 bytes（實測 `7858b859…` vs `1de59455…`），不得當發布物。程序見 `dev/workspace/docs/release-runbook.md` §3.2／§3.6／§3.7。
 - **gate 證據政策（2026-10-31）**：文字證據（`plan`／`report`／`review`／`decision`／`*.raw.txt`）全數納版控；`dev/tests/**` 的截圖只留本機並以 `SHOTS.md` 索引（`dev/workspace/tools/screenshots-manifest.mjs`）。`0.2.0`～`0.2.2` 與 `next` 的 gate 目錄已依指示刪除。
-- **repo 須維持 public**：README 的 10 張圖片依賴 GitHub `raw/HEAD` URL。
+- **repo 須維持 public**：README 的 11 張截圖依賴 GitHub `raw/HEAD` URL。
 - **未驗（不得改稱 PASS）**：`engines.vscode ^1.85.0` 的 **macOS** 未測（使用者 2026-10-27 裁決不測；Windows 由使用者自行確認、Linux x64 由 CI 覆蓋）；實機僅測 **VSCodium 1.140**（本機 VS Code stable 安裝損壞）；**zh-CN 翻譯未逐條審校**（僅結構／placeholder 對稱＋抽樣）；空視窗 root 於「之後開啟資料夾專案」時會被合併規則丟棄（設計取捨，未實機驗）；空視窗 root 不自動寫 `spaces.global`；子選單勾號原生外觀需人工目視。
 - **已裁定、不再重議**：`package:vsix` 的 `--allow-missing-repository`／`--no-rewrite-relative-links` 豁免已移除；`archive/handoffs/` **不建** SHA256 清單；pane2 檢視記憶未實作（見 `dev/planning/BACKLOG.md` B-05）；manifest／l10n 死條目已清理；`package-lock.json` root 版本已對齊。
 - **明確不做**：F-41（空間分組／tags）、F-45（工作區外與 multi-root 深化）、F-54（公開 API 穩定化）。
