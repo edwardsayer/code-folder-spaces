@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -149,3 +150,70 @@ jobs:
           name: folder-spaces-vsix
           path: folder-spaces-*.vsix
           retention-days: 7
+
+  # 建立 GitHub Release 並附加 .vsix（僅在 push tag 時觸發，且需通過全部測試與打包檢查）
+  github-release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [checks, integration, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Download packaged VSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: folder-spaces-vsix
+          path: .
+
+      # 防止「tag 與 package.json 版本不一致」造成對外發布錯誤版本（例如打了 v0.2.4 但 package.json 仍 0.2.3）。
+      - name: Verify tag matches package.json version
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "tag=$TAG_VERSION package.json=$PKG_VERSION"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      # Release notes 一律以 CHANGELOG 為來源（in-repo 工具；私有 dev/ 工作區在 CI 不可用）。
+      - name: Extract Release Notes from CHANGELOG
+        run: node scripts/extract-changelog.mjs "${GITHUB_REF_NAME}" > RELEASE_NOTES.md
+
+      # CI 會重新打包，因此其附件與 gate 受測候選可能不是同一顆位元組；把雜湊寫進 Release notes，
+      # 讓 Phase 6 能對帳（若與 decision.md 的候選 hash 不同，必須在輪次記錄揭露）。
+      - name: Record artefact checksum in the release notes
+        run: |
+          set -euo pipefail
+          VSIX=$(ls folder-spaces-*.vsix | head -n 1)
+          SHA=$(sha256sum "$VSIX" | cut -d' ' -f1)
+          BYTES=$(stat -c '%s' "$VSIX")
+          {
+            echo ''
+            echo '---'
+            echo ''
+            echo "Artefact: \`$VSIX\` ($BYTES bytes)"
+            echo ''
+            echo "SHA-256: \`$SHA\`"
+          } >> RELEASE_NOTES.md
+          echo "sha256=$SHA bytes=$BYTES"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          files: folder-spaces-*.vsix
+          draft: false
+          prerelease: false
