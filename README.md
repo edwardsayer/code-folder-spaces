@@ -1,133 +1,206 @@
 # Folder Spaces for VS Code
 
-**Focused, folder-scoped file navigation for Visual Studio Code.**
-
-Folder Spaces adds one or two native tree views to its own Activity Bar container, so you can work inside the folders you care about without the noise of the whole workspace. It is a normal `TreeView`: you keep native file icons, Git decorations, problem badges, file operations and `workspace.fs` support.
+**Folder-scoped file explorer spaces: focus on one folder at a time without leaving your workspace.**
 
 [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [Changelog](CHANGELOG.md)
 
-![Tree mode: two folder roots in a single pane](assets/screenshots/tree-mode.png)
+[![Visual Studio Marketplace Version](https://vsmarketplacebadges.dev/version/edwardsayer.folder-spaces.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=edwardsayer.folder-spaces)
+[![Visual Studio Marketplace Installs](https://vsmarketplacebadges.dev/installs/edwardsayer.folder-spaces.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=edwardsayer.folder-spaces)
+[![Open VSX Version](https://img.shields.io/open-vsx/v/edwardsayer/folder-spaces?style=flat-square&logo=open-vsx&label=Open%20VSX)](https://open-vsx.org/extension/edwardsayer/folder-spaces)
+[![Open VSX Downloads](https://img.shields.io/open-vsx/dt/edwardsayer/folder-spaces?style=flat-square&logo=open-vsx&label=Open%20VSX%20Downloads)](https://open-vsx.org/extension/edwardsayer/folder-spaces)
+[![Release](https://img.shields.io/github/v/tag/edwardsayer/code-folder-spaces?style=flat-square&logo=github&label=Release)](https://github.com/edwardsayer/code-folder-spaces/releases)
+[![VS Code](https://img.shields.io/badge/VS%20Code-1.85.0%2B-blue?style=flat-square&logo=visualstudiocode)](https://code.visualstudio.com/)
+[![Platform](https://img.shields.io/badge/Platform-Desktop%20only-lightgrey?style=flat-square)](#known-limitations)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-> **Version 0.2.1.** Two layouts are supported: **Tree** (one pane) and **Dual** (two stacked panes). Read [Breaking changes from v1.x](#breaking-changes-from-v1x) before upgrading.
+<img src="assets/screenshots/tree-mode.png" alt="Tree mode: two folder roots in a single pane" width="780" style="max-width: 100%;">
+
+Folder Spaces adds dedicated, focused tree views to its own Activity Bar container, allowing you to work inside specific folders without the noise of the entire workspace. It uses native VS Code `TreeView` components: you retain file icon themes, Git status decorations, problem badges, native drag-and-drop, and full `workspace.fs` file operations.
 
 ## Install
 
-**From the VS Code Marketplace (recommended)**
+### Visual Studio Code Marketplace
 
-1. Open the Extensions view (`Ctrl+Shift+X`) and search for **Folder Spaces**, or open the [Marketplace page](https://marketplace.visualstudio.com/items?itemName=edwardsayer.folder-spaces).
-2. Select **Install**, then reload the window if VS Code asks.
+1. Open the Extensions view (`Ctrl+Shift+X` or `Cmd+Shift+X`).
+2. Search for **Folder Spaces** and select **Install**, or install directly from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=edwardsayer.folder-spaces).
 
-Command line equivalent: `code --install-extension edwardsayer.folder-spaces`
+Command line:
 
-**From a VSIX file**: run **Extensions: Install from VSIX…** from the Command Palette and pick `folder-spaces-<version>.vsix`.
+```bash
+code --install-extension edwardsayer.folder-spaces
+```
 
-> VSCodium and Cursor users: the extension is not on Open VSX yet, so install the VSIX file for now.
+### Open VSX Registry
 
-Once installed, open the **Folder Spaces** icon in the Activity Bar and run **Add Folder Space…** to choose the first folder to work in.
+For VSCodium, Cursor, and other Open VSX-compatible editors, install from the [Open VSX Registry](https://open-vsx.org/extension/edwardsayer/folder-spaces):
 
-## Why Folder Spaces
+```bash
+codium --install-extension edwardsayer.folder-spaces
+```
 
-VS Code's built-in Explorer always shows the entire workspace. Folder Spaces gives you a focused view of selected folders — and of a *second* folder at the same time — while keeping everything native.
+### Manual VSIX Installation
 
-## Tree mode
+Download the latest `folder-spaces-<version>.vsix` from the release artifacts, then open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and run **Extensions: Install from VSIX…**.
 
-Tree mode is a single pane. Each configured root is listed as a top-level row, and several roots can be shown side by side.
+Once installed, click the **Folder Spaces** icon in the Activity Bar. You can add your first folder space using **Add Folder Space…** (`codeFolderSpaces.addSpace`) or by opening a folder/workspace.
 
-- The pane title is the container title **Folder Spaces**; no description is set.
-- Every folder row carries two inline buttons: **Drill Into Folder** and **Activate Child Space**.
-- The title bar holds **Collapse All / Expand Level**, **Filter by Path… / Clear Filter** and the `…` menu (**Dual Pane**, **Sort**, **Add Folder to Space…**, **Refresh**, **Workspace Folders…**).
+## Core Layouts: Tree and Dual
 
-## Dual mode
+Folder Spaces provides two primary layouts:
 
-![Dual mode: Spaces above, Files below](assets/screenshots/dual-mode.png)
+- **Tree Mode (Single Pane)**: Displays only the primary pane (**Spaces**). It supports multiple independent root folders side by side, making it ideal for standard navigation.
+- **Dual Mode (Stacked Panes)**: Stacks the primary pane (**Spaces**) on top and the secondary pane (**Files**) on the bottom.
 
-Dual mode stacks two panes:
+<img src="assets/screenshots/dual-mode.png" alt="Dual mode: Spaces above, Files below" width="780" style="max-width: 100%;">
 
-| | **Spaces** (pane1) | **Files** (pane2) |
+| Feature | **Spaces** (Pane 1) | **Files** (Pane 2) |
 |---|---|---|
-| Role | Control center | Secondary listing |
-| Title bar | Collapse All / Expand Level, Filter, `…` menu | View Mode, Filter, `…` menu |
-| Roots | All configured roots | Only the folder cascaded from pane1 |
-| Can be closed | No | Yes — closing it returns to Tree mode |
+| Role | Primary navigation and control center | Secondary file and detail listing |
+| Title Bar Actions | Collapse All / Expand Level, Filter, `…` Menu | View Mode, Filter, `…` Menu |
+| Roots | Workspace folders, configured spaces, global roots | Folder cascaded from Spaces or set via inline action |
+| Can Be Closed | No (primary pane) | Yes (closing returns to Tree mode) |
 
-- Titles follow content: pane1 shows **Spaces** when it has several roots and no drill-down, otherwise the last path segment; pane2 shows its current folder.
-- Selecting a **folder** in pane1 navigates pane2 into it (selecting a file does not).
-- **Activate Child Space** on a folder row makes that folder pane2's root and opens Dual mode if needed.
-- Pane1 and pane2 remember their own view and sort settings.
+- **Adaptive Titles**: In Dual mode, Pane 1 is titled **Spaces** when it has multiple roots and is not drilled down; when drilled down or showing a single root, it displays the folder's name. Pane 2 displays the active folder's name.
+- **Folder Cascade**: In Dual mode, selecting any directory in Pane 1 automatically cascades that folder into Pane 2 as its active root.
 
-### Files pane view modes
+### Dual Visibility-Aware Layout
 
-The **View Mode** button on the Files pane cycles through three modes:
+The `Dual Pane` and `Dual Pane ✓` menu items exist on **both** panes and synchronize with actual UI visibility:
 
-| Mode | Button | Shows |
+<img src="assets/screenshots/title-menu.png" alt="Container menu listing both views" width="780" style="max-width: 100%;">
+
+- When both panes are open in Dual mode, the pane menus show **Dual Pane ✓**. Clicking it closes Pane 2 and returns to Tree mode.
+- If either pane is hidden using the Activity Bar container's `…` menu, the remaining pane displays an unchecked **Dual Pane** option. Clicking it immediately unhides and restores the missing pane.
+
+## Files Pane View Modes
+
+In Dual mode, the **Files** pane title bar features a single-button mode switcher (`codeFolderSpaces.pane2.toggleViewMode`) that cycles through three distinct view modes:
+
+| View Mode | Title Bar Button | Description |
 |---|---|---|
-| Explorer (default) | `$(list-tree)` | Local tree with drill-down and folder end points |
-| File List | `$(list-flat)` | First-level files only |
-| Nested File List | `$(layers)` | Files from every level, flattened |
+| **Explorer** (Default) | `$(list-tree)` | Full tree structure with directories and files, in-place drill-down, and leaf folder indicators. |
+| **File List** | `$(list-flat)` | Flat listing of first-level direct files only, excluding subfolders. |
+| **Nested File List** | `$(layers)` | Flattened recursive listing of all files across all subdirectories, bounded by `maxDepth`. |
 
-![Explorer mode](assets/screenshots/pane2-explorer.png)
-![File List mode](assets/screenshots/pane2-filelist.png)
-![Nested File List mode](assets/screenshots/pane2-nested-list.png)
+<p>
+  <img src="assets/screenshots/pane2-explorer.png" alt="Explorer mode" width="518" style="max-width: 32%;">
+  <img src="assets/screenshots/pane2-filelist.png" alt="File List mode" width="518" style="max-width: 32%;">
+  <img src="assets/screenshots/pane2-nested-list.png" alt="Nested File List mode" width="518" style="max-width: 32%;">
+</p>
 
-### Dual Pane is visibility-aware
+## In-Place Navigation & Multiple Roots
 
-`Dual Pane` / `Dual Pane ✓` exist on **both** panes and reflect what is actually on screen:
+### In-Place Drill Down
 
-- Both panes visible and mode is Dual → the menu shows **Dual Pane ✓**; activating it closes Files and returns to Tree.
-- Either pane is hidden from the container menu → the remaining pane shows an unchecked **Dual Pane**; activating it unhides and restores the missing pane.
-- Collapsing a pane by clicking its title bar is *not* the same as closing it: the pane stays alive and simply expands again on the next click.
+Click the **Drill Into Folder** (`$(arrow-down)`) inline button on any directory row to temporarily promote that directory as the pane's root. Drill-down maintains your active view preset.
 
-## Menus and check marks
+When drilled down, a **Return to Parent** (`$(arrow-up)`) action appears in the pane title bar, allowing you to navigate back through the drill stack to the root folder.
 
-![Pane title menu](assets/screenshots/pane-menu.png)
+### Activate Child Space
 
-Stateful items are shown as paired commands with a trailing **✓** (for example `Dual Pane ✓`), because VS Code does not render native check marks for extension menus.
+On any folder row in Pane 1, click the **Activate Child Space** (`$(arrow-right)`) inline button. This immediately assigns the selected folder as Pane 2's root and opens Dual mode if the extension is currently in Tree mode.
 
-![Sort submenu](assets/screenshots/sort-submenu.png)
+### Multiple Roots & Candidate Picker
 
-The **Sort** submenu offers Name / Modified / Created, ascending and descending, and each pane keeps its own choice. The container's `…` menu lists the views (**Spaces**, **Files**) and can hide either one.
+You can add multiple independent roots to Pane 1:
 
-![Container menu listing both views](assets/screenshots/title-menu.png)
+<img src="assets/screenshots/add-folder-quickpick.png" alt="Add Folder to Space" width="2754" style="max-width: 100%;">
 
-## Filtering
+- Use **Add Folder to Space…** in the pane `…` menu to open a searchable picker. It automatically suggests parent folders and recently opened directories, and provides a **Browse for folder…** dialog option.
+- When two or more roots are displayed in a pane, each root row displays a **Remove Folder from Space** (`$(close)`) inline button. For safety, the last remaining root cannot be removed.
 
-![Filtered tree with match counter](assets/screenshots/filter-mode.png)
+## Menus, Sorting & State Checkmarks
 
-**Filter by Path…** applies a path-substring filter to the pane and shows a `n / m matches` counter plus an inline **Clear Filter** button. Supported glob syntax for `include` / `exclude` covers `*`, `**`, `**/`, `?` and escaping; brace patterns and character classes are not supported.
+Stateful menu items use paired commands with a trailing **✓** because VS Code does not provide native checkmarks for extension menus:
 
-## Where roots come from
+<img src="assets/screenshots/pane-menu.png" alt="Pane title menu" width="1260" style="max-width: 100%;">
 
-Roots can come from three sources, kept separate on purpose:
+The pane title menu (`…`) gives access to:
+- **Dual Pane** / **Dual Pane ✓**: Toggle between Tree mode and Dual mode.
+- **Sort**: Opens the sorting submenu.
+- **Add Folder to Space…**: Add another root to the current pane.
+- **Refresh**: Re-read the file system and update the tree.
+- **Workspace Folders…**: Select which workspace folders should be visible in the pane.
 
-1. **Workspace roots** — available automatically from the current VS Code workspace. They can be hidden and restored from **Workspace Folders…**.
-2. **`codeFolderSpaces.spaces.workspace`** — project-level list, written to `.vscode/settings.json` or to the `.code-workspace` file.
-3. **`codeFolderSpaces.spaces.global`** — profile-level list in your user `settings.json`, shown in every window of that profile and marked with **🌐**.
+<img src="assets/screenshots/sort-submenu.png" alt="Sort submenu" width="1530" style="max-width: 100%;">
 
-Use **Mark as Global** / **Unmark Global** on a root to move it between the project list and the global list. Profiles keep separate settings, so other profiles need their own global roots (or Settings Sync).
+The **Sort** submenu provides independent ordering controls for each pane:
+- **Name (Ascending / Descending)**
+- **Modified (Ascending / Descending)**
+- **Created (Ascending / Descending)**
 
-## File operations
+## Path Filtering
 
-![Root context menu with Mark as Global and file operations](assets/screenshots/context-menu.png)
+Click the **Filter by Path…** (`$(filter)`) action in the title bar to filter entries by a substring:
 
-- Create, rename, delete, move and drag-and-drop, plus a session-scoped undo for move/rename.
-- Disk-modifying commands are gated by Workspace Trust: they stay disabled until the workspace is trusted.
-- When `files.enableTrash` is on, deletes go through the trash for `file:` URIs; other schemes are refused rather than deleted permanently.
-- Live file-system watchers keep the panes up to date, including folders outside the workspace.
+<img src="assets/screenshots/filter-mode.png" alt="Filtered tree with match counter" width="428" style="max-width: 100%;">
 
-## Settings
+- A match counter (e.g., `1 / 2 matches`) appears in the pane view banner.
+- While filtered, the button toggles to **Clear Filter** (`$(clear-all)`), enabling one-click filter reset.
+
+## Managing Spaces: Workspace vs Global
+
+Roots are managed across two distinct scopes:
+
+1. **Workspace Spaces** (`codeFolderSpaces.spaces.workspace`): Project-specific roots stored in `.vscode/settings.json` or your `.code-workspace` configuration.
+2. **Global Spaces** (`codeFolderSpaces.spaces.global`): Profile-level roots stored in user settings. They appear across all workspaces in the current profile and are marked with a **🌐** badge.
+
+### Context Menu Integration
+
+Right-click any root entry to migrate it between scopes:
+- **Mark as Global**: Moves a workspace root to your global user settings.
+- **Unmark Global**: Moves a global root into the local workspace configuration.
+
+You can also right-click any folder in VS Code's built-in File Explorer and choose **Open in Folder Spaces** (`codeFolderSpaces.openInFolderSpaces`) to immediately bring it into Pane 1.
+
+## File Operations & Safety
+
+Folder Spaces includes full file manipulation capabilities:
+
+<img src="assets/screenshots/context-menu.png" alt="Root context menu with Mark as Global and file operations" width="1395" style="max-width: 100%;">
+
+### Keyboard Shortcuts
+
+File operations use context-aware keybindings matching native Explorer shortcuts:
+
+| Shortcut | Command | Action |
+|---|---|---|
+| `Ctrl+C` / `Cmd+C` | `codeFolderSpaces.copyEntry` | Copy selected file or folder |
+| `Ctrl+X` / `Cmd+X` | `codeFolderSpaces.cutEntry` | Cut selected file or folder |
+| `Ctrl+V` / `Cmd+V` | `codeFolderSpaces.pasteEntries` | Paste items into target directory |
+| `F2` | `codeFolderSpaces.renameEntry` | Rename selected file or folder |
+| `Delete` | `codeFolderSpaces.deleteEntry` | Delete selected entry (respects trash settings) |
+| `Ctrl+Z` / `Cmd+Z` | `codeFolderSpaces.undoFileOperation` | Undo last rename or move operation |
+
+### Safety Guardrails
+
+- **Workspace Trust**: In Restricted Mode, file modifications (create, rename, move, delete, drop) are disabled. Safe operations (browsing, opening files, copying paths) remain available.
+- **Dedicated Undo Stack**: Tracks up to 20 recent move and rename operations made within Folder Spaces, independent of VS Code's editor undo history.
+- **Trash Integration**: When `files.enableTrash` is enabled, deletions on local file systems move items to the OS trash bin.
+- **Native Drag & Drop**: Dragging items within the same space moves them; dragging across different space roots copies them safely.
+
+## Visibility & File Nesting
+
+Folder Spaces automatically respects your VS Code environment settings:
+
+- **Explorer Exclude Rules**: Automatically applies `files.exclude` patterns (such as `.git`, `node_modules`).
+- **Git Ignore**: When `explorer.excludeGitIgnore` is true, entries matched by `.gitignore` rules are hidden.
+- **File Nesting**: Seamlessly integrates with `explorer.fileNesting.enabled`, `patterns`, and `expand` settings, nesting child files (such as `.d.ts` or test files) under their parent files.
+
+## Settings Reference
 
 | Setting | Type | Default | Description |
-| --- | --- | --- | --- |
-| `codeFolderSpaces.spaces.workspace` | array | `[]` | Project/workspace-level roots. Entries are paths or objects. |
-| `codeFolderSpaces.spaces.global` | array | `[]` | Profile-level roots (target of **Mark as Global**); user settings only. |
-| `codeFolderSpaces.followActiveFile` | boolean | `true` | Follow the active editor file in the space tree. |
-| `codeFolderSpaces.maxDepth` | integer (1–100) | `10` | Maximum folder depth enumerated by flat listings. |
-| `codeFolderSpaces.followWorkspaceDirectory` | boolean | `true` | Keep pane1's workspace roots synchronized with workspace folders; configured and global roots are preserved and appended. |
-| `codeFolderSpaces.defaultPreset.singlePane` | string | `Explorer` | View used when switching to Tree mode. |
-| `codeFolderSpaces.defaultPreset.dualPane.pane1` | string | `Navigate` | View used for Spaces when entering Dual mode. |
-| `codeFolderSpaces.defaultPreset.dualPane.pane2` | string | `Explorer` | View used for Files when entering Dual mode. |
+|---|---|---|---|
+| `codeFolderSpaces.spaces.workspace` | `array` | `[]` | Workspace-level folder spaces. Array of paths or configuration objects. |
+| `codeFolderSpaces.spaces.global` | `array` | `[]` | Profile-level folder spaces (application scope). Stored in user settings. |
+| `codeFolderSpaces.followActiveFile` | `boolean` | `true` | Automatically reveal and select the active editor file in the tree. |
+| `codeFolderSpaces.maxDepth` | `integer` | `10` | Maximum folder depth (1–100) enumerated by recursive flat listings. |
+| `codeFolderSpaces.followWorkspaceDirectory` | `boolean` | `true` | Synchronize pane roots with workspace folders while preserving configured spaces. |
+| `codeFolderSpaces.defaultPreset.singlePane` | `string` | `"Explorer"` | Default view preset for Pane 1 in Single Pane (Tree) mode. |
+| `codeFolderSpaces.defaultPreset.dualPane.pane1` | `string` | `"Navigate"` | Default view preset for Pane 1 when entering Dual mode. |
+| `codeFolderSpaces.defaultPreset.dualPane.pane2` | `string` | `"Explorer"` | Default view preset for Pane 2 when entering Dual mode. |
 
-A root entry may be a path string or an object with `path`, `name`, `icon`, `showFiles`, `include` and `exclude`. Paths support `${workspaceFolder}`, `${workspaceFolders[N]}` and `${userHome}`.
+### Configuration Example
 
 ```jsonc
 {
@@ -137,44 +210,56 @@ A root entry may be a path string or an object with `path`, `name`, `icon`, `sho
       "path": "${workspaceFolder}/docs",
       "name": "Documentation",
       "icon": "book",
-      "showFiles": true,
-      "exclude": ["archive/**"]
+      "include": ["**/*.md"],
+      "exclude": ["**/drafts/**"]
     }
   ],
-  "codeFolderSpaces.spaces.global": ["${userHome}/notes"]
+  "codeFolderSpaces.spaces.global": [
+    "${userHome}/notes"
+  ],
+  "codeFolderSpaces.followActiveFile": true,
+  "codeFolderSpaces.maxDepth": 15
 }
 ```
 
-## Common commands
+Configured space objects support:
+- `path` (string, required): Directory path. Supports `${workspaceFolder}`, `${workspaceFolders[N]}`, and `${userHome}`.
+- `name` (string): Custom display name.
+- `icon` (string): ThemeIcon ID (e.g. `folder`, `book`) or an absolute path to an icon file.
+- `include` (string[]): Glob patterns to whitelist files.
+- `exclude` (string[]): Glob patterns to blacklist files and folders.
 
-Most pane actions live in the title bar, the `…` menu, the **Sort** submenu or the context menu, and are hidden from the Command Palette on purpose.
+## Commands Reference
 
-- **Drill Into Folder**, **Activate Child Space** — inline buttons on every folder row in pane1.
-- **Add Folder to Space…** — a single searchable picker with recent folders and a **Browse for folder…** entry; a typed path is accepted directly.
-- **Remove Root**, **Workspace Folders…**, **Refresh**.
-- **Dual Pane** / **Dual Pane ✓**, **Close Pane**.
-- **Collapse All**, **Expand Level**, **Filter by Path…**, **Clear Filter**, **Return to Parent**.
-- **Toggle View Mode** — Files pane: Explorer / File List / Nested File List.
-- **Mark as Global**, **Unmark Global**.
-- **Open Workspace**, **Open Workspace in New Window** — inline buttons on `.code-workspace` rows.
+| Command ID | Title | Shortcut | Placement |
+|---|---|---|---|
+| `codeFolderSpaces.addSpace` | Add Folder Space... | — | Command Palette, Views Welcome |
+| `codeFolderSpaces.pane1.addRoot` | Add Folder to Space... | — | Spaces Pane `…` Menu |
+| `codeFolderSpaces.drillDown` | Drill Into Folder | — | Directory Row Inline (`$(arrow-down)`) |
+| `codeFolderSpaces.activateChildNode` | Activate Child Space | — | Pane 1 Folder Inline (`$(arrow-right)`) |
+| `codeFolderSpaces.pane1.drillUp` | Return to Parent | — | Pane 1 Title Bar (`$(arrow-up)`) |
+| `codeFolderSpaces.pane2.drillUp` | Return to Parent | — | Pane 2 Title Bar (`$(arrow-up)`) |
+| `codeFolderSpaces.pane2.toggleViewMode` | Toggle View Mode | — | Pane 2 Title Bar |
+| `codeFolderSpaces.filter` | Filter by Path... | — | Pane Title Bar (`$(filter)`) |
+| `codeFolderSpaces.clearFilter` | Clear Filter | — | Pane Title Bar (`$(clear-all)`) |
+| `codeFolderSpaces.copyEntry` | Copy | `Ctrl+C` / `Cmd+C` | Context Menu / Keybinding |
+| `codeFolderSpaces.cutEntry` | Cut | `Ctrl+X` / `Cmd+X` | Context Menu / Keybinding |
+| `codeFolderSpaces.pasteEntries` | Paste | `Ctrl+V` / `Cmd+V` | Context Menu / Keybinding |
+| `codeFolderSpaces.renameEntry` | Rename | `F2` | Context Menu / Keybinding |
+| `codeFolderSpaces.deleteEntry` | Delete | `Delete` | Context Menu / Keybinding |
+| `codeFolderSpaces.undoFileOperation` | Undo File Operation | `Ctrl+Z` / `Cmd+Z` | Context Menu / Keybinding |
+| `codeFolderSpaces.openInFolderSpaces` | Open in Folder Spaces | — | Built-in Explorer Context Menu |
+| `codeFolderSpaces.openWorkspace` | Open Workspace | — | `.code-workspace` Row Inline |
+| `codeFolderSpaces.openWorkspaceInNewWindow` | Open Workspace in New Window | — | `.code-workspace` Row Inline |
+| `codeFolderSpaces.root.markAsGlobal` | Mark as Global | — | Root Row Context Menu |
+| `codeFolderSpaces.root.unmarkGlobal` | Unmark Global | — | Global Root Row Context Menu |
 
-The manifest currently contributes **86** commands; all of them are covered by a command-parity check.
+## Known Limitations
 
-## File nesting
-
-File nesting follows VS Code's own `explorer.fileNesting.enabled`, `patterns` and `expand` settings. It applies to sibling files in one directory, each file gets at most one parent, and a path filter disables nesting. Note that `explorer.fileNesting.patterns` from Global and Workspace scopes are merged with the built-in defaults.
-
-## Known limitations
-
-- Pane1 cannot be closed; closing pane2 returns to Tree mode.
-- Glob support is a subset (`*`, `**`, `**/`, `?`, escaping); `src/**` does not match the `src` directory itself.
-- Move safety uses lexical path comparison and does not resolve symlinks.
-- Virtual workspaces are not supported; remote environments have not been fully validated.
-- Pane titles are subject to VS Code's native `text-transform: capitalize`, which an extension cannot override.
-
-## Breaking changes from v1.x
-
-Version 0.1.0 replaces the former multi-pane/preset model with fixed **Tree** and **Dual** layouts, removes the old `codeFolderSpaces.spaces` setting without migrating it, and removes preset controls and several settings. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+- **Fixed Two-Pane Architecture**: Folder Spaces provides up to two panes (Spaces and Files). Pane 1 cannot be closed; closing Pane 2 returns the layout to Tree mode.
+- **Local Filesystem Requirement**: Requires accessible local directory paths. Virtual workspaces are not supported.
+- **Glob Pattern Syntax**: Glob filtering supports `*`, `**`, `**/`, `?`, and escaping. Character ranges or brace expansions are not supported.
+- **Platform Path Case Sensitivity**: Path comparison is case-insensitive on Windows and case-sensitive on Linux/macOS.
 
 ## Development
 
@@ -185,7 +270,7 @@ npm run watch          # esbuild watch
 npm run package:vsix   # production bundle + vsce package
 ```
 
-Run the extension with F5 (**Run Extension**) or load it into an isolated window:
+To run the extension in an isolated Extension Development Host:
 
 ```bash
 npm run vscode:debug -- --extension ./code-folder-spaces
