@@ -2,6 +2,20 @@
 
 All notable changes to Folder Spaces are documented in this file.
 
+## [0.2.4] — 2026-10-31
+
+### Added
+
+- **Automated GitHub Release**: pushing a `v*` tag now builds the extension on CI and publishes a GitHub Release with the packaged VSIX attached — but only after the typecheck, unit, integration (VS Code 1.85.1 and stable) and packaging-hygiene jobs pass. The job fails if the tag and `package.json` version disagree, and the attached artefact's SHA-256 is written into the release notes so it can be reconciled with the pre-release gate.
+
+### Changed
+
+- **The three READMEs were rewritten from the implementation itself.** They carried narrative from the origin project and had drifted from the shipped behaviour — a stale `Version 0.2.1`, “not on Open VSX yet” while 0.2.2 was already published, two different commands written as one (`Add Folder Space…` and `Add Folder to Space…`), and a “breaking changes from v1.x” section for a version that never shipped. The new text is derived from `package.json` contributes, the NLS catalogues and the `src/` behaviour, with all 11 screenshots checked against the current UI.
+
+### Notes
+
+- This release also carries the **unreleased 0.2.3** changes (file-operation keyboard shortcuts repaired, the 8-pane keybinding leftovers removed, the `viewItem` regression guard). 0.2.3 passed its gate but was never published, and its candidate was retired on 2026-10-31.
+
 ## [0.2.3] — 2026-10-29
 
 ### Fixed
